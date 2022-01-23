@@ -1,12 +1,13 @@
 [package]
-name = "simplydmx-plugin-macros"
+name = "simplydmx_plugin_macros"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-crate-type = ["lib"]
 proc-macro = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+quote = "1.0.14"
+syn = { version = "1.0.85", features = ["full"] }

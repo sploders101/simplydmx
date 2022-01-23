@@ -43,6 +43,9 @@ pub enum CallServiceError {
 
 pub trait Service {
 
+	/// Gets the ID of a service for use when calling it
+	fn get_id<'a>(&'a self) -> &'a str;
+
 	/// Gets the name of the service
 	fn get_name<'a>(&'a self) -> &'a str;
 

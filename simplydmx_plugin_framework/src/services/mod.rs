@@ -1,10 +1,8 @@
 use std::collections::HashMap;
 
-use self::service::Service;
+pub mod internals;
 
-mod service;
-
-struct ServiceRegistry (HashMap<String, Box<dyn Service>>);
+struct ServiceRegistry (HashMap<String, Box<dyn internals::Service>>);
 
 impl ServiceRegistry {
 

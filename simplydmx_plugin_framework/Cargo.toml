@@ -1,5 +1,5 @@
 [package]
-name = "simplydmx"
+name = "simplydmx_plugin_framework"
 version = "0.1.0"
 edition = "2021"
 

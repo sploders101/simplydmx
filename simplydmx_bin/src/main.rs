@@ -19,9 +19,12 @@ impl TestService {
         };
     }
 
-    #[interpolate_service()]
-    pub fn call_internal(&self, test1: u16, test2: u32) -> () {
-
+    #[interpolate_service(
+        "This is the ID of the light that you would like to control",
+        "This is the value you want to assign to the light (0-65535)",
+    )]
+    pub fn call_internal(&self, light_id: u16, value: u32) -> () {
+        // Do stuff here
     }
 }
 

@@ -1,15 +1,25 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{
+    quote,
+    ToTokens,
+};
 use syn::{
     ItemFn,
     FnArg,
     punctuated::Punctuated,
-    token::Comma,
     parse::Parser,
-    ExprTuple,
+    Expr,
+    Token,
+    Lit,
+    LitStr,
 };
+
+mod parsing_helpers;
+use parsing_helpers::get_comma_delimited_strings;
+
+static ARGERR: &str = "interpolate_service expects comma-separated list of description strings or (\"description\", \"type-id\") tuples.";
 
 #[proc_macro_derive(Service)]
 pub fn service_derive(input: TokenStream) -> TokenStream {
@@ -21,7 +31,7 @@ pub fn service_derive(input: TokenStream) -> TokenStream {
             fn get_id<'a>(&'a self) -> &'a str { self.id }
             fn get_name<'a>(&'a self) -> &'a str { self.name }
             fn get_description<'a>(&'a self) -> &'a str { self.description }
-            fn get_signature<'a>(&'a self) -> (&[simplydmx_plugin_framework::services::internals::ServiceArgument], Option<simplydmx_plugin_framework::services::internals::ServiceArgument>) { #name::get_signature_internal(self) }
+            fn get_signature<'a>(&'a self) -> (&'a [simplydmx_plugin_framework::services::internals::ServiceArgument], Option<&'a simplydmx_plugin_framework::services::internals::ServiceArgument>) { #name::get_signature_internal(self) }
             fn call(&self, arguments: Vec<Box<dyn std::any::Any>>) -> Result<Box<dyn std::any::Any>, simplydmx_plugin_framework::services::internals::CallServiceError> { #name::call_native_internal(self, arguments) }
             fn call_json(&self, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, simplydmx_plugin_framework::services::internals::CallServiceError> { #name::call_json_internal(self, arguments) }
         }
@@ -31,42 +41,21 @@ pub fn service_derive(input: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream {
-    let descriptions = Punctuated::<ExprTuple, Comma>::parse_separated_nonempty.parse(attr).unwrap();
-    let internals: ItemFn = syn::parse(body).unwrap();
+    let descriptions = Punctuated::<Expr, Token![,]>::parse_terminated.parse(attr)
+        .expect(ARGERR);
+    let internals: ItemFn = syn::parse(body)
+        .expect("interpolate_service can only be used on a function in an impl MyService statement");
     let internal_call = &internals.sig.ident;
-
-    // Validate inputs
-
-    let internal_arguments = generate_argument_casts(&internals);
-
-    let gen = quote! {
-        #internals
-
-        pub fn get_signature_internal(&self) -> (&'static [simplydmx_plugin_framework::services::internals::ServiceArgument], Option<simplydmx_plugin_framework::services::internals::ServiceArgument>) {
-            return (&[], None);
-        }
-
-        pub fn call_native_internal(&self, arguments: Vec<Box<dyn std::any::Any>>) -> Result<Box<dyn std::any::Any>, simplydmx_plugin_framework::services::internals::CallServiceError> {
-            return Ok(Box::new(self.#internal_call(#(#internal_arguments),*)));
-        }
-
-        pub fn call_json_internal(&self, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, simplydmx_plugin_framework::services::internals::CallServiceError> {
-            return Ok(serde_json::Value::Null);
-        }
-    };
-    return gen.into();
-}
-
-
-
-/// Creates a list of argument conversions for use in a `quote!` macro comma-separated
-/// repeating statement
-fn generate_argument_casts(internals: &ItemFn) -> Vec<Box<dyn ToTokens>> {
 
     // Vector of quote objects to use as arguments for the function this macro runs
     // on from the generic `call` implementation
     let mut internal_arguments = Vec::<Box<dyn ToTokens>>::new();
 
+    // Number of arguments other than `self`
+    let mut arg_count = 0;
+
+    // Creates a list of argument conversions for use in a `quote!` macro comma-separated repeating statement,
+    // along with some other metadata that will be helpful later.
     for arg in internals.sig.inputs.iter() {
         match arg {
 
@@ -96,10 +85,46 @@ fn generate_argument_casts(internals: &ItemFn) -> Vec<Box<dyn ToTokens>> {
                         }
                     }
                 }));
+                arg_count += 1;
             },
 
         }
     }
 
-    return internal_arguments;
+    let mut input_tokens = Vec::<Box<dyn ToTokens>>::new();
+
+    for description in descriptions.iter() {
+        if let Expr::Tuple(description) = description {
+            if description.elems.len() != 2 && description.elems.len() != 3 {
+                let desc_elements = get_comma_delimited_strings(description.elems, ARGERR);
+                input_tokens.push(quote! {}); // TODO
+            } else {
+                panic!("{}", ARGERR);
+            }
+        } else {
+            panic!("{}", ARGERR);
+        }
+    }
+
+    // Validate inputs
+    if descriptions.len() != arg_count {
+        panic!("There should be the same number of interpolate_service description arugments as function arguments");
+    }
+
+    let gen = quote! {
+        #internals
+
+        pub fn get_signature_internal(&self) -> (&'static [simplydmx_plugin_framework::services::internals::ServiceArgument], Option<simplydmx_plugin_framework::services::internals::ServiceArgument>) {
+            return #signature_tokens;
+        }
+
+        pub fn call_native_internal(&self, arguments: Vec<Box<dyn std::any::Any>>) -> Result<Box<dyn std::any::Any>, simplydmx_plugin_framework::services::internals::CallServiceError> {
+            return Ok(Box::new(self.#internal_call(#(#internal_arguments),*)));
+        }
+
+        pub fn call_json_internal(&self, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, simplydmx_plugin_framework::services::internals::CallServiceError> {
+            return Ok(serde_json::Value::Null);
+        }
+    };
+    return gen.into();
 }

@@ -19,8 +19,9 @@ impl TestService {
         };
     }
 
-    #[interpolate_service]
+    #[interpolate_service()]
     pub fn call_internal(&self, test1: u16, test2: u32) -> () {
+
     }
 }
 

@@ -73,8 +73,8 @@ pub fn interpolate_service(_: TokenStream, body: TokenStream) -> TokenStream {
     let gen = quote! {
         #internals
 
-        pub fn get_signature_types() -> (&[simplydmx_plugin_framework::services::internals::ServiceArgument], Option<simplydmx_plugin_framework::services::internals::ServiceArgument>) {
-            return ([], None);
+        pub fn get_signature_internal(&self) -> (&'static [simplydmx_plugin_framework::services::internals::ServiceArgument], Option<simplydmx_plugin_framework::services::internals::ServiceArgument>) {
+            return (&[], None);
         }
 
         pub fn call_native_internal(&self, arguments: Vec<Box<dyn std::any::Any>>) -> Result<Box<dyn std::any::Any>, simplydmx_plugin_framework::services::internals::CallServiceError> {

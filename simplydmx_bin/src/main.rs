@@ -15,13 +15,14 @@ impl TestService {
     );
 
     #[interpolate_service(
+        ("Called From", "This indicates how the service was called."),
         ("Light", "This is the ID of the light that you would like to control"),
         ("New Value", "This is the value you want to assign to the light (0-65535)"),
         ("Misc Values", "These are some more miscellaneous values to show off the service framework", "some-stuff"),
     )]
-    pub fn call_internal(&self, light_id: u32, value: Option::<u16>, values: Vec::<String>) -> () {
+    pub fn call_internal(&self, from: String, light_id: u32, value: Option::<u16>, values: Vec::<String>) -> () {
         // Do stuff here
-        println!("Set light {:?} to {:?}. Here are some misc values: {:?}", light_id, value, values);
+        println!("From {}: Set light {:?} to {:?}. Here are some misc values: {:?}", from, light_id, value, values);
     }
 }
 
@@ -34,6 +35,7 @@ fn main() {
 
     // Call TestService as a generic Service trait
     service.call(vec![
+        Box::new(String::from("Native Values")),
         Box::new(15u32),
         Box::new(Some(65535u16)),
         Box::new(vec![
@@ -41,6 +43,18 @@ fn main() {
             String::from("Value 2"),
             String::from("Value 3"),
             String::from("Value 4")
+        ])
+    ]).unwrap();
+
+    service.call_json(vec![
+        json!("JSON_________"),
+        json!(15),
+        json!(65535),
+        json!([
+            "Value 1",
+            "Value 2",
+            "Value 3",
+            "Value 4"
         ])
     ]).unwrap();
 

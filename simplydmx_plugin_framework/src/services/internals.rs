@@ -48,6 +48,13 @@ pub enum CallServiceError {
 	TypeValidationFailed,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum CallServiceJSONError {
+	DeserializationFailed,
+	SerializationFailed,
+}
+
 pub trait Service {
 
 	/// Gets the ID of a service for use when calling it
@@ -66,5 +73,5 @@ pub trait Service {
 	fn call(&self, arguments: Vec<Box<dyn Any>>) -> Result<Box<dyn Any>, CallServiceError>;
 
 	/// Call the service using JSON values
-	fn call_json(&self, arguments: Vec<Value>) -> Result<Value, CallServiceError>;
+	fn call_json(&self, arguments: Vec<Value>) -> Result<Value, CallServiceJSONError>;
 }

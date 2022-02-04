@@ -39,7 +39,7 @@ pub fn service_derive(input: TokenStream) -> TokenStream {
             fn get_description<'a>(&'a self) -> &'a str { #name::get_service_description_internal() }
             fn get_signature<'a>(&'a self) -> (&'a [#internals::ServiceArgument], &'a Option<#internals::ServiceArgument>) { #name::get_service_signature_internal(self) }
             fn call(&self, arguments: Vec<Box<dyn std::any::Any>>) -> Result<Box<dyn std::any::Any>, #internals::CallServiceError> { #name::call_service_native_internal(self, arguments) }
-            fn call_json(&self, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, #internals::CallServiceError> { #name::call_service_json_internal(self, arguments) }
+            fn call_json(&self, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, #internals::CallServiceJSONError> { #name::call_service_json_internal(self, arguments) }
         }
     };
     return gen.into();
@@ -63,6 +63,7 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
     // Vector of quote objects to use as arguments for the function this macro runs
     // on from the generic `call` implementation
     let mut internal_arguments = Vec::<Box<dyn ToTokens>>::new();
+    let mut internal_arguments_json = Vec::<Box<dyn ToTokens>>::new();
     let mut internal_argument_types = Vec::<Box<Type>>::new();
 
     // Number of arguments other than `self`
@@ -99,12 +100,14 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
                 // `call` implementation: Downcasts values to the correct type to call service-specific function
                 internal_arguments.push(Box::new(quote! {
                     match arguments[#index].downcast_ref::<#ty>() {
-                        Some(value) => {
-                            #ty::clone(value)
-                        },
-                        None => {
-                            return Err(#internals::CallServiceError::TypeValidationFailed);
-                        }
+                        Some(value) => #ty::clone(value),
+                        None => return Err(#internals::CallServiceError::TypeValidationFailed),
+                    }
+                }));
+                internal_arguments_json.push(Box::new(quote! {
+                    match serde_json::from_value::<#ty>(serde_json::Value::clone(&arguments[#index])) {
+                        Ok(arg) => arg,
+                        Err(_) => return Err(#internals::CallServiceJSONError::DeserializationFailed),
                     }
                 }));
                 arg_count += 1;
@@ -181,8 +184,12 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
             return Ok(Box::new(self.#internal_call(#(#internal_arguments),*)));
         }
 
-        pub fn call_service_json_internal(&self, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, #internals::CallServiceError> {
-            return Ok(serde_json::Value::Null);
+        pub fn call_service_json_internal(&self, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, #internals::CallServiceJSONError> {
+            let ret_val = serde_json::to_value(self.#internal_call(#(#internal_arguments_json),*));
+            return match ret_val {
+                Ok(ret_val) => return Ok(ret_val),
+                Err(_) => return Err(#internals::CallServiceJSONError::SerializationFailed),
+            };
         }
     };
     return gen.into();

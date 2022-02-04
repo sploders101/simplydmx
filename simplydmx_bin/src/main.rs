@@ -46,17 +46,17 @@ fn main() {
         ])
     ]).unwrap();
 
-    service.call_json(vec![
-        json!("JSON_________"),
-        json!(15),
-        json!(65535),
-        json!([
+    service.call_json(serde_json::from_str(r#"[
+        "JSON_________",
+        15,
+        65535,
+        [
             "Value 1",
             "Value 2",
             "Value 3",
             "Value 4"
-        ])
-    ]).unwrap();
+        ]
+    ]"#).unwrap()).unwrap();
 
     // Print information supplied by TestService through the Service trait
     println!("ID:          {}", service.get_id());

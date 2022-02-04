@@ -1,9 +1,10 @@
-#[macro_use]
-extern crate simplydmx_plugin_framework;
-
 use serde_json::json;
 
-use simplydmx_plugin_framework::Service;
+use simplydmx_plugin_framework::{
+    Service,
+    service_docs,
+    interpolate_service,
+};
 
 #[derive(Service)]
 struct TestService ();

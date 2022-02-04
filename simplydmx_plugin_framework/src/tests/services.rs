@@ -2,7 +2,6 @@ use serde_json::json;
 
 // Create an alias for macro output to use since this is an internal function
 // and the macro outputs fully-qualified type paths
-#[macro_use]
 mod simplydmx_plugin_framework {
 	pub use crate::*;
 }

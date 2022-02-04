@@ -34,12 +34,12 @@ pub fn service_derive(input: TokenStream) -> TokenStream {
 
     let gen = quote! {
         impl Service for #name {
-            fn get_id<'a>(&'a self) -> &'a str { self.id }
-            fn get_name<'a>(&'a self) -> &'a str { self.name }
-            fn get_description<'a>(&'a self) -> &'a str { self.description }
-            fn get_signature<'a>(&'a self) -> (&'a [#internals::ServiceArgument], Option<&'a #internals::ServiceArgument>) { #name::get_signature_internal(self) }
-            fn call(&self, arguments: Vec<Box<dyn std::any::Any>>) -> Result<Box<dyn std::any::Any>, #internals::CallServiceError> { #name::call_native_internal(self, arguments) }
-            fn call_json(&self, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, #internals::CallServiceError> { #name::call_json_internal(self, arguments) }
+            fn get_id<'a>(&'a self) -> &'a str { #name::get_service_id_internal() }
+            fn get_name<'a>(&'a self) -> &'a str { #name::get_service_name_internal() }
+            fn get_description<'a>(&'a self) -> &'a str { #name::get_service_description_internal() }
+            fn get_signature<'a>(&'a self) -> (&'a [#internals::ServiceArgument], &'a Option<#internals::ServiceArgument>) { #name::get_service_signature_internal(self) }
+            fn call(&self, arguments: Vec<Box<dyn std::any::Any>>) -> Result<Box<dyn std::any::Any>, #internals::CallServiceError> { #name::call_service_native_internal(self, arguments) }
+            fn call_json(&self, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, #internals::CallServiceError> { #name::call_service_json_internal(self, arguments) }
         }
     };
     return gen.into();
@@ -144,13 +144,13 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
                 let name = desc_elements.get(0).expect("Couldn't find human-readable name");
                 let description = desc_elements.get(1).expect("Couldn't find the description");
                 let val_type = get_typedoc(Type::clone(internal_argument_types.get(i).as_ref().expect("Couldn't find the internal argument type")));
-                let type_id: Box<dyn ToTokens> = if let Some(stuff) = desc_elements.get(2) { Box::new(quote!{Some(String::from(#stuff))}) } else { Box::new(quote!{None}) };
+                let type_id: Box<dyn ToTokens> = if let Some(type_id) = desc_elements.get(2) { Box::new(quote!{Some(#type_id)}) } else { Box::new(quote!{None}) };
                 // let type_id: Box<dyn ToTokens> = Box::new(desc_elements.get(2).unwrap_or(quote!{None}));
                 input_tokens.push(Box::new(quote! {
                     #internals::ServiceArgument {
-                        id: String::from(#id),
-                        name: String::from(#name),
-                        description: String::from(#description),
+                        id: #id,
+                        name: #name,
+                        description: #description,
                         val_type: #val_type,
                         val_type_id: #type_id,
                     }
@@ -173,15 +173,15 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
     let gen = quote! {
         #fn_internals
 
-        pub fn get_signature_internal(&self) -> (&'static [#internals::ServiceArgument], &'static Option<#internals::ServiceArgument>) {
+        pub fn get_service_signature_internal(&self) -> (&'static [#internals::ServiceArgument<'static>], &'static Option<#internals::ServiceArgument<'static>>) {
             return (&[#(#input_tokens),*], #return_signature);
         }
 
-        pub fn call_native_internal(&self, arguments: Vec<Box<dyn std::any::Any>>) -> Result<Box<dyn std::any::Any>, #internals::CallServiceError> {
+        pub fn call_service_native_internal(&self, arguments: Vec<Box<dyn std::any::Any>>) -> Result<Box<dyn std::any::Any>, #internals::CallServiceError> {
             return Ok(Box::new(self.#internal_call(#(#internal_arguments),*)));
         }
 
-        pub fn call_json_internal(&self, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, #internals::CallServiceError> {
+        pub fn call_service_json_internal(&self, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, #internals::CallServiceError> {
             return Ok(serde_json::Value::Null);
         }
     };

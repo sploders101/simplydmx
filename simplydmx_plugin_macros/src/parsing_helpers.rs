@@ -53,22 +53,22 @@ pub fn get_typedoc(in_type: Type) -> Box<dyn ToTokens> {
 		"String" => quote! {#required(#types::String)},
 
 		// Optional
-		"Option<u8>" => quote! {#optional(#types::U8)},
-		"Option<u16>" => quote! {#optional(#types::U16)},
-		"Option<u32>" => quote! {#optional(#types::U32)},
-		"Option<i8>" => quote! {#optional(#types::I8)},
-		"Option<i16>" => quote! {#optional(#types::I16)},
-		"Option<i32>" => quote! {#optional(#types::I32)},
-		"Option<String>" => quote! {#optional(#types::String)},
+		"Option :: < u8 >" => quote! {#optional(#types::U8)},
+		"Option :: < u16 >" => quote! {#optional(#types::U16)},
+		"Option :: < u32 >" => quote! {#optional(#types::U32)},
+		"Option :: < i8 >" => quote! {#optional(#types::I8)},
+		"Option :: < i16 >" => quote! {#optional(#types::I16)},
+		"Option :: < i32 >" => quote! {#optional(#types::I32)},
+		"Option :: < String >" => quote! {#optional(#types::String)},
 
 		// List
-		"Vec<u8>" => quote! {#vector(#types::U8)},
-		"Vec<u16>" => quote! {#vector(#types::U16)},
-		"Vec<u32>" => quote! {#vector(#types::U32)},
-		"Vec<i8>" => quote! {#vector(#types::I8)},
-		"Vec<i16>" => quote! {#vector(#types::I16)},
-		"Vec<i32>" => quote! {#vector(#types::I32)},
-		"Vec<String>" => quote! {#vector(#types::String)},
+		"Vec :: < u8 >" => quote! {#vector(#types::U8)},
+		"Vec :: < u16 >" => quote! {#vector(#types::U16)},
+		"Vec :: < u32 >" => quote! {#vector(#types::U32)},
+		"Vec :: < i8 >" => quote! {#vector(#types::I8)},
+		"Vec :: < i16 >" => quote! {#vector(#types::I16)},
+		"Vec :: < i32 >" => quote! {#vector(#types::I32)},
+		"Vec :: < String >" => quote! {#vector(#types::String)},
 
 		// Unknown
 		type_string => panic!("Type {} is not recognized as a valid service input.", type_string),

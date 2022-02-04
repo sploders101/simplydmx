@@ -6,10 +6,10 @@ use serde::{
 use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ServiceArgument {
-	pub id: String,
-	pub name: String,
-	pub description: String,
+pub struct ServiceArgument<'a> {
+	pub id: &'a str,
+	pub name: &'a str,
+	pub description: &'a str,
 	pub val_type: ServiceArgumentModifiers,
 
 	/// Type ID identifying more specific information about the value. For example, the following could be
@@ -18,7 +18,7 @@ pub struct ServiceArgument {
 	/// `Some(String::from("fixture-uid"))`
 	///
 	/// This can be used to provide auto-completion and inference in UI-driven configuration tools.
-	pub val_type_id: Option<String>,
+	pub val_type_id: Option<&'a str>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

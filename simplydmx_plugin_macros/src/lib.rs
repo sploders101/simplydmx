@@ -187,8 +187,8 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
         pub fn call_service_json_internal(&self, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, #internals::CallServiceJSONError> {
             let ret_val = serde_json::to_value(self.#internal_call(#(#internal_arguments_json),*));
             return match ret_val {
-                Ok(ret_val) => return Ok(ret_val),
-                Err(_) => return Err(#internals::CallServiceJSONError::SerializationFailed),
+                Ok(ret_val) => Ok(ret_val),
+                Err(_) => Err(#internals::CallServiceJSONError::SerializationFailed),
             };
         }
     };

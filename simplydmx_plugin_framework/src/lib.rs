@@ -3,6 +3,9 @@ pub mod event_emitter;
 pub mod plugin;
 pub mod services;
 
+#[cfg(test)]
+mod tests;
+
 pub use services::internals::Service;
 
 pub extern crate simplydmx_plugin_macros;

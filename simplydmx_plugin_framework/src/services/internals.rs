@@ -11,6 +11,14 @@ pub struct ServiceArgument {
 	pub name: String,
 	pub description: String,
 	pub val_type: ServiceArgumentModifiers,
+
+	/// Type ID identifying more specific information about the value. For example, the following could be
+	/// used to identify that a string uuid representing a fixture should be provided.
+	///
+	/// `Some(String::from("fixture-uid"))`
+	///
+	/// This can be used to provide auto-completion and inference in UI-driven configuration tools.
+	pub val_type_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -18,25 +26,20 @@ pub struct ServiceArgument {
 pub enum ServiceArgumentModifiers {
 	Required(ServiceDataTypes),
 	Optional(ServiceDataTypes),
+	Vector(ServiceDataTypes),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", content = "desc")]
-/// Describes a data type used by a service. The optional string should be a general type ID
-/// identifying more specific information about the type. For example, the following could be
-/// used to identify that a string uuid representing a fixture should be provided.
-///
-/// `ServiceDataTypes::String(Some(String::from("fixture-uid")))`
-///
-/// This can be used to provide auto-completion and inference in UI-driven configuration tools.
+#[serde(tag = "type")]
+/// Describes a data type used by a service.
 pub enum ServiceDataTypes {
-	U8(Option<String>),
-	U16(Option<String>),
-	U32(Option<String>),
-	I8(Option<String>),
-	I16(Option<String>),
-	I32(Option<String>),
-	String(Option<String>),
+	U8,
+	U16,
+	U32,
+	I8,
+	I16,
+	I32,
+	String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,7 +60,7 @@ pub trait Service {
 	fn get_description<'a>(&'a self) -> &'a str;
 
 	/// Get the documentation for the arguments required by the service
-	fn get_signature<'a>(&'a self) -> (&'a [ServiceArgument], Option<'a ServiceArgument>);
+	fn get_signature<'a>(&'a self) -> (&'a [ServiceArgument], &'a Option<ServiceArgument>);
 
 	/// Call the service locally without static typing
 	fn call(&self, arguments: Vec<Box<dyn Any>>) -> Result<Box<dyn Any>, CallServiceError>;

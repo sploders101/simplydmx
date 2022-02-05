@@ -1,14 +1,17 @@
+// Mods
 pub mod keep_alive;
 pub mod event_emitter;
 pub mod plugin;
 pub mod services;
 
+// Tests
 #[cfg(test)]
 mod tests;
 
+// Re-exports
 pub use services::internals::Service;
 
-pub extern crate simplydmx_plugin_macros;
+// Macros and macro re-exports
 pub use simplydmx_plugin_macros::*;
 
 #[macro_export]
@@ -18,17 +21,4 @@ macro_rules! service_docs {
         fn get_service_name_internal() -> &'static str {$name}
         fn get_service_description_internal() -> &'static str {$description}
     };
-}
-
-use std::collections::HashMap;
-
-use self::{
-	event_emitter::EventEmitter,
-	keep_alive::KeepAlive, plugin::Plugin,
-};
-
-pub struct Hypervisor {
-	evt_bus: EventEmitter,
-	keep_alive: KeepAlive,
-	plugins: HashMap<String, Plugin>,
 }

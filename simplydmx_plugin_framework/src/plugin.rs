@@ -3,17 +3,29 @@ use std::{
 	sync::{
 		Arc,
 	},
+	any::Any,
 };
 use async_std::{
 	sync::{
 		RwLock,
 	},
 };
+use serde::{
+	Serialize,
+};
+use serde_json::Value;
 use crate::{
-	event_emitter::EventEmitter,
+	event_emitter::{
+		EventEmitter,
+		EventReceiver,
+	},
 	keep_alive::KeepAlive,
 	services::{
-		internals::Service,
+		internals::{
+			Service,
+			CallServiceError,
+			CallServiceJSONError,
+		},
 		type_specifiers::TypeSpecifier,
 	},
 };
@@ -100,4 +112,82 @@ impl PluginContext {
 		evt_bus.send(String::from("simplydmx.service_removed"), String::from(&self.1.id) + "." + svc_id).await;
 
 	}
+
+	pub async fn call_service(&self, plugin_id: &str, svc_id: &str, args: Vec<Box<dyn Any>>) -> Result<Box<dyn Any>, ExternalServiceError> {
+
+		// Get plugin
+		let plugins = self.0.plugins.read().await;
+		let plugin = plugins.get(plugin_id);
+		if let Some(plugin) = plugin {
+
+			// Get service
+			let services = plugin.services.read().await;
+			let service = services.get(svc_id);
+			if let Some(service) = service {
+
+				// Call service
+				let response = service.call(args);
+				return match response {
+					Ok(value) => Ok(value),
+					Err(error) => Err(ExternalServiceError::ErrorReturned(error)),
+				};
+
+			} else { return Err(ExternalServiceError::ServiceNotFound) }
+
+		} else { return Err(ExternalServiceError::PluginNotFound) }
+
+	}
+
+	pub async fn call_service_json(&self, plugin_id: &str, svc_id: &str, args: Vec<Value>) -> Result<Value, ExternalServiceJSONError> {
+
+		// Get plugin
+		let plugins = self.0.plugins.read().await;
+		let plugin = plugins.get(plugin_id);
+		if let Some(plugin) = plugin {
+
+			// Get service
+			let services = plugin.services.read().await;
+			let service = services.get(svc_id);
+			if let Some(service) = service {
+
+				// Call service
+				let response = service.call_json(args);
+				return match response {
+					Ok(value) => Ok(value),
+					Err(error) => Err(ExternalServiceJSONError::ErrorReturned(error)),
+				};
+
+			} else { return Err(ExternalServiceJSONError::ServiceNotFound) }
+
+		} else { return Err(ExternalServiceJSONError::PluginNotFound) }
+
+	}
+
+	/// Sends an event on the bus. `T` gets cast to `Any`, boxed, wrapped in `Arc`,
+	/// and sent to all registered listeners.
+	pub async fn emit<T: Any + Send + Sync>(&self, event_name: String, message: T) {
+		self.0.evt_bus.write().await.send(event_name, message).await;
+	}
+
+	/// Registers an event listener on the bus of the given type. Returns
+	/// an instance of `EventReceiver<T>` which filters for the desired type
+	/// and wraps resulting values in `ArcAny<T>` to make usage of the data
+	/// simpler.
+	pub async fn on<T: 'static>(&mut self, event_name: String) -> EventReceiver<T> {
+		return self.0.evt_bus.write().await.on::<T>(event_name);
+	}
+}
+
+#[derive(Debug)]
+pub enum ExternalServiceError {
+	PluginNotFound,
+	ServiceNotFound,
+	ErrorReturned(CallServiceError),
+}
+
+#[derive(Serialize, Debug)]
+pub enum ExternalServiceJSONError {
+	PluginNotFound,
+	ServiceNotFound,
+	ErrorReturned(CallServiceJSONError),
 }

@@ -16,7 +16,8 @@ use async_std::{
 	},
 };
 
-use event_receiver::EventReceiver;
+pub use event_receiver::EventReceiver;
+pub use arc_any::ArcAny;
 
 
 /// # Semi-statically-typed event bus.

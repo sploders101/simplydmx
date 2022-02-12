@@ -40,6 +40,13 @@ pub enum ServiceRegistrationError {
 
 pub struct PluginContext (Arc<PluginRegistry>, Arc<Plugin>);
 impl PluginContext {
+
+	/// Create a new plugin context from a registry arc, a plugin ID, and human-readable plugin name.
+	/// This function is only intended to be called by the plugin manager upon instantiation of a plugin
+	/// in order to control access to the registry.
+	///
+	/// Only one plugin can claim an ID at a time. If a plugin tries to register an ID that already exists,
+	/// an error will be returned.
 	pub async fn new(registry: &Arc<PluginRegistry>, id: String, name: String) -> Result<PluginContext, RegisterPluginError> {
 		let mut plugins = registry.plugins.write().await;
 
@@ -52,11 +59,16 @@ impl PluginContext {
 			name: name,
 			services: RwLock::new(HashMap::new()),
 		});
-		plugins.insert(id, Arc::clone(&plugin));
+		plugins.insert(String::clone(&id), Arc::clone(&plugin));
+
+		registry.evt_bus.write().await.send(String::from("simplydmx.plugin_registered"), id).await;
 
 		return Ok(PluginContext (Arc::clone(&registry), plugin));
 	}
 
+	/// Register a new service with the system. This service can be discovered and called by other plugins, either by
+	/// downcasting to the original type, or using generic call methods implemented by the `Service` trait, allowing
+	/// things like user configuration.
 	pub async fn register_service<T: Service + 'static>(&self, service: T) -> Result<(), ServiceRegistrationError> {
 		let service: Box<dyn Service> = Box::new(service);
 		let id = String::from(service.get_id());
@@ -76,6 +88,7 @@ impl PluginContext {
 		return Ok(());
 	}
 
+	/// Unregister a service, removing it from any discovery lists
 	pub async fn unregister_service(&self, svc_id: &str) {
 
 		// Unregister Service

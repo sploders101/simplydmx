@@ -10,9 +10,12 @@ use async_std::{
 	},
 };
 use crate::{
-	Service,
 	event_emitter::EventEmitter,
 	keep_alive::KeepAlive,
+	services::{
+		internals::Service,
+		type_specifiers::TypeSpecifier,
+	},
 };
 
 pub struct Plugin {
@@ -24,6 +27,7 @@ pub struct Plugin {
 pub struct PluginRegistry {
 	evt_bus: RwLock<EventEmitter>,
 	keep_alive: RwLock<KeepAlive>,
+	type_specifiers: RwLock<HashMap<String, Box<dyn TypeSpecifier>>>,
 	plugins: RwLock<HashMap<String, Arc<Plugin>>>,
 }
 

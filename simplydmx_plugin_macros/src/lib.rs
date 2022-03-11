@@ -1,12 +1,12 @@
 extern crate proc_macro;
 
+use lazy_static::lazy_static;
 use proc_macro::TokenStream;
 use quote::{
     quote,
     ToTokens,
 };
 use syn::{
-    ItemFn,
     FnArg,
     punctuated::Punctuated,
     parse::Parser,
@@ -30,12 +30,20 @@ use parsing_helpers::{
 
 static ARGERR: &str = "interpolate_service expects comma-separated list of description strings or (\"name\", \"description\", \"type-id\") tuples.";
 
+lazy_static! {
+    static ref internals: quote::__private::TokenStream = quote! {simplydmx_plugin_framework::services::internals};
+    static ref pin: quote::__private::TokenStream = quote! {std::pin::Pin};
+    static ref box_: quote::__private::TokenStream = quote! {std::boxed::Box};
+    static ref future: quote::__private::TokenStream = quote! {std::future::Future};
+    static ref any: quote::__private::TokenStream = quote! {std::any::Any};
+    static ref value: quote::__private::TokenStream = quote! {serde_json::Value};
+    static ref arc: quote::__private::TokenStream = quote! {std::sync::Arc};
+}
+
 #[proc_macro_derive(Service)]
 pub fn service_derive(input: TokenStream) -> TokenStream {
     let ast: syn::DeriveInput = syn::parse(input).unwrap();
     let name = &ast.ident;
-
-    let internals = quote! {simplydmx_plugin_framework::services::internals};
 
     let gen = quote! {
         impl Service for #name {
@@ -43,8 +51,8 @@ pub fn service_derive(input: TokenStream) -> TokenStream {
             fn get_name<'a>(&'a self) -> &'a str { #name::get_service_name_internal() }
             fn get_description<'a>(&'a self) -> &'a str { #name::get_service_description_internal() }
             fn get_signature<'a>(&'a self) -> (&'a [#internals::ServiceArgument], &'a Option<#internals::ServiceArgument>) { #name::get_service_signature_internal(self) }
-            fn call<'a>(&'a self, arguments: Vec<Box<dyn Any>>) -> Pin<Box<dyn Future<Output = Result<Box<dyn Any>, CallServiceError>> + Send + 'a>> { #name::call_service_native_internal(self, arguments) }
-            fn call_json<'a>(&'a self, arguments: Vec<Value>) -> Pin<Box<dyn Future<Output = Result<Value, CallServiceJSONError>> + Send + 'a>> { #name::call_service_json_internal(self, arguments) }
+            fn call<'a>(&'a self, arguments: Vec<#box_<dyn #any>>) -> #pin<#box_<dyn #future<Output = Result<#box_<dyn #any>, #internals::CallServiceError>> + Send + 'a>> { #name::call_service_native_internal(self, arguments) }
+            fn call_json<'a>(&'a self, arguments: Vec<Value>) -> #pin<#box_<dyn #future<Output = Result<Value, #internals::CallServiceJSONError>> + Send + 'a>> { #name::call_service_json_internal(self, arguments) }
         }
     };
     return gen.into();
@@ -52,9 +60,6 @@ pub fn service_derive(input: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream {
-
-    // Output aliases
-    let internals = quote! {simplydmx_plugin_framework::services::internals};
 
     // Gather standard documentation
     let mut docs = Punctuated::<Expr, Token![,]>::parse_terminated.parse(attr).expect("Improperly formatted outer macro usage.").into_iter();
@@ -104,13 +109,13 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
 
     // Generate output
     let gen = quote!{
-        struct #name (Arc<#inner_type>);
+        struct #name (#arc<#inner_type>);
         impl #name {
             #(#items)*
         }
         impl Clone for #name {
             fn clone(&self) -> Self {
-                return #name (Arc::clone(&self.0));
+                return #name (#arc::clone(&self.0));
             }
         }
         impl #internals::Service for #name {
@@ -118,8 +123,8 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
             fn get_name<'a>(&'a self) -> &'a str { #service_name }
             fn get_description<'a>(&'a self) -> &'a str { #service_description }
             fn get_signature<'a>(&'a self) -> (&'a [#internals::ServiceArgument], &'a Option<#internals::ServiceArgument>) { #name::get_service_signature_internal(self) }
-            fn call<'a>(&'a self, arguments: Vec<Box<dyn Any + Send>>) -> Pin<Box<dyn Future<Output = Result<Box<dyn Any + Send>, CallServiceError>> + Send + 'a>> { #name::call_service_native_internal(self, arguments) }
-            fn call_json<'a>(&'a self, arguments: Vec<Value>) -> Pin<Box<dyn Future<Output = Result<Value, CallServiceJSONError>> + Send + 'a>> { #name::call_service_json_internal(self, arguments) }
+            fn call<'a>(&'a self, arguments: Vec<#box_<dyn #any + Send>>) -> #pin<#box_<dyn #future<Output = Result<#box_<dyn #any + Send>, #internals::CallServiceError>> + Send + 'a>> { #name::call_service_native_internal(self, arguments) }
+            fn call_json<'a>(&'a self, arguments: Vec<#value>) -> #pin<#box_<dyn #future<Output = Result<#value, #internals::CallServiceJSONError>> + Send + 'a>> { #name::call_service_json_internal(self, arguments) }
         }
     };
     return gen.into();
@@ -134,9 +139,6 @@ fn check_is_main(attribute: &Attribute) -> bool {
 /// Interpolates the inner main function of a service, creating functions related to documentation and
 /// type casting
 fn interpolate_service_main(outer_type: Type, _inner_type: Expr, attr: TokenStream, body: ImplItemMethod) -> Box<dyn ToTokens> {
-
-    // Aliases
-    let internals = quote! {simplydmx_plugin_framework::services::internals};
 
     // Function internals
     let descriptions: ExprTuple = syn::parse(attr).expect(ARGERR);
@@ -191,7 +193,7 @@ fn interpolate_service_main(outer_type: Type, _inner_type: Expr, attr: TokenStre
                     }
                 }));
                 internal_arguments_json.push(Box::new(quote! {
-                    match serde_json::from_value::<#ty>(serde_json::Value::clone(&arguments[#index])) {
+                    match serde_json::from_value::<#ty>(#value::clone(&arguments[#index])) {
                         Ok(arg) => arg,
                         Err(_) => return Err(#internals::CallServiceJSONError::DeserializationFailed),
                     }
@@ -266,18 +268,18 @@ fn interpolate_service_main(outer_type: Type, _inner_type: Expr, attr: TokenStre
             return (&[#(#input_tokens),*], #return_signature);
         }
 
-        pub fn call_service_native_internal<'a>(&self, arguments: Vec<Box<dyn std::any::Any + Send>>) -> Pin<Box<dyn Future<Output = Result<Box<dyn std::any::Any + Send>, #internals::CallServiceError>> + Send + 'a>>
+        pub fn call_service_native_internal<'a>(&self, arguments: Vec<#box_<dyn #any + Send>>) -> #pin<#box_<dyn #future<Output = Result<#box_<dyn #any + Send>, #internals::CallServiceError>> + Send + 'a>>
         where
             Self: Sync + 'a
         {
-            async fn run(_self: #outer_type, arguments: Vec<Box<dyn std::any::Any + Send>>) -> Result<Box<dyn std::any::Any + Send>, #internals::CallServiceError> {
-                return Ok(Box::new(#outer_type::#internal_call(_self, #(#internal_arguments),*)));
+            async fn run(_self: #outer_type, arguments: Vec<#box_<dyn #any + Send>>) -> Result<#box_<dyn #any + Send>, #internals::CallServiceError> {
+                return Ok(#box_::new(#outer_type::#internal_call(_self, #(#internal_arguments),*)));
             }
 
-            return std::boxed::Box::pin(run(#outer_type::clone(&self), arguments));
+            return #box_::pin(run(#outer_type::clone(&self), arguments));
         }
 
-        pub fn call_service_json_internal<'a>(&self, arguments: Vec<serde_json::Value>) -> Pin<Box<dyn Future<Output = Result<serde_json::Value, #internals::CallServiceJSONError>> + Send + 'a>>
+        pub fn call_service_json_internal<'a>(&self, arguments: Vec<serde_json::Value>) -> #pin<#box_<dyn #future<Output = Result<serde_json::Value, #internals::CallServiceJSONError>> + Send + 'a>>
         where
             Self: Sync + 'a
         {
@@ -289,7 +291,7 @@ fn interpolate_service_main(outer_type: Type, _inner_type: Expr, attr: TokenStre
                 };
             }
 
-            return std::boxed::Box::pin(run(#outer_type::clone(&self), arguments));
+            return #box_::pin(run(#outer_type::clone(&self), arguments));
         }
     });
 }

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use serde_json::json;
 use async_std::test;
 
@@ -12,14 +14,6 @@ use crate::{
 	service_docs,
 	interpolate_service,
 };
-
-use std::pin::Pin;
-use std::future::Future;
-use std::any::Any;
-use std::sync::Arc;
-use serde_json::Value;
-use crate::services::internals::CallServiceError;
-use crate::services::internals::CallServiceJSONError;
 
 struct Test ();
 #[interpolate_service(

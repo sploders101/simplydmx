@@ -130,6 +130,7 @@ fn interpolate_service_main(outer_type: Type, _inner_type: Expr, attr: TokenStre
     // panic!("{}", attr);
     // let descriptions = Punctuated::<Expr, Token![,]>::parse_terminated.parse(attr).expect("Improperly formatted main macro usage.").into_iter();
     let internal_call = &body.sig.ident;
+    let inject_await = if body.sig.asyncness.is_some() { quote! {.await} } else { quote! {} };
 
     let mut argument_names = Vec::<String>::new();
 
@@ -249,16 +250,16 @@ fn interpolate_service_main(outer_type: Type, _inner_type: Expr, attr: TokenStre
         fn get_signature<'a>(&'a self) -> (&'a [#internals::ServiceArgument], &'a Option<#internals::ServiceArgument>) {
             return (&[#(#input_tokens),*], #return_signature);
         }
-        fn call<'a>(&'a self, arguments: Vec<#box_<dyn #any + Send>>) -> #pin<#box_<dyn #future<Output = Result<#box_<dyn #any + Send>, #internals::CallServiceError>> + Send + 'a>> {
-            async fn run(_self: #outer_type, arguments: Vec<#box_<dyn #any + Send>>) -> Result<#box_<dyn #any + Send>, #internals::CallServiceError> {
-                return Ok(#box_::new(#outer_type::#internal_call(_self, #(#internal_arguments),*)));
+        fn call<'a>(&'a self, arguments: Vec<#box_<dyn #any + Sync + Send>>) -> #pin<#box_<dyn #future<Output = Result<#box_<dyn #any + Sync + Send>, #internals::CallServiceError>> + Send + 'a>> {
+            async fn run(_self: #outer_type, arguments: Vec<#box_<dyn #any + Sync + Send>>) -> Result<#box_<dyn #any + Sync + Send>, #internals::CallServiceError> {
+                return Ok(#box_::new(#outer_type::#internal_call(_self, #(#internal_arguments),*)#inject_await));
             }
 
-            return #box_::pin(run(#outer_type::clone(&self), arguments));
+            return #box_::pin(run(#outer_type::clone(self), arguments));
         }
         fn call_json<'a>(&'a self, arguments: Vec<#value>) -> #pin<#box_<dyn #future<Output = Result<#value, #internals::CallServiceJSONError>> + Send + 'a>> {
             async fn run(_self: #outer_type, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, #internals::CallServiceJSONError> {
-                let ret_val = serde_json::to_value(#outer_type::#internal_call(_self, #(#internal_arguments_json),*));
+                let ret_val = serde_json::to_value(#outer_type::#internal_call(_self, #(#internal_arguments_json),*)#inject_await);
                 return match ret_val {
                     Ok(ret_val) => Ok(ret_val),
                     Err(_) => Err(#internals::CallServiceJSONError::SerializationFailed),

@@ -113,7 +113,7 @@ impl PluginContext {
 
 	}
 
-	pub async fn call_service(&self, plugin_id: &str, svc_id: &str, args: Vec<Box<dyn Any + Send>>) -> Result<Box<dyn Any>, ExternalServiceError> {
+	pub async fn call_service(&self, plugin_id: &str, svc_id: &str, args: Vec<Box<dyn Any + Sync + Send>>) -> Result<Box<dyn Any>, ExternalServiceError> {
 
 		// Get plugin
 		let plugins = self.0.plugins.read().await;

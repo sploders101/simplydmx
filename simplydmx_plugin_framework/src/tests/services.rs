@@ -29,7 +29,7 @@ impl TestService {
 		("Misc Values", "These are some more miscellaneous values to show off the service framework", "some-stuff"),
 		("Formatted string", "This is a formatted string created from the inputs that were supplied"),
 	)]
-	pub fn call_internal(self, from: String, light_id: u32, value: Option::<u16>, values: Vec::<String>) -> String {
+	pub async fn call_internal(self, from: String, light_id: u32, value: Option::<u16>, values: Vec::<String>) -> String {
 		// Do stuff here
 		return format!("From {}: Set light {:?} to {:?}. Here are some misc values: {:?}", from, light_id, value, values);
 	}

@@ -75,7 +75,7 @@ pub trait Service {
 	fn get_signature<'a>(&'a self) -> (&'a [ServiceArgument], &'a Option<ServiceArgument>);
 
 	/// Call the service locally without static typing
-	fn call<'a>(&'a self, arguments: Vec<Box<dyn Any + Send>>) -> Pin<Box<dyn Future<Output = Result<Box<dyn Any + Send>, CallServiceError>> + Send + 'a>>;
+	fn call<'a>(&'a self, arguments: Vec<Box<dyn Any + Sync + Send>>) -> Pin<Box<dyn Future<Output = Result<Box<dyn Any + Sync + Send>, CallServiceError>> + Send + 'a>>;
 
 	/// Call the service using JSON values
 	fn call_json<'a>(&'a self, arguments: Vec<Value>) -> Pin<Box<dyn Future<Output = Result<Value, CallServiceJSONError>> + Send + 'a>>;

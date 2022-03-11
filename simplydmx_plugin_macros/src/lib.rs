@@ -29,31 +29,6 @@ use parsing_helpers::{
 
 static ARGERR: &str = "interpolate_service expects comma-separated list of description strings or (\"name\", \"description\", \"type-id\") tuples.";
 
-#[proc_macro_derive(Service)]
-pub fn service_derive(input: TokenStream) -> TokenStream {
-    // Output aliases
-    let internals = quote! {simplydmx_plugin_framework::services::internals};
-    let pin = quote! {std::pin::Pin};
-    let box_ = quote! {std::boxed::Box};
-    let future = quote! {std::future::Future};
-    let any = quote! {std::any::Any};
-
-    let ast: syn::DeriveInput = syn::parse(input).unwrap();
-    let name = &ast.ident;
-
-    let gen = quote! {
-        impl Service for #name {
-            fn get_id<'a>(&'a self) -> &'a str { #name::get_service_id_internal() }
-            fn get_name<'a>(&'a self) -> &'a str { #name::get_service_name_internal() }
-            fn get_description<'a>(&'a self) -> &'a str { #name::get_service_description_internal() }
-            fn get_signature<'a>(&'a self) -> (&'a [#internals::ServiceArgument], &'a Option<#internals::ServiceArgument>) { #name::get_service_signature_internal(self) }
-            fn call<'a>(&'a self, arguments: Vec<#box_<dyn #any>>) -> #pin<#box_<dyn #future<Output = Result<#box_<dyn #any>, #internals::CallServiceError>> + Send + 'a>> { #name::call_service_native_internal(self, arguments) }
-            fn call_json<'a>(&'a self, arguments: Vec<Value>) -> #pin<#box_<dyn #future<Output = Result<Value, #internals::CallServiceJSONError>> + Send + 'a>> { #name::call_service_json_internal(self, arguments) }
-        }
-    };
-    return gen.into();
-}
-
 #[proc_macro_attribute]
 pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream {
     // Output aliases

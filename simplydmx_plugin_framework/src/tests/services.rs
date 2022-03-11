@@ -11,7 +11,6 @@ mod simplydmx_plugin_framework {
 
 use crate::{
 	Service,
-	service_docs,
 	interpolate_service,
 };
 
@@ -23,7 +22,7 @@ struct Test ();
 	"Test service's description"
 )]
 impl TestService {
-	#[main(
+	#[service_main(
 		("Called From", "This indicates how the service was called."),
 		("Light", "This is the ID of the light that you would like to control"),
 		("New Value", "This is the value you want to assign to the light (0-65535)"),

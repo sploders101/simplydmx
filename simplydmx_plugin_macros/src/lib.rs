@@ -1,6 +1,5 @@
 extern crate proc_macro;
 
-use lazy_static::lazy_static;
 use proc_macro::TokenStream;
 use quote::{
     quote,
@@ -30,18 +29,15 @@ use parsing_helpers::{
 
 static ARGERR: &str = "interpolate_service expects comma-separated list of description strings or (\"name\", \"description\", \"type-id\") tuples.";
 
-lazy_static! {
-    static ref internals: quote::__private::TokenStream = quote! {simplydmx_plugin_framework::services::internals};
-    static ref pin: quote::__private::TokenStream = quote! {std::pin::Pin};
-    static ref box_: quote::__private::TokenStream = quote! {std::boxed::Box};
-    static ref future: quote::__private::TokenStream = quote! {std::future::Future};
-    static ref any: quote::__private::TokenStream = quote! {std::any::Any};
-    static ref value: quote::__private::TokenStream = quote! {serde_json::Value};
-    static ref arc: quote::__private::TokenStream = quote! {std::sync::Arc};
-}
-
 #[proc_macro_derive(Service)]
 pub fn service_derive(input: TokenStream) -> TokenStream {
+    // Output aliases
+    let internals = quote! {simplydmx_plugin_framework::services::internals};
+    let pin = quote! {std::pin::Pin};
+    let box_ = quote! {std::boxed::Box};
+    let future = quote! {std::future::Future};
+    let any = quote! {std::any::Any};
+
     let ast: syn::DeriveInput = syn::parse(input).unwrap();
     let name = &ast.ident;
 
@@ -60,6 +56,9 @@ pub fn service_derive(input: TokenStream) -> TokenStream {
 
 #[proc_macro_attribute]
 pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream {
+    // Output aliases
+    let internals = quote! {simplydmx_plugin_framework::services::internals};
+    let arc = quote! {std::sync::Arc};
 
     // Gather standard documentation
     let mut docs = Punctuated::<Expr, Token![,]>::parse_terminated.parse(attr).expect("Improperly formatted outer macro usage.").into_iter();
@@ -81,22 +80,25 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
     if impl_internals.trait_.is_some() { panic!("interpolate_service cannot be used on trait implementations"); }
 
     // Go through impl items and look for the #[main] attribute
-    let mut found_main = false;
     let mut items: Vec<Box<dyn ToTokens>> = Vec::new();
+    let mut service_implementation: Option<Box<dyn ToTokens>> = None;
     for item in impl_internals.items {
         match item {
             ImplItem::Method(item) => {
                 for (i, attribute) in item.attrs.clone().into_iter().enumerate() {
                     if check_is_main(&attribute) {
-                        if found_main {
+                        if let Some(_) = service_implementation {
                             panic!("Cannot have two main functions in a service");
                         } else {
-                            found_main = true;
 
-                            // Interpolate service calls from main
+                            // Remove marker attribute and add
                             let mut cloned_item = item.clone();
                             cloned_item.attrs.remove(i);
-                            items.push(interpolate_service_main((*name).clone(), inner_type.clone(), attribute.tokens.into(), cloned_item));
+                            items.push(Box::new(cloned_item.clone()));
+
+                            // Interpolate service calls from main
+                            service_implementation = Some(interpolate_service_main((*name).clone(), inner_type.clone(), attribute.tokens.into(), cloned_item));
+
                         }
                     }
                 }
@@ -108,6 +110,7 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
     }
 
     // Generate output
+    let service_implementation = service_implementation.expect("Could not find entrypoint for service. Make sure to mark it with #[main(...)]");
     let gen = quote!{
         struct #name (#arc<#inner_type>);
         impl #name {
@@ -118,13 +121,12 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
                 return #name (#arc::clone(&self.0));
             }
         }
-        impl #internals::Service for #name {
+        impl #internals::Service for #name
+        {
             fn get_id<'a>(&'a self) -> &'a str { #service_id }
             fn get_name<'a>(&'a self) -> &'a str { #service_name }
             fn get_description<'a>(&'a self) -> &'a str { #service_description }
-            fn get_signature<'a>(&'a self) -> (&'a [#internals::ServiceArgument], &'a Option<#internals::ServiceArgument>) { #name::get_service_signature_internal(self) }
-            fn call<'a>(&'a self, arguments: Vec<#box_<dyn #any + Send>>) -> #pin<#box_<dyn #future<Output = Result<#box_<dyn #any + Send>, #internals::CallServiceError>> + Send + 'a>> { #name::call_service_native_internal(self, arguments) }
-            fn call_json<'a>(&'a self, arguments: Vec<#value>) -> #pin<#box_<dyn #future<Output = Result<#value, #internals::CallServiceJSONError>> + Send + 'a>> { #name::call_service_json_internal(self, arguments) }
+            #service_implementation
         }
     };
     return gen.into();
@@ -133,12 +135,19 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
 fn check_is_main(attribute: &Attribute) -> bool {
     if attribute.path.leading_colon.is_some() { return false };
     if attribute.path.segments.len() != 1 { return false };
-    return attribute.path.segments[0].ident.to_string() == "main";
+    return attribute.path.segments[0].ident.to_string() == "service_main";
 }
 
 /// Interpolates the inner main function of a service, creating functions related to documentation and
 /// type casting
 fn interpolate_service_main(outer_type: Type, _inner_type: Expr, attr: TokenStream, body: ImplItemMethod) -> Box<dyn ToTokens> {
+    // Output aliases
+    let internals = quote! {simplydmx_plugin_framework::services::internals};
+    let pin = quote! {std::pin::Pin};
+    let box_ = quote! {std::boxed::Box};
+    let future = quote! {std::future::Future};
+    let any = quote! {std::any::Any};
+    let value = quote! {serde_json::Value};
 
     // Function internals
     let descriptions: ExprTuple = syn::parse(attr).expect(ARGERR);
@@ -262,27 +271,17 @@ fn interpolate_service_main(outer_type: Type, _inner_type: Expr, attr: TokenStre
     };
 
     return Box::new(quote! {
-        #body
-
-        pub fn get_service_signature_internal(&self) -> (&'static [#internals::ServiceArgument<'static>], &'static Option<#internals::ServiceArgument<'static>>) {
+        fn get_signature<'a>(&'a self) -> (&'a [#internals::ServiceArgument], &'a Option<#internals::ServiceArgument>) {
             return (&[#(#input_tokens),*], #return_signature);
         }
-
-        pub fn call_service_native_internal<'a>(&self, arguments: Vec<#box_<dyn #any + Send>>) -> #pin<#box_<dyn #future<Output = Result<#box_<dyn #any + Send>, #internals::CallServiceError>> + Send + 'a>>
-        where
-            Self: Sync + 'a
-        {
+        fn call<'a>(&'a self, arguments: Vec<#box_<dyn #any + Send>>) -> #pin<#box_<dyn #future<Output = Result<#box_<dyn #any + Send>, #internals::CallServiceError>> + Send + 'a>> {
             async fn run(_self: #outer_type, arguments: Vec<#box_<dyn #any + Send>>) -> Result<#box_<dyn #any + Send>, #internals::CallServiceError> {
                 return Ok(#box_::new(#outer_type::#internal_call(_self, #(#internal_arguments),*)));
             }
 
             return #box_::pin(run(#outer_type::clone(&self), arguments));
         }
-
-        pub fn call_service_json_internal<'a>(&self, arguments: Vec<serde_json::Value>) -> #pin<#box_<dyn #future<Output = Result<serde_json::Value, #internals::CallServiceJSONError>> + Send + 'a>>
-        where
-            Self: Sync + 'a
-        {
+        fn call_json<'a>(&'a self, arguments: Vec<#value>) -> #pin<#box_<dyn #future<Output = Result<#value, #internals::CallServiceJSONError>> + Send + 'a>> {
             async fn run(_self: #outer_type, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, #internals::CallServiceJSONError> {
                 let ret_val = serde_json::to_value(#outer_type::#internal_call(_self, #(#internal_arguments_json),*));
                 return match ret_val {

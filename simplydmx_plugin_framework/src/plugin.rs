@@ -113,7 +113,7 @@ impl PluginContext {
 
 	}
 
-	pub async fn call_service(&self, plugin_id: &str, svc_id: &str, args: Vec<Box<dyn Any>>) -> Result<Box<dyn Any>, ExternalServiceError> {
+	pub async fn call_service(&self, plugin_id: &str, svc_id: &str, args: Vec<Box<dyn Any + Send>>) -> Result<Box<dyn Any>, ExternalServiceError> {
 
 		// Get plugin
 		let plugins = self.0.plugins.read().await;
@@ -126,7 +126,7 @@ impl PluginContext {
 			if let Some(service) = service {
 
 				// Call service
-				let response = service.call(args);
+				let response = service.call(args).await;
 				return match response {
 					Ok(value) => Ok(value),
 					Err(error) => Err(ExternalServiceError::ErrorReturned(error)),
@@ -151,7 +151,7 @@ impl PluginContext {
 			if let Some(service) = service {
 
 				// Call service
-				let response = service.call_json(args);
+				let response = service.call_json(args).await;
 				return match response {
 					Ok(value) => Ok(value),
 					Err(error) => Err(ExternalServiceJSONError::ErrorReturned(error)),

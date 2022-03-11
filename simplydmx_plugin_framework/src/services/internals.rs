@@ -1,4 +1,9 @@
-use std::any::Any;
+use std::{
+	any::Any,
+	pin::Pin,
+	boxed::Box,
+	future::Future,
+};
 use serde::{
 	Serialize,
 	Deserialize,
@@ -70,8 +75,8 @@ pub trait Service {
 	fn get_signature<'a>(&'a self) -> (&'a [ServiceArgument], &'a Option<ServiceArgument>);
 
 	/// Call the service locally without static typing
-	fn call(&self, arguments: Vec<Box<dyn Any>>) -> Result<Box<dyn Any>, CallServiceError>;
+	fn call<'a>(&'a self, arguments: Vec<Box<dyn Any + Send>>) -> Pin<Box<dyn Future<Output = Result<Box<dyn Any + Send>, CallServiceError>> + Send + 'a>>;
 
 	/// Call the service using JSON values
-	fn call_json(&self, arguments: Vec<Value>) -> Result<Value, CallServiceJSONError>;
+	fn call_json<'a>(&'a self, arguments: Vec<Value>) -> Pin<Box<dyn Future<Output = Result<Value, CallServiceJSONError>> + Send + 'a>>;
 }

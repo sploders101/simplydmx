@@ -1,4 +1,5 @@
 use serde_json::json;
+use async_std::test;
 
 // Create an alias for macro output to use since this is an internal function
 // and the macro outputs fully-qualified type paths
@@ -12,33 +13,40 @@ use crate::{
 	interpolate_service,
 };
 
-#[derive(Service)]
-struct TestService ();
-impl TestService {
-	service_docs!(
-		"test_service",
-		"Test Service",
-		"Test service's description"
-	);
+use std::pin::Pin;
+use std::future::Future;
+use std::any::Any;
+use std::sync::Arc;
+use serde_json::Value;
+use crate::services::internals::CallServiceError;
+use crate::services::internals::CallServiceJSONError;
 
-	#[interpolate_service(
+struct Test ();
+#[interpolate_service(
+	Test,
+	"test_service",
+	"Test Service",
+	"Test service's description"
+)]
+impl TestService {
+	#[main(
 		("Called From", "This indicates how the service was called."),
 		("Light", "This is the ID of the light that you would like to control"),
 		("New Value", "This is the value you want to assign to the light (0-65535)"),
 		("Misc Values", "These are some more miscellaneous values to show off the service framework", "some-stuff"),
 		("Formatted string", "This is a formatted string created from the inputs that were supplied"),
 	)]
-	pub fn call_internal(&self, from: String, light_id: u32, value: Option::<u16>, values: Vec::<String>) -> String {
+	pub fn call_internal(self, from: String, light_id: u32, value: Option::<u16>, values: Vec::<String>) -> String {
 		// Do stuff here
 		return format!("From {}: Set light {:?} to {:?}. Here are some misc values: {:?}", from, light_id, value, values);
 	}
 }
 
 #[test]
-fn smoke_test() {
+async fn smoke_test() {
 
 	// Create an instance of TestService
-	let service = TestService ();
+	let service = TestService (Arc::new(Test ()));
 
 	// Convert TestService to generic Service trait implementation
 	let service: Box<dyn Service> = Box::new(service);
@@ -54,7 +62,7 @@ fn smoke_test() {
 			String::from("Value 3"),
 			String::from("Value 4")
 		])
-	]).unwrap();
+	]).await.unwrap();
 	assert_eq!(
 		service_result.downcast_ref::<String>().expect("Service result was not a string"),
 		r#"From Native Values: Set light 15 to Some(65535). Here are some misc values: ["Value 1", "Value 2", "Value 3", "Value 4"]"#
@@ -71,7 +79,7 @@ fn smoke_test() {
 			"Value 3",
 			"Value 4"
 		]
-	]"#).expect("Couldn't parse JSON input")).unwrap();
+	]"#).expect("Couldn't parse JSON input")).await.unwrap();
 	assert_eq!(
 		service_result,
 		json!(r#"From JSON: Set light 15 to Some(65535). Here are some misc values: ["Value 1", "Value 2", "Value 3", "Value 4"]"#)

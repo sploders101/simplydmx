@@ -1,7 +1,13 @@
-use std::sync::Arc;
+use std::{
+	sync::Arc,
+	time::Duration,
+};
 
 use serde_json::json;
-use async_std::test;
+use async_std::{
+	test,
+	task::sleep,
+};
 
 // Create an alias for macro output to use since this is an internal function
 // and the macro outputs fully-qualified type paths
@@ -30,7 +36,8 @@ impl TestService {
 		("Formatted string", "This is a formatted string created from the inputs that were supplied"),
 	)]
 	pub async fn call_internal(self, from: String, light_id: u32, value: Option::<u16>, values: Vec::<String>) -> String {
-		// Do stuff here
+		// Check carrying of data across await
+		sleep(Duration::from_millis(5)).await;
 		return format!("From {}: Set light {:?} to {:?}. Here are some misc values: {:?}", from, light_id, value, values);
 	}
 }

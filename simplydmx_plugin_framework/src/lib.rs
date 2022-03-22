@@ -22,3 +22,13 @@ macro_rules! service_docs {
 		fn get_service_description_internal() -> &'static str {$description}
 	};
 }
+
+#[macro_export]
+macro_rules! call_service {
+	($context:ident, $plugin:literal, $service:literal) => {
+		$context.get_service($plugin, $service).await.unwrap().call(vec!()).await.unwrap();
+	};
+	($context:ident, $plugin:literal, $service:literal, $($args:expr),*) => {
+		$context.get_service($plugin, $service).await.unwrap().call(vec!($(Box::new($args)),+)).await.unwrap();
+	};
+}

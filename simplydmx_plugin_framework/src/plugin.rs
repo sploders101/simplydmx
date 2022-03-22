@@ -272,7 +272,7 @@ impl PluginContext {
 	/// an instance of `EventReceiver<T>` which filters for the desired type
 	/// and wraps resulting values in `ArcAny<T>` to make usage of the data
 	/// simpler.
-	pub async fn on<T: 'static>(&mut self, event_name: String) -> EventReceiver<T> {
+	pub async fn on<T: 'static>(&self, event_name: String) -> EventReceiver<T> {
 		return self.0.evt_bus.write().await.on::<T>(event_name);
 	}
 

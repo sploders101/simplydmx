@@ -55,6 +55,7 @@ pub struct Plugin {
 }
 
 pub struct PluginRegistry {
+	discoverable_services: RwLock<HashMap<String, HashMap<String, ServiceDescription>>>,
 	init_bus: RwLock<HashMap<Uuid, Sender<Arc<Dependency>>>>,
 	evt_bus: RwLock<EventEmitter>,
 	keep_alive: RwLock<KeepAlive>,
@@ -73,6 +74,7 @@ impl PluginManager {
 	pub fn new() -> (PluginManager, Receiver<()>) {
 		let (evt_bus, shutdown_receiver) = EventEmitter::new();
 		return (PluginManager(Arc::new(PluginRegistry {
+			discoverable_services: RwLock::new(HashMap::new()),
 			init_bus: RwLock::new(HashMap::new()),
 			evt_bus: RwLock::new(evt_bus),
 			keep_alive: RwLock::new(KeepAlive::new()),
@@ -126,6 +128,11 @@ impl PluginContext {
 	/// Only one plugin can claim an ID at a time. If a plugin tries to register an ID that already exists,
 	/// an error will be returned.
 	async fn new(registry: &Arc<PluginRegistry>, id: String, name: String) -> Result<PluginContext, RegisterPluginError> {
+
+		// Add a slot for discoverable services
+		registry.discoverable_services.write().await.insert(String::clone(&id), HashMap::new());
+
+		// Register the plugin
 		let mut plugins = registry.plugins.write().await;
 
 		if plugins.contains_key(&id) {
@@ -140,8 +147,10 @@ impl PluginContext {
 		});
 		plugins.insert(String::clone(&id), Arc::clone(&plugin));
 
+		// Signal that a new plugin has been registered
 		registry.evt_bus.write().await.send(String::from("simplydmx.plugin_registered"), String::clone(&id)).await;
 
+		// Create plugin context
 		let plugin_context = PluginContext (Arc::clone(&registry), plugin);
 		plugin_context.signal_dep(Dependency::Plugin{ plugin_id: id }).await;
 
@@ -161,9 +170,11 @@ impl PluginContext {
 	/// Register a new service with the system. This service can be discovered and called by other plugins, either by
 	/// downcasting to the original type, or using generic call methods implemented by the `Service` trait, allowing
 	/// things like user configuration.
-	pub async fn register_service<T: Service + 'static>(&self, service: T) -> Result<(), ServiceRegistrationError> {
+	pub async fn register_service<T: Service + 'static>(&self, discoverable: bool, service: T) -> Result<(), ServiceRegistrationError> {
 		let service: Box<dyn Service> = Box::new(service);
 		let id = String::from(service.get_id());
+		let name = String::from(service.get_name());
+		let description = String::from(service.get_description());
 
 		// Register service
 		let mut self_services = self.1.services.write().await;
@@ -173,10 +184,21 @@ impl PluginContext {
 		self_services.insert(String::clone(&id), Arc::new(service));
 		drop(self_services);
 
+		// Add service to discoverable list if applicable
+		if discoverable {
+			self.0.discoverable_services.write().await
+				.get_mut(&self.1.id).unwrap() // TODO: Add empty hashmap when plugin is created
+				.insert(String::clone(&id), ServiceDescription {
+					plugin_id: String::clone(&self.1.id),
+					id: String::clone(&id),
+					name,
+					description,
+				});
+		}
+
 		// Advertise service via evt_bus
-		let mut evt_bus = self.0.evt_bus.write().await;
-		evt_bus.send(String::from("simplydmx.service_registered"), String::from(&self.1.id) + "." + &id).await;
-		drop(evt_bus);
+		self.0.evt_bus.write().await
+			.send(String::from("simplydmx.service_registered"), String::from(&self.1.id) + "." + &id).await;
 
 		self.signal_dep(Dependency::Service{
 			plugin_id: self.1.id.clone(),
@@ -190,13 +212,31 @@ impl PluginContext {
 	pub async fn unregister_service(&self, svc_id: &str) {
 
 		// Unregister Service
-		let mut self_services = self.1.services.write().await;
-		self_services.remove(svc_id);
+		self.1.services.write().await.remove(svc_id);
+
+		// Remove service from discoverable list if applicable
+		self.0.discoverable_services.write().await
+			.get_mut(&self.1.id).unwrap()
+			.remove(svc_id);
 
 		// Advertise removal via evt_bus
-		let mut evt_bus = self.0.evt_bus.write().await;
-		evt_bus.send(String::from("simplydmx.service_removed"), String::from(&self.1.id) + "." + svc_id).await;
+		self.0.evt_bus.write().await
+			.send(String::from("simplydmx.service_removed"), String::from(&self.1.id) + "." + svc_id).await;
 
+	}
+
+	/// List Services
+	pub async fn list_services(&self) -> Vec<ServiceDescription> {
+		let mut service_list = Vec::new();
+
+		let discoverable_services = self.0.discoverable_services.read().await;
+		for plugin in discoverable_services.values() {
+			for service in plugin.values() {
+				service_list.push(service.clone());
+			}
+		}
+
+		return service_list;
 	}
 
 	/// Get a service object directly
@@ -420,6 +460,14 @@ pub enum TypeSpecifierRegistrationError {
 
 pub enum TypeSpecifierRetrievalError {
 	SpecifierNotFound,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ServiceDescription {
+	pub plugin_id: String,
+	pub id: String,
+	pub name: String,
+	pub description: String,
 }
 
 #[derive(Debug)]

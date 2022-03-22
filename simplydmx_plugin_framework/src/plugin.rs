@@ -50,7 +50,7 @@ pub use crate::keep_alive::{
 pub struct Plugin {
 	pub id: String,
 	pub name: String,
-	services: RwLock<HashMap<String, Arc<Box<dyn Service>>>>,
+	services: RwLock<HashMap<String, Arc<Box<dyn Service + Sync + Send>>>>,
 	init_flags: RwLock<HashSet<String>>,
 }
 
@@ -59,7 +59,7 @@ pub struct PluginRegistry {
 	init_bus: RwLock<HashMap<Uuid, Sender<Arc<Dependency>>>>,
 	evt_bus: RwLock<EventEmitter>,
 	keep_alive: RwLock<KeepAlive>,
-	type_specifiers: RwLock<HashMap<String, Box<dyn TypeSpecifier>>>,
+	type_specifiers: RwLock<HashMap<String, Box<dyn TypeSpecifier + Sync + Send>>>,
 	plugins: RwLock<HashMap<String, Arc<Plugin>>>,
 }
 
@@ -95,6 +95,10 @@ impl PluginManager {
 
 	pub async fn shutdown(&self) {
 		self.0.evt_bus.write().await.send_shutdown().await;
+	}
+
+	pub async fn finish_shutdown(&self) {
+		self.0.keep_alive.write().await.shut_down().await;
 	}
 }
 
@@ -170,8 +174,8 @@ impl PluginContext {
 	/// Register a new service with the system. This service can be discovered and called by other plugins, either by
 	/// downcasting to the original type, or using generic call methods implemented by the `Service` trait, allowing
 	/// things like user configuration.
-	pub async fn register_service<T: Service + 'static>(&self, discoverable: bool, service: T) -> Result<(), ServiceRegistrationError> {
-		let service: Box<dyn Service> = Box::new(service);
+	pub async fn register_service<T: Service + Sync + Send + 'static>(&self, discoverable: bool, service: T) -> Result<(), ServiceRegistrationError> {
+		let service: Box<dyn Service + Sync + Send> = Box::new(service);
 		let id = String::from(service.get_id());
 		let name = String::from(service.get_name());
 		let description = String::from(service.get_description());
@@ -244,7 +248,7 @@ impl PluginContext {
 	/// `plugin_id`: The plugin that owns the service
 	///
 	/// `svc_id`: The ID of the service
-	pub async fn get_service(&self, plugin_id: &str, svc_id: &str) -> Result<Arc<Box<dyn Service>>, GetServiceError> {
+	pub async fn get_service(&self, plugin_id: &str, svc_id: &str) -> Result<Arc<Box<dyn Service + Sync + Send>>, GetServiceError> {
 
 		// Get plugin
 		let plugins = self.0.plugins.read().await;
@@ -392,7 +396,7 @@ impl PluginContext {
 	/// `type_id`: The ID of the type specifier, used in a service's `get_signature` function
 	///
 	/// `type_specifier`: The type specifier to be boxed and stored
-	pub async fn register_service_type_specifier<T: TypeSpecifier + 'static>(&self, type_id: String, type_specifier: T) -> Result<(), TypeSpecifierRegistrationError> {
+	pub async fn register_service_type_specifier<T: TypeSpecifier + Sync + Send + 'static>(&self, type_id: String, type_specifier: T) -> Result<(), TypeSpecifierRegistrationError> {
 		let mut type_specifiers = self.0.type_specifiers.write().await;
 		if type_specifiers.contains_key(&type_id) {
 			type_specifiers.insert(type_id, Box::new(type_specifier));

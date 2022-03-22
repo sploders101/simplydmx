@@ -17,6 +17,7 @@ use async_std::{
 	channel::{
 		self,
 		Sender,
+		Receiver,
 	},
 };
 use serde::{
@@ -64,6 +65,40 @@ pub struct PluginRegistry {
 	plugins: RwLock<HashMap<String, Arc<Plugin>>>,
 }
 
+/// The plugin manager provides a method of easily instantiating the plugin framework and registering
+/// other plugins.
+#[derive(Clone)]
+pub struct PluginManager(Arc<PluginRegistry>);
+
+impl PluginManager {
+	/// Creates a new PluginRegistry, returning a shutdown receiver so the main thread can block,
+	/// waiting for a shutdown request, them properly initiate it via the integrated KeepAlive.
+	pub fn new() -> (PluginManager, Receiver<()>) {
+		let (evt_bus, shutdown_receiver) = EventEmitter::new();
+		return (PluginManager(Arc::new(PluginRegistry {
+			init_bus: RwLock::new(HashMap::new()),
+			evt_bus: RwLock::new(evt_bus),
+			keep_alive: RwLock::new(KeepAlive::new()),
+			type_specifiers: RwLock::new(HashMap::new()),
+			plugins: RwLock::new(HashMap::new()),
+		})), shutdown_receiver);
+	}
+
+	/// Creates a new plugin context to be passed to a plugin so it can interact with the rest of the
+	/// program. The arguments can be anything that can be converted to `String` (like `&'static str`),
+	/// for convenience.
+	pub async fn register_plugin<S>(&self, id: S, name: S) -> Result<PluginContext, RegisterPluginError>
+	where
+		S: Into<String>
+	{
+		return PluginContext::new(&self.0, id.into(), name.into()).await;
+	}
+
+	pub async fn shutdown(&self) {
+		self.0.evt_bus.write().await.send_shutdown().await;
+	}
+}
+
 pub enum RegisterPluginError {
 	IDConflict,
 }
@@ -71,6 +106,14 @@ pub enum ServiceRegistrationError {
 	IDConflict,
 }
 
+/// This provides a channel through which plugins can communicate with each other and invoke functionality
+/// This is the only method through which plugins should be able to communicate with one another. It ensures
+/// that all functionality can be used by other plugins like user-made ones, and increases the application's
+/// flexibility to communicate through other means (like TCP, for example).
+///
+/// For example, to expose the ability to shut down the application to other plugins, a "core plugin" could
+/// be created with access to both its context, *and* the PluginManager instance, and a service could be
+/// created to provide an entrypoint to the shutdown function.
 pub struct PluginContext (Arc<PluginRegistry>, Arc<Plugin>);
 impl PluginContext {
 
@@ -85,7 +128,7 @@ impl PluginContext {
 	///
 	/// Only one plugin can claim an ID at a time. If a plugin tries to register an ID that already exists,
 	/// an error will be returned.
-	pub async fn new(registry: &Arc<PluginRegistry>, id: String, name: String) -> Result<PluginContext, RegisterPluginError> {
+	async fn new(registry: &Arc<PluginRegistry>, id: String, name: String) -> Result<PluginContext, RegisterPluginError> {
 		let mut plugins = registry.plugins.write().await;
 
 		if plugins.contains_key(&id) {

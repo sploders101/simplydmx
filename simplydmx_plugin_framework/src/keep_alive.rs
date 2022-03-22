@@ -57,6 +57,15 @@ struct KeepAliveInternal {
 }
 
 impl KeepAlive {
+	pub fn new() -> KeepAlive {
+		KeepAlive {
+			internal_data: Arc::new(KeepAliveInternal {
+				shutting_down: RwLock::new(false),
+				blockers: Mutex::new(HashMap::new()),
+				finishers: Mutex::new(HashMap::new()),
+			}),
+		}
+	}
 
 	/// Register a routine that should be run to completion before shutting down the application.
 	/// Anything that should not be interrupted should be run through this function. If the

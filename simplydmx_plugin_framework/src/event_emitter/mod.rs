@@ -13,11 +13,17 @@ use async_std::{
 	channel::{
 		self,
 		Sender,
+		Receiver,
 	},
 };
 
 pub use event_receiver::EventReceiver;
 pub use arc_any::ArcAny;
+
+pub enum AnyEvent {
+	Msg(Arc<Box<dyn Any + Send + Sync>>),
+	Shutdown,
+}
 
 
 /// # Semi-statically-typed event bus.
@@ -41,16 +47,19 @@ pub use arc_any::ArcAny;
 /// channel. Whichever plugin recognizes the event name and message format can listen
 /// for the serde `Value` type, then re-emit under its statically-typed equivalent.
 pub struct EventEmitter {
-	listeners: HashMap<String, Vec<Arc<Sender<Arc<Box<dyn Any + Send + Sync>>>>>>,
+	listeners: HashMap<String, Vec<Sender<AnyEvent>>>,
+	shutdown_listener: Sender<()>,
 }
 
 impl EventEmitter {
 
 	/// Creates a new EventEmitter.
-	pub fn new() -> EventEmitter {
-		return EventEmitter {
+	pub fn new() -> (EventEmitter, Receiver<()>) {
+		let (sender, receiver) = channel::bounded(1);
+		return (EventEmitter {
 			listeners: HashMap::new(),
-		};
+			shutdown_listener: sender,
+		}, receiver);
 	}
 
 	/// Runs garbage collection for old receivers that are no longer active.
@@ -97,7 +106,7 @@ impl EventEmitter {
 
 		let (sender, receiver) = channel::unbounded();
 
-		self.listeners.get_mut(&event_name).unwrap().push(Arc::new(sender));
+		self.listeners.get_mut(&event_name).unwrap().push(sender);
 		return EventReceiver::new(event_name, receiver);
 	}
 
@@ -112,10 +121,24 @@ impl EventEmitter {
 		if let Some(listeners) = self.listeners.get_mut(&event_name) {
 			let message_arc = Arc::<Box<dyn Any + Send + Sync>>::new(Box::new(message));
 			for listener in listeners.iter() {
-				let listener_cloned = Arc::clone(listener);
+				let listener_cloned = listener.clone();
 				let message_arc_cloned = Arc::clone(&message_arc);
 				task::spawn(async move {
-					listener_cloned.send(message_arc_cloned).await.ok();
+					listener_cloned.send(AnyEvent::Msg(message_arc_cloned)).await.ok();
+				});
+			}
+		}
+	}
+
+	pub async fn send_shutdown(&mut self) {
+		self.gc();
+
+		self.shutdown_listener.send(()).await.ok();
+		for listener_group in self.listeners.values() {
+			for listener in listener_group.iter() {
+				let listener_cloned = listener.clone();
+				task::spawn(async move {
+					listener_cloned.send(AnyEvent::Shutdown).await.ok();
 				});
 			}
 		}

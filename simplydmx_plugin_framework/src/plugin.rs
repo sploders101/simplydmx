@@ -24,7 +24,6 @@ use serde::{
 	Serialize,
 	Deserialize,
 };
-use serde_json::Value;
 use crate::{
 	event_emitter::{
 		EventEmitter,
@@ -34,8 +33,6 @@ use crate::{
 	services::{
 		internals::{
 			Service,
-			CallServiceError,
-			CallServiceJSONError,
 		},
 		type_specifiers::{
 			TypeSpecifier,
@@ -53,7 +50,7 @@ pub use crate::keep_alive::{
 pub struct Plugin {
 	pub id: String,
 	pub name: String,
-	services: RwLock<HashMap<String, Box<dyn Service>>>,
+	services: RwLock<HashMap<String, Arc<Box<dyn Service>>>>,
 	init_flags: RwLock<HashSet<String>>,
 }
 
@@ -173,7 +170,7 @@ impl PluginContext {
 		if self_services.contains_key(&id) {
 			return Err(ServiceRegistrationError::IDConflict);
 		}
-		self_services.insert(String::clone(&id), service);
+		self_services.insert(String::clone(&id), Arc::new(service));
 		drop(self_services);
 
 		// Advertise service via evt_bus
@@ -202,14 +199,12 @@ impl PluginContext {
 
 	}
 
-	/// Call a service using native values
+	/// Get a service object directly
 	///
-	/// `plugin_id`: The plugin that owns the service to be called
+	/// `plugin_id`: The plugin that owns the service
 	///
-	/// `svc_id`: The ID of the service to be called
-	///
-	/// `args`: A vec of boxed Any arguments to be sent to the service
-	pub async fn call_service(&self, plugin_id: &str, svc_id: &str, args: Vec<Box<dyn Any + Sync + Send>>) -> Result<Box<dyn Any>, ExternalServiceError> {
+	/// `svc_id`: The ID of the service
+	pub async fn get_service(&self, plugin_id: &str, svc_id: &str) -> Result<Arc<Box<dyn Service>>, GetServiceError> {
 
 		// Get plugin
 		let plugins = self.0.plugins.read().await;
@@ -221,48 +216,11 @@ impl PluginContext {
 			let service = services.get(svc_id);
 			if let Some(service) = service {
 
-				// Call service
-				let response = service.call(args).await;
-				return match response {
-					Ok(value) => Ok(value),
-					Err(error) => Err(ExternalServiceError::ErrorReturned(error)),
-				};
+				return Ok(Arc::clone(service));
 
-			} else { return Err(ExternalServiceError::ServiceNotFound) }
+			} else { return Err(GetServiceError::ServiceNotFound) }
 
-		} else { return Err(ExternalServiceError::PluginNotFound) }
-
-	}
-
-	/// Call a service using JSON values
-	///
-	/// `plugin_id`: The plugin that owns the service to be called
-	///
-	/// `svc_id`: The ID of the service to be called
-	///
-	/// `args`: A vec of boxed Value arguments to be sent to the service
-	pub async fn call_service_json(&self, plugin_id: &str, svc_id: &str, args: Vec<Value>) -> Result<Value, ExternalServiceJSONError> {
-
-		// Get plugin
-		let plugins = self.0.plugins.read().await;
-		let plugin = plugins.get(plugin_id);
-		if let Some(plugin) = plugin {
-
-			// Get service
-			let services = plugin.services.read().await;
-			let service = services.get(svc_id);
-			if let Some(service) = service {
-
-				// Call service
-				let response = service.call_json(args).await;
-				return match response {
-					Ok(value) => Ok(value),
-					Err(error) => Err(ExternalServiceJSONError::ErrorReturned(error)),
-				};
-
-			} else { return Err(ExternalServiceJSONError::ServiceNotFound) }
-
-		} else { return Err(ExternalServiceJSONError::PluginNotFound) }
+		} else { return Err(GetServiceError::PluginNotFound) }
 
 	}
 
@@ -465,17 +423,9 @@ pub enum TypeSpecifierRetrievalError {
 }
 
 #[derive(Debug)]
-pub enum ExternalServiceError {
+pub enum GetServiceError {
 	PluginNotFound,
 	ServiceNotFound,
-	ErrorReturned(CallServiceError),
-}
-
-#[derive(Serialize, Debug)]
-pub enum ExternalServiceJSONError {
-	PluginNotFound,
-	ServiceNotFound,
-	ErrorReturned(CallServiceJSONError),
 }
 
 #[derive(PartialEq, Hash, Debug, Serialize, Deserialize)]

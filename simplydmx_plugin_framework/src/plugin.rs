@@ -102,13 +102,6 @@ impl PluginManager {
 	}
 }
 
-pub enum RegisterPluginError {
-	IDConflict,
-}
-pub enum ServiceRegistrationError {
-	IDConflict,
-}
-
 /// This provides a channel through which plugins can communicate with each other and invoke functionality
 /// This is the only method through which plugins should be able to communicate with one another. It ensures
 /// that all functionality can be used by other plugins like user-made ones, and increases the application's
@@ -117,6 +110,7 @@ pub enum ServiceRegistrationError {
 /// For example, to expose the ability to shut down the application to other plugins, a "core plugin" could
 /// be created with access to both its context, *and* the PluginManager instance, and a service could be
 /// created to provide an entrypoint to the shutdown function.
+#[derive(Clone)]
 pub struct PluginContext (Arc<PluginRegistry>, Arc<Plugin>);
 impl PluginContext {
 
@@ -462,6 +456,7 @@ pub enum TypeSpecifierRegistrationError {
 	NameConflict,
 }
 
+#[derive(Debug)]
 pub enum TypeSpecifierRetrievalError {
 	SpecifierNotFound,
 }
@@ -472,6 +467,16 @@ pub struct ServiceDescription {
 	pub id: String,
 	pub name: String,
 	pub description: String,
+}
+
+#[derive(Debug, Serialize)]
+pub enum RegisterPluginError {
+	IDConflict,
+}
+
+#[derive(Debug, Serialize)]
+pub enum ServiceRegistrationError {
+	IDConflict,
 }
 
 #[derive(Debug)]

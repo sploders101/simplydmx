@@ -16,14 +16,17 @@ use async_std::{
 	},
 };
 use uuid::Uuid;
+use serde::Serialize;
 
 
 /// An error returned from a `KeepAlive` registration call
+#[derive(Debug, Serialize)]
 pub enum KeepAliveRegistrationError {
 	ShuttingDown,
 }
 
 /// An error returned from a `KeepAlive` de-registration call
+#[derive(Debug, Serialize)]
 pub enum KeepAliveDeregistrationError {
 	ShuttingDown,
 	NotRegistered,

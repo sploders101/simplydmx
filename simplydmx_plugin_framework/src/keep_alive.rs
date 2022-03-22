@@ -147,6 +147,7 @@ pub async fn shut_down(keep_alive: KeepAlive) {
 		let finisher = finisher_futures.remove(&finisher_key).expect("`finishers` was modified while locked!");
 		return task::spawn(finisher);
 	});
+
 	// Wait for all finishers to complete
 	for handle in finisher_tasks {
 		handle.await;

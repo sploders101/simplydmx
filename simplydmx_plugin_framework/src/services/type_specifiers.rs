@@ -7,6 +7,7 @@ use serde::{
 
 /// This trait provides an interface for querying potential options
 pub trait TypeSpecifier {
+	fn is_exclusive(&self) -> bool;
 	fn get_options(&self) -> Vec<DropdownOptionNative>;
 	fn get_options_json(&self) -> Vec<DropdownOptionJSON>;
 }

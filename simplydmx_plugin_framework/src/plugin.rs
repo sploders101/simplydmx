@@ -1,17 +1,27 @@
 use std::{
-	collections::HashMap,
+	collections::{
+		HashMap,
+		HashSet,
+	},
 	sync::{
 		Arc,
 	},
 	any::Any,
+	future::Future,
 };
+use uuid::Uuid;
 use async_std::{
 	sync::{
 		RwLock,
 	},
+	channel::{
+		self,
+		Sender,
+	},
 };
 use serde::{
 	Serialize,
+	Deserialize,
 };
 use serde_json::Value;
 use crate::{
@@ -26,17 +36,28 @@ use crate::{
 			CallServiceError,
 			CallServiceJSONError,
 		},
-		type_specifiers::TypeSpecifier,
+		type_specifiers::{
+			TypeSpecifier,
+			DropdownOptionNative,
+			DropdownOptionJSON,
+		},
 	},
 };
 
+pub use crate::keep_alive::{
+	KeepAliveRegistrationError,
+	KeepAliveDeregistrationError,
+};
+
 pub struct Plugin {
-	id: String,
-	name: String,
+	pub id: String,
+	pub name: String,
 	services: RwLock<HashMap<String, Box<dyn Service>>>,
+	init_flags: RwLock<HashSet<String>>,
 }
 
 pub struct PluginRegistry {
+	init_bus: RwLock<HashMap<Uuid, Sender<Arc<Dependency>>>>,
 	evt_bus: RwLock<EventEmitter>,
 	keep_alive: RwLock<KeepAlive>,
 	type_specifiers: RwLock<HashMap<String, Box<dyn TypeSpecifier>>>,
@@ -52,6 +73,11 @@ pub enum ServiceRegistrationError {
 
 pub struct PluginContext (Arc<PluginRegistry>, Arc<Plugin>);
 impl PluginContext {
+
+
+	// ┌──────────────────┐
+	// │    Public API    │
+	// └──────────────────┘
 
 	/// Create a new plugin context from a registry arc, a plugin ID, and human-readable plugin name.
 	/// This function is only intended to be called by the plugin manager upon instantiation of a plugin
@@ -70,12 +96,26 @@ impl PluginContext {
 			id: String::clone(&id),
 			name: name,
 			services: RwLock::new(HashMap::new()),
+			init_flags: RwLock::new(HashSet::new()),
 		});
 		plugins.insert(String::clone(&id), Arc::clone(&plugin));
 
-		registry.evt_bus.write().await.send(String::from("simplydmx.plugin_registered"), id).await;
+		registry.evt_bus.write().await.send(String::from("simplydmx.plugin_registered"), String::clone(&id)).await;
 
-		return Ok(PluginContext (Arc::clone(&registry), plugin));
+		let plugin_context = PluginContext (Arc::clone(&registry), plugin);
+		plugin_context.signal_dep(Dependency::Plugin{ plugin_id: id }).await;
+
+		return Ok(plugin_context);
+	}
+
+	/// Set init flag to notify dependents of an initialization step
+	pub async fn set_init_flag(&self, flag_name: String) {
+		self.1.init_flags.write().await.insert(String::clone(&flag_name));
+		let dependency = Dependency::Flag{
+			plugin_id: self.1.id.clone(),
+			flag_id: flag_name,
+		};
+		self.signal_dep(dependency).await;
 	}
 
 	/// Register a new service with the system. This service can be discovered and called by other plugins, either by
@@ -97,6 +137,12 @@ impl PluginContext {
 		let mut evt_bus = self.0.evt_bus.write().await;
 		evt_bus.send(String::from("simplydmx.service_registered"), String::from(&self.1.id) + "." + &id).await;
 		drop(evt_bus);
+
+		self.signal_dep(Dependency::Service{
+			plugin_id: self.1.id.clone(),
+			service_id: id,
+		}).await;
+
 		return Ok(());
 	}
 
@@ -113,6 +159,13 @@ impl PluginContext {
 
 	}
 
+	/// Call a service using native values
+	///
+	/// `plugin_id`: The plugin that owns the service to be called
+	///
+	/// `svc_id`: The ID of the service to be called
+	///
+	/// `args`: A vec of boxed Any arguments to be sent to the service
 	pub async fn call_service(&self, plugin_id: &str, svc_id: &str, args: Vec<Box<dyn Any + Sync + Send>>) -> Result<Box<dyn Any>, ExternalServiceError> {
 
 		// Get plugin
@@ -138,6 +191,13 @@ impl PluginContext {
 
 	}
 
+	/// Call a service using JSON values
+	///
+	/// `plugin_id`: The plugin that owns the service to be called
+	///
+	/// `svc_id`: The ID of the service to be called
+	///
+	/// `args`: A vec of boxed Value arguments to be sent to the service
 	pub async fn call_service_json(&self, plugin_id: &str, svc_id: &str, args: Vec<Value>) -> Result<Value, ExternalServiceJSONError> {
 
 		// Get plugin
@@ -176,6 +236,189 @@ impl PluginContext {
 	pub async fn on<T: 'static>(&mut self, event_name: String) -> EventReceiver<T> {
 		return self.0.evt_bus.write().await.on::<T>(event_name);
 	}
+
+	/// Spawn the specified task when the set of dependencies has finished.
+	pub async fn spawn_when<'a, F>(&self, mut dependencies: Vec<Dependency>, blocker: F) -> Result<(), KeepAliveRegistrationError>
+	where
+		F: Future<Output = ()> + Send + 'static
+	{
+		// Consolidate list of dependencies to eliminate unnecessary locking
+		let mut needed_resources = HashMap::<&String, ConsolidatedDependencies>::new();
+		for dependency in dependencies.iter() {
+			match dependency {
+				Dependency::Flag{ plugin_id, flag_id } => {
+					ensure_deplist(&mut needed_resources, plugin_id);
+					needed_resources.get_mut(plugin_id).unwrap().flags.push(flag_id);
+				},
+				Dependency::Plugin{ plugin_id } => {
+					ensure_deplist(&mut needed_resources, plugin_id);
+					needed_resources.get_mut(plugin_id).unwrap().plugin = true;
+				},
+				Dependency::Service{ plugin_id, service_id } => {
+					ensure_deplist(&mut needed_resources, plugin_id);
+					needed_resources.get_mut(plugin_id).unwrap().services.push(service_id);
+				},
+			}
+		}
+
+		// Set up listener channel
+		let (sender, receiver) = channel::unbounded::<Arc<Dependency>>();
+		let uuid = Uuid::new_v4();
+		self.0.init_bus.write().await.insert(uuid.clone(), sender);
+
+		// Create list of fulfilled dependencies
+		let mut known_dependencies = Vec::<Dependency>::new();
+		let plugins = self.0.plugins.read().await;
+		for (plugin_id, deps) in needed_resources {
+			let plugin = plugins.get(plugin_id);
+			if let Some(plugin) = plugin {
+				if deps.plugin {
+					known_dependencies.push(Dependency::Plugin{ plugin_id: plugin_id.clone() });
+				}
+				if deps.services.len() > 0 {
+					let services = plugin.services.read().await;
+					for service_id in deps.services {
+						if services.contains_key(service_id) {
+							known_dependencies.push(Dependency::Service{
+								plugin_id: plugin_id.clone(),
+								service_id: service_id.clone(),
+							});
+						}
+					}
+				}
+				if deps.flags.len() > 0 {
+					let flags = plugin.init_flags.read().await;
+					for flag_id in deps.flags {
+						if flags.contains(flag_id) {
+							known_dependencies.push(Dependency::Flag{
+								plugin_id: plugin_id.clone(),
+								flag_id: flag_id.clone(),
+							});
+						}
+					}
+				}
+			}
+		}
+
+		// Remove cleared dependencies from original list
+		dependencies = dependencies.into_iter().filter(|dependency| known_dependencies.contains(dependency)).collect();
+
+		// Spawn task to finish the process
+		return self.spawn(async move {
+			// Wait for dependencies to be resolved
+			while dependencies.len() > 0 {
+				let next_dep = receiver.recv().await.unwrap();
+				dependencies = dependencies.into_iter().filter(|dependency| *dependency != *next_dep).collect();
+			}
+
+			blocker.await;
+		}).await;
+	}
+
+	/// Spawns a task that prevents application shutdown until complete.
+	///
+	/// `blocker`: The future to let finish before shutting down
+	pub async fn spawn<F>(&self, blocker: F) -> Result<(), KeepAliveRegistrationError>
+	where
+		F: Future<Output = ()> + Send + 'static,
+	{
+		let keep_alive = self.0.keep_alive.write().await;
+		return keep_alive.register_blocker(blocker).await;
+	}
+
+	/// Registers a future to be driven during the final stage of shutdown. This can be useful for closing
+	/// sockets, notifying clients of shutdown, saving files, etc.
+	///
+	/// `finisher`: The future to drive during shutdown
+	pub async fn register_finisher<F>(&self, finisher: F) -> Result<Uuid, KeepAliveRegistrationError>
+	where
+		F: Future<Output = ()> + Send + 'static,
+	{
+		let mut keep_alive = self.0.keep_alive.write().await;
+		return keep_alive.register_finisher(finisher).await;
+	}
+
+	/// Unregisters a previously-registered finisher, removing it from the list of things to do during shutdown
+	///
+	/// `finisher_id`: The UUID returned from the `register_finisher` call
+	pub async fn deregister_finisher<F>(&self, finisher_id: Uuid) -> Result<(), KeepAliveDeregistrationError> {
+		let mut keep_alive = self.0.keep_alive.write().await;
+		return keep_alive.deregister_finisher(finisher_id).await;
+	}
+
+	/// Registers a service type specifier. These can be used to provide dropdown options to graphical interfaces.
+	///
+	/// `type_id`: The ID of the type specifier, used in a service's `get_signature` function
+	///
+	/// `type_specifier`: The type specifier to be boxed and stored
+	pub async fn register_service_type_specifier<T: TypeSpecifier + 'static>(&self, type_id: String, type_specifier: T) -> Result<(), TypeSpecifierRegistrationError> {
+		let mut type_specifiers = self.0.type_specifiers.write().await;
+		if type_specifiers.contains_key(&type_id) {
+			type_specifiers.insert(type_id, Box::new(type_specifier));
+			return Err(TypeSpecifierRegistrationError::NameConflict);
+		} else {
+			return Ok(());
+		}
+	}
+
+	/// Get service type options as native values. This can be used to provide dropdowns for graphical interfaces
+	///
+	/// `type_id`: The ID of the type specifier, used in a service's `get_signature` function
+	///
+	/// Returns: `(exclusive, options)`
+	///
+	/// `exclusive`: Whether or not the user should be allowed to type in their own values
+	///
+	/// `options`: The options themselves
+	pub async fn get_service_type_options(&self, type_id: &str) -> Result<(bool, Vec<DropdownOptionNative>), TypeSpecifierRetrievalError> {
+		let type_specifiers = self.0.type_specifiers.read().await;
+		if let Some(specifier) = type_specifiers.get(type_id) {
+			return Ok((specifier.is_exclusive(), specifier.get_options()));
+		} else {
+			return Err(TypeSpecifierRetrievalError::SpecifierNotFound);
+		}
+	}
+
+	/// Get service type options as JSON values. This can be used to provide dropdowns for graphical interfaces
+	///
+	/// `type_id`: The ID of the type specifier, used in a service's `get_signature` function
+	///
+	/// Returns: `(exclusive, options)`
+	///
+	/// `exclusive`: Whether or not the user should be allowed to type in their own values
+	///
+	/// `options`: The options themselves
+	pub async fn get_service_type_options_json(&self, type_id: &str) -> Result<(bool, Vec<DropdownOptionJSON>), TypeSpecifierRetrievalError> {
+		let type_specifiers = self.0.type_specifiers.read().await;
+		if let Some(specifier) = type_specifiers.get(type_id) {
+			return Ok((specifier.is_exclusive(), specifier.get_options_json()));
+		} else {
+			return Err(TypeSpecifierRetrievalError::SpecifierNotFound);
+		}
+	}
+
+
+	// ┌────────────────────────┐
+	// │    Helper functions    │
+	// └────────────────────────┘
+
+	/// Distribute a dependency to all pending spawn_when tasks
+	async fn signal_dep(&self, dep: Dependency) {
+		let listeners = self.0.init_bus.read().await;
+		let dependency = Arc::new(dep);
+		for listener in listeners.values() {
+			listener.send(Arc::clone(&dependency)).await.ok();
+		}
+	}
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum TypeSpecifierRegistrationError {
+	NameConflict,
+}
+
+pub enum TypeSpecifierRetrievalError {
+	SpecifierNotFound,
 }
 
 #[derive(Debug)]
@@ -190,4 +433,38 @@ pub enum ExternalServiceJSONError {
 	PluginNotFound,
 	ServiceNotFound,
 	ErrorReturned(CallServiceJSONError),
+}
+
+#[derive(PartialEq, Hash, Debug, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum Dependency {
+
+	/// Represents a dependency on a flag posted by a service, which can represent
+	/// any part of the initialization process, like event handlers, for example.
+	Flag{ plugin_id: String, flag_id: String },
+
+	/// Represents a service dependency
+	Service{ plugin_id: String, service_id: String },
+
+	/// This dependency type is discouraged due to its ambiguous nature.
+	/// It only represents a plugin being loaded, and does not garauntee that it
+	/// has been properly initialized. It is better to use a `Flag` or `Service`
+	/// for this purpose
+	Plugin{ plugin_id: String },
+}
+
+struct ConsolidatedDependencies<'a> {
+	plugin: bool,
+	flags: Vec<&'a String>,
+	services: Vec<&'a String>,
+}
+
+fn ensure_deplist<'a>(deps: &mut HashMap<&'a String, ConsolidatedDependencies>, plugin_id: &'a String) {
+	if !deps.contains_key(plugin_id) {
+		deps.insert(plugin_id, ConsolidatedDependencies {
+			plugin: false,
+			flags: Vec::new(),
+			services: Vec::new(),
+		});
+	}
 }

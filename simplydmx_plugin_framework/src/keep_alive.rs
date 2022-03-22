@@ -120,46 +120,32 @@ impl KeepAlive {
 		}
 	}
 
-}
+	/// Initiate the shutdown sequence contained in the KeepAlive. This gives plugins an
+	/// opportunity to finish what they were doing and perform cleanup routines before quitting
+	/// the application
+	pub async fn shut_down(&mut self) {
+		// Mark that we're shutting down
+		*self.internal_data.shutting_down.write().await = true;
 
-/// Create a new instance of KeepAlive. Plugins should not have the ability to do this, so it
-/// is not included as part of the type.
-pub fn create_keep_alive() -> KeepAlive {
-	return KeepAlive {
-		internal_data: Arc::new(KeepAliveInternal {
-			shutting_down: RwLock::new(false),
-			blockers: Mutex::new(HashMap::new()),
-			finishers: Mutex::new(HashMap::new()),
-		})
-	};
-}
+		// Wait for all blockers to finish
+		for handle in self.internal_data.blockers.lock().await.values_mut() {
+			// This await does not drive the future, since it was created
+			// using task::spawn(...)
+			handle.await;
+		}
 
-/// Initiate the shutdown sequence contained in the KeepAlive. This gives plugins an
-/// opportunity to finish what they were doing and perform cleanup routines before quitting
-/// the application
-pub async fn shut_down(keep_alive: KeepAlive) {
+		// Run all finishers in parallel
+		let mut finisher_futures = self.internal_data.finishers.lock().await;
+		let finisher_keys = finisher_futures.keys().cloned().collect::<Vec<Uuid>>();
+		let finisher_tasks = finisher_keys.into_iter().map(move |finisher_key| {
+			let finisher = finisher_futures.remove(&finisher_key).expect("`finishers` was modified while locked!");
+			return task::spawn(finisher);
+		});
 
-	// Mark that we're shutting down
-	*keep_alive.internal_data.shutting_down.write().await = true;
-
-	// Wait for all blockers to finish
-	for handle in keep_alive.internal_data.blockers.lock().await.values_mut() {
-		// This await does not drive the future, since it was created
-		// using task::spawn(...)
-		handle.await;
-	}
-
-	// Run all finishers in parallel
-	let mut finisher_futures = keep_alive.internal_data.finishers.lock().await;
-	let finisher_keys = finisher_futures.keys().cloned().collect::<Vec<Uuid>>();
-	let finisher_tasks = finisher_keys.into_iter().map(move |finisher_key| {
-		let finisher = finisher_futures.remove(&finisher_key).expect("`finishers` was modified while locked!");
-		return task::spawn(finisher);
-	});
-
-	// Wait for all finishers to complete
-	for handle in finisher_tasks {
-		handle.await;
+		// Wait for all finishers to complete
+		for handle in finisher_tasks {
+			handle.await;
+		}
 	}
 
 }

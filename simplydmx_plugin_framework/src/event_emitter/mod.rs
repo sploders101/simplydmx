@@ -19,6 +19,7 @@ use async_std::{
 
 pub use event_receiver::EventReceiver;
 pub use arc_any::ArcAny;
+pub use event_receiver::Event;
 
 pub enum AnyEvent {
 	Msg(Arc<Box<dyn Any + Send + Sync>>),

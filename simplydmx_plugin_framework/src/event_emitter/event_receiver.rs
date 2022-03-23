@@ -4,7 +4,6 @@ use std::{
 
 use async_std::channel::{
 	Receiver,
-	RecvError,
 };
 
 use super::{
@@ -48,24 +47,18 @@ impl<T: 'static> EventReceiver<T> {
 
 	/// Receives a single message of the desired type, wrapping it in an `ArcAny<T>` for ease
 	/// of use.
-	pub async fn receive(&self) -> Result<Event<T>, RecvError> {
+	pub async fn receive(&self) -> Event<T> {
 		loop {
-			let msg = self.receiver.recv().await;
+			// Unwrapped because it *should* be impossible for the sender to be disconnected
+			let msg = self.receiver.recv().await.unwrap();
 			match msg {
-				Ok(msg) => {
-					match msg {
-						AnyEvent::Msg(msg) => {
-							if let Some(thing) = ArcAny::<T>::new(msg) {
-								return Ok(Event::<T>::Msg(thing));
-							}
-						},
-						AnyEvent::Shutdown => {
-							return Ok(Event::<T>::Shutdown);
-						}
+				AnyEvent::Msg(msg) => {
+					if let Some(thing) = ArcAny::<T>::new(msg) {
+						return Event::<T>::Msg(thing);
 					}
 				},
-				Err(error) => {
-					return Err(error);
+				AnyEvent::Shutdown => {
+					return Event::<T>::Shutdown;
 				}
 			}
 		}

@@ -19,13 +19,26 @@ impl ShutdownService {
 	}
 }
 
+#[interpolate_service(
+	PluginContext,
+	"log",
+	"Log",
+	"Log a message somewhere useful",
+)]
+impl LogService {
+	#[service_main(
+		("Message", "The message to log"),
+	)]
+	pub async fn log(self, msg: String) {
+
+		#[cfg(feature = "stdout-logging")]
+		println!("{}", &msg);
+
+		self.0.emit::<String>("log".into(), msg).await;
+	}
+}
+
 pub async fn initialize(plugin_manager: PluginManager, plugin_context: PluginContext) {
 	plugin_context.register_service(true, ShutdownService(Arc::new(plugin_manager.clone()))).await.unwrap();
-
-	let plugin_context_dup = plugin_context.clone();
-	plugin_context.spawn(async move {
-		async_std::task::sleep(std::time::Duration::from_secs(10)).await;
-		let shutdown_service = plugin_context_dup.get_service("core", "shutdown").await.unwrap();
-		shutdown_service.call(Vec::new()).await.unwrap();
-	}).await.unwrap();
+	plugin_context.register_service(true, LogService(Arc::new(plugin_context.clone()))).await.unwrap();
 }

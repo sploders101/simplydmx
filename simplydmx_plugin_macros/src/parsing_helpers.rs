@@ -32,12 +32,11 @@ pub fn get_comma_delimited_strings(input: &Punctuated<Expr, Token![,]>, error_ms
 pub fn get_typedoc(in_type: Type) -> Box<dyn ToTokens> {
 
 	// Alias setup
-	let internals = quote! {simplydmx_plugin_framework::services::internals};
-	let modifiers = quote! {#internals::ServiceArgumentModifiers};
+	let modifiers = quote! {simplydmx_plugin_framework::ServiceArgumentModifiers};
 	let required = quote! {#modifiers::Required};
 	let optional = quote! {#modifiers::Optional};
 	let vector = quote! {#modifiers::Vector};
-	let types = quote! {#internals::ServiceDataTypes};
+	let types = quote! {simplydmx_plugin_framework::ServiceDataTypes};
 
 	// Type documentation
 	let in_type = in_type.into_token_stream().to_string();

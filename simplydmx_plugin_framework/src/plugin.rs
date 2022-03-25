@@ -42,7 +42,7 @@ use crate::{
 	},
 };
 
-pub use crate::keep_alive::{
+use crate::keep_alive::{
 	KeepAliveRegistrationError,
 	KeepAliveDeregistrationError,
 };

@@ -32,7 +32,6 @@ static ARGERR: &str = "interpolate_service expects comma-separated list of descr
 #[proc_macro_attribute]
 pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream {
     // Output aliases
-    let internals = quote! {simplydmx_plugin_framework::services::internals};
     let arc = quote! {std::sync::Arc};
 
     // Gather standard documentation
@@ -96,7 +95,7 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
                 return #name (#arc::clone(&self.0));
             }
         }
-        impl #internals::Service for #name
+        impl simplydmx_plugin_framework::Service for #name
         {
             fn get_id<'a>(&'a self) -> &'a str { #service_id }
             fn get_name<'a>(&'a self) -> &'a str { #service_name }
@@ -117,7 +116,6 @@ fn check_is_main(attribute: &Attribute) -> bool {
 /// type casting
 fn interpolate_service_main(outer_type: Type, _inner_type: Expr, attr: TokenStream, body: ImplItemMethod) -> Box<dyn ToTokens> {
     // Output aliases
-    let internals = quote! {simplydmx_plugin_framework::services::internals};
     let pin = quote! {std::pin::Pin};
     let box_ = quote! {std::boxed::Box};
     let future = quote! {std::future::Future};
@@ -174,13 +172,13 @@ fn interpolate_service_main(outer_type: Type, _inner_type: Expr, attr: TokenStre
                 internal_arguments.push(Box::new(quote! {
                     match arguments[#index].downcast_ref::<#ty>() {
                         Some(value) => #ty::clone(value),
-                        None => return Err(#internals::CallServiceError::TypeValidationFailed),
+                        None => return Err(simplydmx_plugin_framework::CallServiceError::TypeValidationFailed),
                     }
                 }));
                 internal_arguments_json.push(Box::new(quote! {
                     match serde_json::from_value::<#ty>(#value::clone(&arguments[#index])) {
                         Ok(arg) => arg,
-                        Err(_) => return Err(#internals::CallServiceJSONError::DeserializationFailed),
+                        Err(_) => return Err(simplydmx_plugin_framework::CallServiceJSONError::DeserializationFailed),
                     }
                 }));
                 arg_count += 1;
@@ -223,7 +221,7 @@ fn interpolate_service_main(outer_type: Type, _inner_type: Expr, attr: TokenStre
                 let type_id: Box<dyn ToTokens> = if let Some(type_id) = desc_elements.get(2) { Box::new(quote!{Some(#type_id)}) } else { Box::new(quote!{None}) };
                 // let type_id: Box<dyn ToTokens> = Box::new(desc_elements.get(2).unwrap_or(quote!{None}));
                 input_tokens.push(Box::new(quote! {
-                    #internals::ServiceArgument {
+                    simplydmx_plugin_framework::ServiceArgument {
                         id: #id,
                         name: #name,
                         description: #description,
@@ -247,22 +245,22 @@ fn interpolate_service_main(outer_type: Type, _inner_type: Expr, attr: TokenStre
     };
 
     return Box::new(quote! {
-        fn get_signature<'a>(&'a self) -> (&'a [#internals::ServiceArgument], &'a Option<#internals::ServiceArgument>) {
+        fn get_signature<'a>(&'a self) -> (&'a [simplydmx_plugin_framework::ServiceArgument], &'a Option<simplydmx_plugin_framework::ServiceArgument>) {
             return (&[#(#input_tokens),*], #return_signature);
         }
-        fn call<'a>(&'a self, arguments: Vec<#box_<dyn #any + Sync + Send>>) -> #pin<#box_<dyn #future<Output = Result<#box_<dyn #any + Sync + Send>, #internals::CallServiceError>> + Send + 'a>> {
-            async fn run(_self: #outer_type, arguments: Vec<#box_<dyn #any + Sync + Send>>) -> Result<#box_<dyn #any + Sync + Send>, #internals::CallServiceError> {
+        fn call<'a>(&'a self, arguments: Vec<#box_<dyn #any + Sync + Send>>) -> #pin<#box_<dyn #future<Output = Result<#box_<dyn #any + Sync + Send>, simplydmx_plugin_framework::CallServiceError>> + Send + 'a>> {
+            async fn run(_self: #outer_type, arguments: Vec<#box_<dyn #any + Sync + Send>>) -> Result<#box_<dyn #any + Sync + Send>, simplydmx_plugin_framework::CallServiceError> {
                 return Ok(#box_::new(#outer_type::#internal_call(_self, #(#internal_arguments),*)#inject_await));
             }
 
             return #box_::pin(run(#outer_type::clone(self), arguments));
         }
-        fn call_json<'a>(&'a self, arguments: Vec<#value>) -> #pin<#box_<dyn #future<Output = Result<#value, #internals::CallServiceJSONError>> + Send + 'a>> {
-            async fn run(_self: #outer_type, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, #internals::CallServiceJSONError> {
+        fn call_json<'a>(&'a self, arguments: Vec<#value>) -> #pin<#box_<dyn #future<Output = Result<#value, simplydmx_plugin_framework::CallServiceJSONError>> + Send + 'a>> {
+            async fn run(_self: #outer_type, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, simplydmx_plugin_framework::CallServiceJSONError> {
                 let ret_val = serde_json::to_value(#outer_type::#internal_call(_self, #(#internal_arguments_json),*)#inject_await);
                 return match ret_val {
                     Ok(ret_val) => Ok(ret_val),
-                    Err(_) => Err(#internals::CallServiceJSONError::SerializationFailed),
+                    Err(_) => Err(simplydmx_plugin_framework::CallServiceJSONError::SerializationFailed),
                 };
             }
 

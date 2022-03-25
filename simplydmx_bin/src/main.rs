@@ -1,7 +1,7 @@
 mod core;
 
 use simplydmx_plugin_framework::{
-	plugin::PluginManager,
+	PluginManager,
 };
 
 #[async_std::main]

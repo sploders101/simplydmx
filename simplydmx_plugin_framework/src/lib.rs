@@ -1,15 +1,51 @@
 // Mods
-pub mod keep_alive;
-pub mod event_emitter;
-pub mod plugin;
-pub mod services;
+mod keep_alive;
+mod event_emitter;
+mod plugin;
+mod services;
 
 // Tests
 #[cfg(test)]
 mod tests;
 
 // Re-exports
-pub use services::internals::Service;
+pub use services::{
+	internals::{
+		Service,
+		CallServiceError,
+		CallServiceJSONError,
+		ServiceArgument,
+		ServiceArgumentModifiers,
+		ServiceDataTypes,
+	},
+	type_specifiers::{
+		TypeSpecifier,
+		DropdownOptionNative,
+		DropdownOptionJSON,
+	}
+};
+pub use event_emitter::{
+	EventEmitter,
+	EventReceiver,
+	ArcAny,
+};
+pub use keep_alive::{
+	KeepAliveRegistrationError,
+	KeepAliveDeregistrationError,
+};
+pub use plugin::{
+	Dependency,
+	GetServiceError,
+	Plugin,
+	PluginContext,
+	PluginManager,
+	PluginRegistry,
+	RegisterPluginError,
+	ServiceDescription,
+	ServiceRegistrationError,
+	TypeSpecifierRegistrationError,
+	TypeSpecifierRetrievalError,
+};
 
 // Macros and macro re-exports
 pub use simplydmx_plugin_macros::*;

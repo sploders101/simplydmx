@@ -1,10 +1,8 @@
 use std::sync::Arc;
 
 use simplydmx_plugin_framework::{
-	plugin::{
-		PluginManager,
-		PluginContext,
-	},
+	PluginManager,
+	PluginContext,
 	interpolate_service,
 };
 

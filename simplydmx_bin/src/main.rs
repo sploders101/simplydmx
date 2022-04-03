@@ -1,4 +1,4 @@
-mod core;
+mod plugins;
 
 use simplydmx_plugin_framework::{
 	PluginManager,
@@ -11,9 +11,23 @@ async fn main() {
 	let (plugin_manager, shutdown_receiver) = PluginManager::new();
 
 	// Register core plugin
-	core::initialize(plugin_manager.clone(), plugin_manager.register_plugin("core", "SimplyDMX Core").await.unwrap()).await;
+	plugins::core::initialize(
+		plugin_manager.clone(),
+		plugin_manager.register_plugin(
+			"core",
+			"SimplyDMX Core",
+		).await.unwrap()
+	).await;
 
 	// Register other plugins
+
+	#[cfg(target = "output-dmx-e131")]
+	plugins::output_dmx_e131::initialize(
+		plugin_manager.register_plugin(
+			"output-dmx-e131",
+			"E1.31/sACN DMX Output",
+		).await.unwrap()
+	).await;
 
 	// Wait for shutdown request
 	shutdown_receiver.recv().await.unwrap();

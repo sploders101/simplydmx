@@ -18,6 +18,8 @@ use syn::{
     ImplItem,
     Attribute,
     ExprTuple,
+    TypeTuple,
+    PatTuple,
     ImplItemMethod,
 };
 
@@ -36,14 +38,13 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
 
     // Gather standard documentation
     let mut docs = Punctuated::<Expr, Token![,]>::parse_terminated.parse(attr).expect("Improperly formatted outer macro usage.").into_iter();
-    let inner_type = docs.next().expect("Inner type not provided");
     let service_id = docs.next().expect("ID not provided");
     let service_name = docs.next().expect("Name not provided");
     let service_description = docs.next().expect("Docs not provided");
 
     // Gather information from impl
     let impl_internals: ItemImpl = syn::parse(body)
-        .expect("interpolate_service can only be used on an impl MyService statement");
+    .expect("interpolate_service can only be used on an impl MyService statement");
     let name = impl_internals.self_ty;
 
     // Check for anything weird
@@ -53,6 +54,47 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
     }
     if impl_internals.trait_.is_some() { panic!("interpolate_service cannot be used on trait implementations"); }
 
+    // Find inner type specified in another attribute on impl
+    let mut inner_type: Option<Box<dyn ToTokens>> = None;
+    for item in impl_internals.attrs {
+
+        let is_inner = check_simple_attr(&item, "inner");
+        let is_inner_raw = check_simple_attr(&item, "inner_raw");
+
+        if is_inner || is_inner_raw {
+            if inner_type.is_some() { panic!("A service can have only one inner type") };
+            let item_tokens: Pat = syn::parse(item.tokens.into()).expect("Invalid inner type");
+            match item_tokens {
+                Pat::Tuple(item_tokens) => {
+                    let inner_tokens = item_tokens.elems;
+                    match inner_tokens.len() {
+                        0 => {
+                            inner_type = Some(Box::new(quote! {()}));
+                        },
+                        1 => {
+                            if is_inner {
+                                inner_type = Some(Box::new(quote! {(#arc<#inner_tokens>)}));
+                            } else if is_inner_raw {
+                                inner_type = Some(Box::new(quote! {(#inner_tokens)}));
+                            }
+                        },
+                        _ => {
+                            if is_inner {
+                                inner_type = Some(Box::new(quote! {(#arc<(#inner_tokens)>)}));
+                            } else if is_inner_raw {
+                                inner_type = Some(Box::new(quote! {(#inner_tokens)}));
+                            }
+                        }
+                    }
+                },
+                _ => panic!("Unrecognized pattern on inner type attribute"),
+            }
+        }
+    }
+
+    // Expect required types
+    let inner_type = inner_type.expect("Inner type not specified (ex: `#[inner(MyInnerDataType)]`)");
+
     // Go through impl items and look for the #[main] attribute
     let mut items: Vec<Box<dyn ToTokens>> = Vec::new();
     let mut service_implementation: Option<Box<dyn ToTokens>> = None;
@@ -60,7 +102,7 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
         match item {
             ImplItem::Method(item) => {
                 for (i, attribute) in item.attrs.clone().into_iter().enumerate() {
-                    if check_is_main(&attribute) {
+                    if check_simple_attr(&attribute, "service_main") {
                         if let Some(_) = service_implementation {
                             panic!("Cannot have two main functions in a service");
                         } else {
@@ -71,7 +113,7 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
                             items.push(Box::new(cloned_item.clone()));
 
                             // Interpolate service calls from main
-                            service_implementation = Some(interpolate_service_main((*name).clone(), inner_type.clone(), attribute.tokens.into(), cloned_item));
+                            service_implementation = Some(interpolate_service_main((*name).clone(), attribute.tokens.into(), cloned_item));
 
                         }
                     }
@@ -86,14 +128,10 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
     // Generate output
     let service_implementation = service_implementation.expect("Could not find entrypoint for service. Make sure to mark it with #[main(...)]");
     let gen = quote!{
-        struct #name (#arc<#inner_type>);
+        #[derive(Clone)]
+        struct #name #inner_type;
         impl #name {
             #(#items)*
-        }
-        impl Clone for #name {
-            fn clone(&self) -> Self {
-                return #name (#arc::clone(&self.0));
-            }
         }
         impl simplydmx_plugin_framework::Service for #name
         {
@@ -106,15 +144,15 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
     return gen.into();
 }
 
-fn check_is_main(attribute: &Attribute) -> bool {
+fn check_simple_attr(attribute: &Attribute, expect: &str) -> bool {
     if attribute.path.leading_colon.is_some() { return false };
     if attribute.path.segments.len() != 1 { return false };
-    return attribute.path.segments[0].ident.to_string() == "service_main";
+    return attribute.path.segments[0].ident.to_string() == expect;
 }
 
 /// Interpolates the inner main function of a service, creating functions related to documentation and
 /// type casting
-fn interpolate_service_main(outer_type: Type, _inner_type: Expr, attr: TokenStream, body: ImplItemMethod) -> Box<dyn ToTokens> {
+fn interpolate_service_main(outer_type: Type, attr: TokenStream, body: ImplItemMethod) -> Box<dyn ToTokens> {
     // Output aliases
     let pin = quote! {std::pin::Pin};
     let box_ = quote! {std::boxed::Box};

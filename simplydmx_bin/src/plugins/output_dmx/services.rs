@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use simplydmx_plugin_framework::*;
 use super::types::{
 	OutputContext,
@@ -7,12 +9,14 @@ use super::types::{
 
 
 #[interpolate_service(
-	(PluginContext, OutputContext),
 	"register_output_type",
 	"Register Output Type",
 	"Registers a new DMX transport type",
 )]
 impl RegisterOutputType {
+
+	#![inner_raw(PluginContext, Arc::<OutputContext>)]
+
 	#[service_main(
 		("Output ID", "The unique ID of the output to be used for referencing this transport. This ID should be static so it can be saved for later."),
 		("Output Name", "The name of the output type for display in the GUI"),
@@ -31,7 +35,7 @@ impl RegisterOutputType {
 		delete_universe_id: String,
 		output_channel: String,
 	) {
-		let mut available_outputs = self.0.1.output_types.write().await;
+		let mut available_outputs = self.1.output_types.write().await;
 		available_outputs.insert(String::clone(&id), OutputDescriptor {
 			id: String::clone(&id),
 			name,
@@ -42,18 +46,21 @@ impl RegisterOutputType {
 			output_channel,
 		});
 		drop(available_outputs);
-		self.0.0.emit("output_dmx.output_registered".into(), id).await;
+		self.0.emit("output_dmx.output_registered".into(), id).await;
 	}
+
 }
 
 
 #[interpolate_service(
-	OutputContext,
 	"query_output_types",
 	"Query output types",
 	"Queries a list of valid output types with presentable metadata for the UI",
 )]
 impl QueryOutputTypes {
+
+	#![inner(OutputContext)]
+
 	#[service_main(
 		("Outputs", "List of output types with presentable metadata"),
 	)]

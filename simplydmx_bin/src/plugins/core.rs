@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use simplydmx_plugin_framework::{
 	PluginManager,
 	PluginContext,
@@ -7,12 +5,12 @@ use simplydmx_plugin_framework::{
 };
 
 #[interpolate_service(
-	PluginManager,
 	"shutdown",
 	"Quit SimplyDMX",
 	"Shut down SimplyDMX and all of its components",
 )]
 impl ShutdownService {
+	#![inner_raw(PluginManager)]
 	#[service_main()]
 	pub async fn shutdown(self) {
 		self.0.shutdown().await;
@@ -20,12 +18,12 @@ impl ShutdownService {
 }
 
 #[interpolate_service(
-	PluginContext,
 	"log",
 	"Log",
 	"Log a message somewhere useful",
 )]
 impl LogService {
+	#![inner_raw(PluginContext)]
 	#[service_main(
 		("Message", "The message to log"),
 	)]
@@ -39,6 +37,6 @@ impl LogService {
 }
 
 pub async fn initialize(plugin_manager: PluginManager, plugin_context: PluginContext) {
-	plugin_context.register_service(true, ShutdownService(Arc::new(plugin_manager.clone()))).await.unwrap();
-	plugin_context.register_service(true, LogService(Arc::new(plugin_context.clone()))).await.unwrap();
+	plugin_context.register_service(true, ShutdownService(plugin_manager.clone())).await.unwrap();
+	plugin_context.register_service(true, LogService(plugin_context.clone())).await.unwrap();
 }

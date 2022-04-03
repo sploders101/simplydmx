@@ -15,7 +15,7 @@ pub struct ServiceArgument<'a> {
 	pub id: &'a str,
 	pub name: &'a str,
 	pub description: &'a str,
-	pub val_type: ServiceArgumentModifiers,
+	pub val_type: ServiceArgumentModifiers<'a>,
 
 	/// Type ID identifying more specific information about the value. For example, the following could be
 	/// used to identify that a string uuid representing a fixture should be provided.
@@ -28,10 +28,11 @@ pub struct ServiceArgument<'a> {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "modifier", content = "value")]
-pub enum ServiceArgumentModifiers {
+pub enum ServiceArgumentModifiers<'a> {
 	Required(ServiceDataTypes),
 	Optional(ServiceDataTypes),
 	Vector(ServiceDataTypes),
+	Custom(&'a str),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -84,6 +84,6 @@ pub fn get_typedoc(in_type: Type) -> Box<dyn ToTokens> {
 		"Vec < String >" => quote! {#vector(#types::String)},
 
 		// Unknown
-		type_string => panic!("Type {} is not recognized as a valid service input.", type_string),
+		type_string => quote! {#modifiers::Custom(#type_string)},
 	});
 }

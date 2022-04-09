@@ -18,8 +18,6 @@ use syn::{
     ImplItem,
     Attribute,
     ExprTuple,
-    TypeTuple,
-    PatTuple,
     ImplItemMethod,
 };
 

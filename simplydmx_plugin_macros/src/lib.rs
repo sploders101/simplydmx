@@ -54,10 +54,12 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
 
     // Find inner type specified in another attribute on impl
     let mut inner_type: Option<Box<dyn ToTokens>> = None;
+    let mut is_public = quote!{pub };
     for item in impl_internals.attrs {
 
         let is_inner = check_simple_attr(&item, "inner");
         let is_inner_raw = check_simple_attr(&item, "inner_raw");
+        let is_private = check_simple_attr(&item, "private");
 
         if is_inner || is_inner_raw {
             if inner_type.is_some() { panic!("A service can have only one inner type") };
@@ -87,6 +89,8 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
                 },
                 _ => panic!("Unrecognized pattern on inner type attribute"),
             }
+        } else if is_private {
+            is_public = quote!{};
         }
     }
 
@@ -127,7 +131,7 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
     let service_implementation = service_implementation.expect("Could not find entrypoint for service. Make sure to mark it with #[main(...)]");
     let gen = quote!{
         #[derive(Clone)]
-        struct #name #inner_type;
+        #is_public struct #name #inner_type;
         impl #name {
             #(#items)*
         }

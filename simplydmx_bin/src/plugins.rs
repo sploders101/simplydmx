@@ -1,5 +1,7 @@
 pub mod core;
 
+pub mod patcher;
+pub mod mixer;
 pub mod output_dmx;
 
 #[cfg(feature = "output-dmx-e131")]

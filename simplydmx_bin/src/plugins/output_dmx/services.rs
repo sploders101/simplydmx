@@ -17,6 +17,10 @@ impl RegisterOutputType {
 
 	#![inner_raw(PluginContext, Arc::<OutputContext>)]
 
+	pub fn new(plugin_context: PluginContext, output_context: Arc<OutputContext>) -> RegisterOutputType {
+		return RegisterOutputType(plugin_context, output_context);
+	}
+
 	#[service_main(
 		("Output ID", "The unique ID of the output to be used for referencing this transport. This ID should be static so it can be saved for later."),
 		("Output Name", "The name of the output type for display in the GUI"),
@@ -60,6 +64,10 @@ impl RegisterOutputType {
 impl QueryOutputTypes {
 
 	#![inner(OutputContext)]
+
+	pub fn new(output_context: Arc<OutputContext>) -> QueryOutputTypes {
+		return QueryOutputTypes(output_context);
+	}
 
 	#[service_main(
 		("Outputs", "List of output types with presentable metadata"),

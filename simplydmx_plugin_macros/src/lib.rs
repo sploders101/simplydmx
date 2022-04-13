@@ -103,11 +103,15 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
     for item in impl_internals.items {
         match item {
             ImplItem::Method(item) => {
+                let mut fn_added = false;
                 for (i, attribute) in item.attrs.clone().into_iter().enumerate() {
                     if check_simple_attr(&attribute, "service_main") {
                         if let Some(_) = service_implementation {
                             panic!("Cannot have two main functions in a service");
                         } else {
+
+                            // Mark that we found the main function
+                            fn_added = true;
 
                             // Remove marker attribute and add
                             let mut cloned_item = item.clone();
@@ -119,6 +123,9 @@ pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream 
 
                         }
                     }
+                }
+                if !fn_added {
+                    items.push(Box::new(item));
                 }
             },
             _ => {

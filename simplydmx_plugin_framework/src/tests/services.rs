@@ -22,12 +22,12 @@ use crate::{
 
 struct Test ();
 #[interpolate_service(
-	Test,
 	"test_service",
 	"Test Service",
 	"Test service's description"
 )]
 impl TestService {
+	#![inner(Test)]
 	#[service_main(
 		("Called From", "This indicates how the service was called."),
 		("Light", "This is the ID of the light that you would like to control"),

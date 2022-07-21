@@ -1,4 +1,5 @@
-mod plugins;
+pub mod plugins;
+pub mod type_extensions;
 
 use simplydmx_plugin_framework::{
 	PluginManager,
@@ -19,15 +20,28 @@ async fn main() {
 		).await.unwrap()
 	).await;
 
-	// Register other plugins
-
-	#[cfg(target = "output-dmx-e131")]
-	plugins::output_dmx_e131::initialize(
+	plugins::mixer::initialize_mixer(
 		plugin_manager.register_plugin(
-			"output-dmx-e131",
-			"E1.31/sACN DMX Output",
-		).await.unwrap()
+			"patcher",
+			"SimplyDMX Fixture Patcher",
+		).await.unwrap(),
 	).await;
+
+	// Register other plugins
+	plugins::mixer::initialize_mixer(
+		plugin_manager.register_plugin(
+			"mixer",
+			"SimplyDMX Mixer",
+		).await.unwrap(),
+	).await;
+
+	// #[cfg(target = "output-dmx-e131")]
+	// plugins::output_dmx_e131::initialize(
+	// 	plugin_manager.register_plugin(
+	// 		"output-dmx-e131",
+	// 		"E1.31/sACN DMX Output",
+	// 	).await.unwrap()
+	// ).await;
 
 	// Wait for shutdown request
 	shutdown_receiver.recv().await.unwrap();

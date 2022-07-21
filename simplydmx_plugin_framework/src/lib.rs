@@ -28,6 +28,7 @@ pub use event_emitter::{
 	EventEmitter,
 	EventReceiver,
 	ArcAny,
+	Event,
 };
 pub use keep_alive::{
 	KeepAliveRegistrationError,

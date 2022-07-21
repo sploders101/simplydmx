@@ -1,10 +1,17 @@
 use std::{
+	any::Any,
 	marker::PhantomData,
 };
 
 use async_std::channel::{
 	Receiver,
 };
+
+use serde::{
+	Serialize,
+	Deserialize,
+};
+use serde_json::Value;
 
 use super::{
 	AnyEvent,
@@ -25,7 +32,7 @@ pub enum Event<T: 'static> {
 	Shutdown,
 }
 
-impl<T: 'static> EventReceiver<T> {
+impl<T: 'static + Any + Serialize + Deserialize<'static>> EventReceiver<T> {
 
 	/// Create a new Type filter that discards events that don't yield
 	/// the desired type.

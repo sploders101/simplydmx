@@ -272,7 +272,7 @@ impl PluginContext {
 	/// an instance of `EventReceiver<T>` which filters for the desired type
 	/// and wraps resulting values in `ArcAny<T>` to make usage of the data
 	/// simpler.
-	pub async fn on<T: 'static>(&self, event_name: String) -> EventReceiver<T> {
+	pub async fn on<T: 'static + Any + Serialize + Deserialize<'static>>(&self, event_name: String) -> EventReceiver<T> {
 		return self.0.evt_bus.write().await.on::<T>(event_name);
 	}
 
@@ -346,12 +346,32 @@ impl PluginContext {
 		return self.spawn(async move {
 			// Wait for dependencies to be resolved
 			while dependencies.len() > 0 {
-				let next_dep = receiver.recv().await.unwrap();
-				dependencies = dependencies.into_iter().filter(|dependency| *dependency != *next_dep).collect();
+				if let Ok(next_dep) = receiver.recv().await {
+					dependencies = dependencies.into_iter().filter(|dependency| *dependency != *next_dep).collect();
+				} else {
+					// The sender may be destroyed during shutdown, so
+					break;
+				}
 			}
 
 			blocker.await;
 		}).await;
+	}
+
+	/// Spawn the specified task when the set of dependencies has finished.
+	///
+	/// Ignore errors resulting from imminent shutdown
+	pub async fn spawn_when_volatile<'a, F>(&self, dependencies: Vec<Dependency>, blocker: F) -> ()
+	where
+		F: Future<Output = ()> + Send + 'static
+	{
+		let result = self.spawn_when(dependencies, blocker).await;
+		match result {
+			Ok(()) => (),
+			Err(err) => match err {
+				KeepAliveRegistrationError::ShuttingDown => (),
+			},
+		}
 	}
 
 	/// Spawns a task that prevents application shutdown until complete.
@@ -363,6 +383,24 @@ impl PluginContext {
 	{
 		let keep_alive = self.0.keep_alive.write().await;
 		return keep_alive.register_blocker(blocker).await;
+	}
+
+	/// Spawns a task that prevents application shutdown until complete.
+	///
+	/// `blocker`: The future to let finish before shutting down
+	///
+	/// Ignore errors resulting from imminent shutdown
+	pub async fn spawn_volatile<F>(&self, blocker: F) -> ()
+	where
+		F: Future<Output = ()> + Send + 'static,
+	{
+		let result = self.spawn(blocker).await;
+		match result {
+			Ok(()) => (),
+			Err(err) => match err {
+				KeepAliveRegistrationError::ShuttingDown => (),
+			},
+		}
 	}
 
 	/// Registers a future to be driven during the final stage of shutdown. This can be useful for closing
@@ -501,6 +539,26 @@ pub enum Dependency {
 	/// has been properly initialized. It is better to use a `Flag` or `Service`
 	/// for this purpose
 	Plugin{ plugin_id: String },
+}
+
+impl Dependency {
+	pub fn flag(plugin_id: &str, flag_id: &str) -> Dependency {
+		return Dependency::Flag {
+			plugin_id: String::from(plugin_id),
+			flag_id: String::from(flag_id),
+		};
+	}
+	pub fn service(plugin_id: &str, service_id: &str) -> Dependency {
+		return Dependency::Service {
+			plugin_id: String::from(plugin_id),
+			service_id: String::from(service_id),
+		};
+	}
+	pub fn plugin(plugin_id: &str) -> Dependency {
+		return Dependency::Plugin {
+			plugin_id: String::from(plugin_id),
+		};
+	}
 }
 
 struct ConsolidatedDependencies<'a> {

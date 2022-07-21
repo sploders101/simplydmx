@@ -17,6 +17,11 @@ use async_std::{
 	},
 };
 
+use serde::{
+	Serialize,
+	Deserialize,
+};
+
 pub use event_receiver::EventReceiver;
 pub use arc_any::ArcAny;
 pub use event_receiver::Event;
@@ -98,7 +103,7 @@ impl EventEmitter {
 	/// an instance of `EventReceiver<T>` which filters for the desired type
 	/// and wraps resulting values in `ArcAny<T>` to make usage of the data
 	/// simpler.
-	pub fn on<T>(&mut self, event_name: String) -> EventReceiver<T> {
+	pub fn on<T: 'static + Any + Serialize + Deserialize<'static>>(&mut self, event_name: String) -> EventReceiver<T> {
 		self.gc();
 
 		if !self.listeners.contains_key(&event_name) {

@@ -36,6 +36,25 @@ impl LogService {
 	}
 }
 
+#[interpolate_service(
+	"log_error",
+	"Log Error",
+	"Log an error that needs to be addressed",
+)]
+impl LogErrorService {
+	#![inner_raw(PluginContext)]
+	#[service_main(
+		("Message", "The message to log"),
+	)]
+	pub async fn log(self, msg: String) {
+
+		#[cfg(feature = "stdout-logging")]
+		println!("{}", &msg);
+
+		self.0.emit::<String>("log_error".into(), msg).await;
+	}
+}
+
 pub async fn initialize(plugin_manager: PluginManager, plugin_context: PluginContext) {
 	plugin_context.register_service(true, ShutdownService(plugin_manager.clone())).await.unwrap();
 	plugin_context.register_service(true, LogService(plugin_context.clone())).await.unwrap();

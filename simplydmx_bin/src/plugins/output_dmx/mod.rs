@@ -19,7 +19,7 @@ pub async fn initialize(plugin_context: PluginContext) {
 	});
 
 	// Register services
-	plugin_context.register_service(false, services::RegisterOutputType::new(plugin_context.clone(), Arc::clone(&output_context))).await.unwrap();
-	plugin_context.register_service(false, services::QueryOutputTypes::new(Arc::clone(&output_context))).await.unwrap();
+	plugin_context.register_service(true, services::RegisterOutputType::new(plugin_context.clone(), Arc::clone(&output_context))).await.unwrap();
+	plugin_context.register_service(true, services::QueryOutputTypes::new(Arc::clone(&output_context))).await.unwrap();
 
 }

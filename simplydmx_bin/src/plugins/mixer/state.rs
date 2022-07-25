@@ -82,12 +82,18 @@ pub struct LayerBin {
 /// Represents the data for all the lights in a layer.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Submaster {
-	pub data: HashMap<Uuid, AbstractLayerLight>,
+	pub data: SubmasterData,
 }
+
+/// Represents the data within a submaster used for blending
+pub type SubmasterData = HashMap<Uuid, AbstractLayerLight>;
 
 /// Represents the abstract data for a single light in a layer.
 /// A value's binary may be masked if the output is u8 (integer overflow cast)
 pub type AbstractLayerLight = HashMap<String, BlenderValue>;
+
+/// Represents a set of data to be merged with the existing submaster data
+pub type SubmasterDelta = HashMap<Uuid, HashMap<String, Option<BlenderValue>>>;
 
 /// Value to be used in a submaster with instructions for mixing it into the result
 #[derive(Debug, Serialize, Deserialize, Clone)]

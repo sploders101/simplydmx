@@ -34,10 +34,9 @@ pub async fn initialize_mixer(plugin_context: PluginContext) {
 	plugin_context.register_service(true, commands::EnterBlindMode::new(plugin_context.clone(), Arc::clone(&mixer_context))).await.unwrap();
 	plugin_context.register_service(true, commands::SetBlindOpacity::new(plugin_context.clone(), Arc::clone(&mixer_context), update_sender.clone())).await.unwrap();
 	plugin_context.register_service(true, commands::GetBlindOpacity::new(plugin_context.clone(), Arc::clone(&mixer_context))).await.unwrap();
-	plugin_context.register_service(true, commands::ExitBlindMode::new(plugin_context.clone(), Arc::clone(&mixer_context))).await.unwrap();
 	plugin_context.register_service(true, commands::RevertBlind::new(plugin_context.clone(), Arc::clone(&mixer_context), update_sender.clone())).await.unwrap();
 	plugin_context.register_service(true, commands::CommitBlind::new(plugin_context.clone(), Arc::clone(&mixer_context), update_sender.clone())).await.unwrap();
-	plugin_context.register_service(true, commands::CreateLayer::new(plugin_context.clone(), Arc::clone(&mixer_context), update_sender.clone())).await.unwrap();
+	plugin_context.register_service(true, commands::CreateLayer::new(plugin_context.clone(), Arc::clone(&mixer_context))).await.unwrap();
 	plugin_context.register_service(true, commands::SetLayerContents::new(plugin_context.clone(), Arc::clone(&mixer_context), update_sender.clone())).await.unwrap();
 	plugin_context.register_service(true, commands::GetLayerContents::new(plugin_context.clone(), Arc::clone(&mixer_context))).await.unwrap();
 	plugin_context.register_service(true, commands::SetLayerOpacity::new(plugin_context.clone(), Arc::clone(&mixer_context), update_sender.clone())).await.unwrap();

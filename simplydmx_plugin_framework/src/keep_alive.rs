@@ -16,17 +16,17 @@ use async_std::{
 	},
 };
 use uuid::Uuid;
-use serde::Serialize;
+use simplydmx_plugin_macros::portable;
 
 
 /// An error returned from a `KeepAlive` registration call
-#[derive(Debug, Serialize)]
+#[portable]
 pub enum KeepAliveRegistrationError {
 	ShuttingDown,
 }
 
 /// An error returned from a `KeepAlive` de-registration call
-#[derive(Debug, Serialize)]
+#[portable]
 pub enum KeepAliveDeregistrationError {
 	ShuttingDown,
 	NotRegistered,

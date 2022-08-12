@@ -2,6 +2,7 @@ use std::{
 	collections::HashMap,
 	sync::Arc,
 };
+use simplydmx_plugin_framework::*;
 use crate::type_extensions::{
 	uuid::Uuid,
 };
@@ -13,7 +14,7 @@ use serde::{
 
 // Use this for upgrades: https://serde.rs/attr-default.html
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[portable]
 pub struct MixerContext {
 	/// The layer bin any layer opacity changes should be written to.
 	pub default_layer_bin: Uuid,
@@ -73,14 +74,14 @@ impl MixerContext {
 ///
 /// Useful for things like blind mode, so looks can be created separately and
 /// transitioned into & out of
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[portable]
 pub struct LayerBin {
 	pub layer_order: Vec<Uuid>,
 	pub layer_opacities: HashMap<Uuid, u16>,
 }
 
 /// Represents the data for all the lights in a layer.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[portable]
 pub struct Submaster {
 	pub data: SubmasterData,
 }
@@ -96,7 +97,7 @@ pub type AbstractLayerLight = HashMap<String, BlenderValue>;
 pub type SubmasterDelta = HashMap<Uuid, HashMap<String, Option<BlenderValue>>>;
 
 /// Value to be used in a submaster with instructions for mixing it into the result
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[portable]
 pub enum BlenderValue {
 
 	/// Static value, meaning at 100%, the channel should be exactly this value
@@ -133,6 +134,7 @@ impl Default for MixerCache {
 	}
 }
 
+#[portable]
 pub enum BlendingScheme {
 
 	/// Highest Takes Priority (usually used for intensity)
@@ -143,6 +145,7 @@ pub enum BlendingScheme {
 
 }
 
+#[portable]
 pub enum SnapData {
 
 	/// Do not snap values. Output without transforming
@@ -153,6 +156,7 @@ pub enum SnapData {
 
 }
 
+#[portable]
 pub struct BlendingData {
 
 	/// Indicates how the value should be blended

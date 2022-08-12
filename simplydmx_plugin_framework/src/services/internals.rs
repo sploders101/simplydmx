@@ -4,13 +4,11 @@ use std::{
 	boxed::Box,
 	future::Future,
 };
-use serde::{
-	Serialize,
-	Deserialize,
-};
 use serde_json::Value;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+use simplydmx_plugin_macros::portable;
+
+#[portable]
 pub struct ServiceArgument<'a> {
 	pub id: &'a str,
 	pub name: &'a str,
@@ -26,7 +24,7 @@ pub struct ServiceArgument<'a> {
 	pub val_type_id: Option<&'a str>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[portable]
 #[serde(tag = "modifier", content = "value")]
 pub enum ServiceArgumentModifiers<'a> {
 	Required(ServiceDataTypes),
@@ -35,7 +33,7 @@ pub enum ServiceArgumentModifiers<'a> {
 	Custom(&'a str),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[portable]
 #[serde(tag = "type")]
 /// Describes a data type used by a service.
 pub enum ServiceDataTypes {
@@ -48,13 +46,13 @@ pub enum ServiceDataTypes {
 	String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[portable]
 #[serde(tag = "type")]
 pub enum CallServiceError {
 	TypeValidationFailed,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[portable]
 #[serde(tag = "type")]
 pub enum CallServiceJSONError {
 	DeserializationFailed,

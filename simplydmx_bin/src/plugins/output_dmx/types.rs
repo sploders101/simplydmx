@@ -8,17 +8,14 @@ use async_std::{
 		RwLock,
 	},
 };
-use serde::{
-	Serialize,
-	Deserialize,
-};
+use simplydmx_plugin_framework::*;
 
 #[derive(Debug)]
 pub struct OutputContext {
 	pub output_types: RwLock<HashMap<String, OutputDescriptor>>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[portable]
 pub struct OutputDescriptor {
 	pub id: String,
 	pub name: String,
@@ -29,7 +26,7 @@ pub struct OutputDescriptor {
 	pub output_channel: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[portable]
 pub struct DisplayableOutput {
 	pub id: String,
 	pub name: String,

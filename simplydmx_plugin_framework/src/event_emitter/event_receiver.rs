@@ -1,46 +1,38 @@
-use std::{
-	any::Any,
-	marker::PhantomData,
-};
+use std::marker::PhantomData;
 
 use async_std::channel::{
 	Receiver,
 };
 
-use serde::{
-	Serialize,
-	Deserialize,
-};
-use serde_json::Value;
-
 use super::{
-	AnyEvent,
-	arc_any::ArcAny,
+	PortableEvent,
+	BidirectionalPortable,
+	arc_portable::ArcPortable,
 };
 
-/// Wrapped receiver that filters an `Arc<Any>` event stream and returns `ArcAny<T>` for the
-/// desired type. The `ArcAny<T>` allows the data to be easily cast to the correct type via deref
+/// Wrapped receiver that filters an `Arc<Any>` event stream and returns `ArcPortable<T>` for the
+/// desired type. The `ArcPortable<T>` allows the data to be easily cast to the correct type via deref
 /// while maintaining ownership of the `Arc` to avoid deallocation.
-pub struct EventReceiver<T: 'static> {
+pub struct EventReceiver<T: BidirectionalPortable> {
 	event_name: String,
-	receiver: Receiver<AnyEvent>,
+	receiver: Receiver<PortableEvent>,
 	_phantom: PhantomData<T>,
 }
 
 pub enum Event<T: 'static> {
-	Msg(ArcAny<T>),
+	Msg(ArcPortable<T>),
 	Shutdown,
 }
 
-impl<T: 'static + Any + Serialize + Deserialize<'static>> EventReceiver<T> {
+impl<T: BidirectionalPortable> EventReceiver<T> {
 
 	/// Create a new Type filter that discards events that don't yield
 	/// the desired type.
 	///
 	/// When the wrapped receiver returns an event with valid data, the data will be returned
-	/// through an ArcAny struct. This struct maintains ownership of the arc while allowing a
+	/// through an ArcPortable struct. This struct maintains ownership of the arc while allowing a
 	/// dereference to typed data. Type ID is checked on creation to prevent downcast issues.
-	pub fn new(event_name: String, receiver: Receiver<AnyEvent>) -> EventReceiver<T> {
+	pub fn new(event_name: String, receiver: Receiver<PortableEvent>) -> EventReceiver<T> {
 		return EventReceiver::<T> {
 			event_name,
 			receiver,
@@ -52,19 +44,21 @@ impl<T: 'static + Any + Serialize + Deserialize<'static>> EventReceiver<T> {
 		return &self.event_name;
 	}
 
-	/// Receives a single message of the desired type, wrapping it in an `ArcAny<T>` for ease
+	/// Receives a single message of the desired type, wrapping it in an `ArcPortable<T>` for ease
 	/// of use.
 	pub async fn receive(&self) -> Event<T> {
 		loop {
 			// Unwrapped because it *should* be impossible for the sender to be disconnected
 			let msg = self.receiver.recv().await.unwrap();
 			match msg {
-				AnyEvent::Msg(msg) => {
-					if let Some(thing) = ArcAny::<T>::new(msg) {
-						return Event::<T>::Msg(thing);
+				PortableEvent::Msg(msg) => {
+					if let Some(msg) = ArcPortable::new(msg) {
+						return Event::<T>::Msg(msg);
 					}
+					// else clause not needed; we will just wait for the next loop iteration
+					// to find a value
 				},
-				AnyEvent::Shutdown => {
+				PortableEvent::Shutdown => {
 					return Event::<T>::Shutdown;
 				}
 			}

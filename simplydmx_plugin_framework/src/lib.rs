@@ -3,6 +3,7 @@ mod keep_alive;
 mod event_emitter;
 mod plugin;
 mod services;
+mod arc_any;
 
 // Tests
 #[cfg(test)]
@@ -27,13 +28,14 @@ pub use services::{
 pub use event_emitter::{
 	EventEmitter,
 	EventReceiver,
-	ArcAny,
+	ArcPortable,
 	Event,
 };
 pub use keep_alive::{
 	KeepAliveRegistrationError,
 	KeepAliveDeregistrationError,
 };
+pub use arc_any::ArcAny;
 pub use plugin::{
 	Dependency,
 	GetServiceError,

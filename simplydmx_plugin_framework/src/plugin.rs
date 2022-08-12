@@ -6,7 +6,6 @@ use std::{
 	sync::{
 		Arc,
 	},
-	any::Any,
 	future::Future,
 };
 use uuid::Uuid;
@@ -20,14 +19,13 @@ use async_std::{
 		Receiver,
 	},
 };
-use serde::{
-	Serialize,
-	Deserialize,
-};
+use simplydmx_plugin_macros::portable;
 use crate::{
 	event_emitter::{
 		EventEmitter,
 		EventReceiver,
+		BidirectionalPortable,
+		RegisterListenerError,
 	},
 	keep_alive::KeepAlive,
 	services::{
@@ -146,7 +144,7 @@ impl PluginContext {
 		plugins.insert(String::clone(&id), Arc::clone(&plugin));
 
 		// Signal that a new plugin has been registered
-		registry.evt_bus.write().await.send(String::from("simplydmx.plugin_registered"), String::clone(&id)).await;
+		registry.evt_bus.write().await.emit(String::from("simplydmx.plugin_registered"), String::clone(&id)).await;
 
 		// Create plugin context
 		let plugin_context = PluginContext (Arc::clone(&registry), plugin);
@@ -196,7 +194,7 @@ impl PluginContext {
 
 		// Advertise service via evt_bus
 		self.0.evt_bus.write().await
-			.send(String::from("simplydmx.service_registered"), String::from(&self.1.id) + "." + &id).await;
+			.emit(String::from("simplydmx.service_registered"), String::from(&self.1.id) + "." + &id).await;
 
 		self.signal_dep(Dependency::Service{
 			plugin_id: self.1.id.clone(),
@@ -219,7 +217,7 @@ impl PluginContext {
 
 		// Advertise removal via evt_bus
 		self.0.evt_bus.write().await
-			.send(String::from("simplydmx.service_removed"), String::from(&self.1.id) + "." + svc_id).await;
+			.emit(String::from("simplydmx.service_removed"), String::from(&self.1.id) + "." + svc_id).await;
 
 	}
 
@@ -264,15 +262,15 @@ impl PluginContext {
 
 	/// Sends an event on the bus. `T` gets cast to `Any`, boxed, wrapped in `Arc`,
 	/// and sent to all registered listeners.
-	pub async fn emit<T: Any + Send + Sync>(&self, event_name: String, message: T) {
-		self.0.evt_bus.write().await.send(event_name, message).await;
+	pub async fn emit<T: BidirectionalPortable>(&self, event_name: String, message: T) {
+		self.0.evt_bus.write().await.emit(event_name, message).await;
 	}
 
 	/// Registers an event listener on the bus of the given type. Returns
 	/// an instance of `EventReceiver<T>` which filters for the desired type
-	/// and wraps resulting values in `ArcAny<T>` to make usage of the data
+	/// and wraps resulting values in `ArcPortable<T>` to make usage of the data
 	/// simpler.
-	pub async fn on<T: 'static + Any + Serialize + Deserialize<'static>>(&self, event_name: String) -> EventReceiver<T> {
+	pub async fn on<T: BidirectionalPortable>(&self, event_name: String) -> Result<EventReceiver<T>, RegisterListenerError> {
 		return self.0.evt_bus.write().await.on::<T>(event_name);
 	}
 
@@ -489,17 +487,17 @@ impl PluginContext {
 	}
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[portable]
 pub enum TypeSpecifierRegistrationError {
 	NameConflict,
 }
 
-#[derive(Debug)]
+#[portable]
 pub enum TypeSpecifierRetrievalError {
 	SpecifierNotFound,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[portable]
 pub struct ServiceDescription {
 	pub plugin_id: String,
 	pub id: String,
@@ -507,23 +505,24 @@ pub struct ServiceDescription {
 	pub description: String,
 }
 
-#[derive(Debug, Serialize)]
+#[portable]
 pub enum RegisterPluginError {
 	IDConflict,
 }
 
-#[derive(Debug, Serialize)]
+#[portable]
 pub enum ServiceRegistrationError {
 	IDConflict,
 }
 
-#[derive(Debug)]
+#[portable]
 pub enum GetServiceError {
 	PluginNotFound,
 	ServiceNotFound,
 }
 
-#[derive(PartialEq, Hash, Debug, Serialize, Deserialize)]
+#[portable]
+#[derive(PartialEq, Hash)]
 #[serde(tag = "type")]
 pub enum Dependency {
 

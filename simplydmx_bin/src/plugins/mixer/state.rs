@@ -7,11 +7,6 @@ use crate::type_extensions::{
 	uuid::Uuid,
 };
 
-use serde::{
-	Serialize,
-	Deserialize,
-};
-
 // Use this for upgrades: https://serde.rs/attr-default.html
 
 #[portable]

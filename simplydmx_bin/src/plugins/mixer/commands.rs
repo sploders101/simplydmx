@@ -16,9 +16,7 @@ use super::state::{
 };
 use super::blender::UpdateList;
 
-use crate::type_extensions::{
-	uuid::Uuid,
-};
+use uuid::Uuid;
 
 
 // ┌──────────────────────────┐
@@ -49,7 +47,7 @@ impl EnterBlindMode {
 			return None;
 		}
 
-		let new_uuid = Uuid::new();
+		let new_uuid = Uuid::new_v4();
 
 		// Clone default bin and insert
 		let cloned_bin = LayerBin::clone(ctx.layer_bins.get(&ctx.default_layer_bin).unwrap());
@@ -204,7 +202,7 @@ impl CreateLayer {
 		("Submaster ID", "UUID value that should be used from this point forward to identify the submaster", "mixer::layer_id"),
 	)]
 	async fn main(self) -> Uuid {
-		let uuid = Uuid::new();
+		let uuid = Uuid::new_v4();
 		let mut context = self.1.lock().await;
 
 		context.submasters.insert(uuid, Submaster {

@@ -50,7 +50,7 @@ impl RegisterOutputType {
 			output_channel,
 		});
 		drop(available_outputs);
-		self.0.emit("output_dmx.output_registered".into(), id).await;
+		self.0.emit("output_dmx.output_registered".into(), FilterCriteria::None, id).await;
 	}
 
 }

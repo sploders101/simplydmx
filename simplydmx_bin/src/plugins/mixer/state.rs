@@ -3,9 +3,7 @@ use std::{
 	sync::Arc,
 };
 use simplydmx_plugin_framework::*;
-use crate::type_extensions::{
-	uuid::Uuid,
-};
+use uuid::Uuid;
 
 // Use this for upgrades: https://serde.rs/attr-default.html
 
@@ -37,7 +35,7 @@ pub struct MixerContext {
 
 impl MixerContext {
 	pub fn new() -> Self {
-		let default_uuid = Uuid::new();
+		let default_uuid = Uuid::new_v4();
 
 		// Create empty mixer context
 		let mut mixer_context = MixerContext {

@@ -10,7 +10,7 @@ use async_std::{
 	},
 };
 use simplydmx_plugin_framework::*;
-use crate::type_extensions::uuid::Uuid;
+use uuid::Uuid;
 use super::state::{
 	MixerContext,
 	FullMixerOutput,
@@ -21,6 +21,8 @@ use super::state::{
 	LayerBin,
 	SnapData,
 };
+
+type PatcherData = (FullMixerOutput, FullMixerBlendingData);
 
 #[portable]
 #[derive(Eq, PartialEq)]
@@ -51,7 +53,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 	let update_sender_patcher = update_sender.clone();
 	plugin_context.spawn_volatile(async move {
 		let plugin_context = plugin_context_patcher_updates;
-		match plugin_context.on::<()>(String::from("patcher.patch_updated")).await {
+		match plugin_context.on::<()>(String::from("patcher.patch_updated"), FilterCriteria::None).await {
 			Ok(listener) => {
 				loop {
 					let event = listener.receive().await;
@@ -134,11 +136,10 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 							ctx.output_cache.layer_bins.insert(layer_bin_id.clone(), Arc::clone(&bin_arc));
 							// Send events now that the cache has been updated
 							// TODO: Use arc instead of cloning
-							plugin_context_blender.emit(String::from("mixer.layer_bin_output.") + &layer_bin_id.to_string(), (*bin_arc).clone()).await;
-							plugin_context_blender.emit(String::from("mixer.layer_bin_output"), (*bin_arc).clone()).await;
+							plugin_context_blender.emit(String::from("mixer.layer_bin_output"), FilterCriteria::Uuid(layer_bin_id.clone()), (*bin_arc).clone()).await;
 						}
 
-						let mut final_results: FullMixerOutput = patcher_data.0.clone();
+						let mut final_results: FullMixerOutput = (&patcher_data as &PatcherData).0.clone();
 
 						// Blend layer bins together
 						// TODO: Make this more efficient. We could open all layer bins at once and loop the attributes.
@@ -152,7 +153,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 							) {
 								// All layer_bin blending is LTP static, with potential snapping
 								for (fixture_id, fixture_data) in layer_bin_data.iter() {
-									if let Some(light_data) = patcher_data.1.get(fixture_id) {
+									if let Some(light_data) = (&patcher_data as &PatcherData).1.get(fixture_id) {
 										for (attribute_id, attribute_value) in fixture_data.iter() {
 											if let (
 												Some(attribute_data),
@@ -196,7 +197,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 						let final_results = Arc::new(final_results);
 						ctx.output_cache.final_output = Arc::clone(&final_results);
 						// TODO: Use arc instead of cloning
-						plugin_context_blender.emit(String::from("mixer.final_output"), (*final_results).clone()).await;
+						plugin_context_blender.emit(String::from("mixer.final_output"), FilterCriteria::None, (*final_results).clone()).await;
 
 						#[cfg(feature = "blender-benchmark")]
 						call_service!(plugin_context_blender, "core", "log", format!("Blender took {:?} to run.", start.elapsed()));

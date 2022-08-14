@@ -1,8 +1,4 @@
-use simplydmx_plugin_framework::{
-	PluginManager,
-	PluginContext,
-	interpolate_service,
-};
+use simplydmx_plugin_framework::*;
 
 #[interpolate_service(
 	"shutdown",
@@ -32,7 +28,7 @@ impl LogService {
 		#[cfg(feature = "stdout-logging")]
 		println!("{}", &msg);
 
-		self.0.emit::<String>("log".into(), msg).await;
+		self.0.emit::<String>("log".into(), FilterCriteria::None, msg).await;
 	}
 }
 
@@ -51,7 +47,7 @@ impl LogErrorService {
 		#[cfg(feature = "stdout-logging")]
 		println!("{}", &msg);
 
-		self.0.emit::<String>("log_error".into(), msg).await;
+		self.0.emit::<String>("log_error".into(), FilterCriteria::None, msg).await;
 	}
 }
 

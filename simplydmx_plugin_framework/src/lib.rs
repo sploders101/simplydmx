@@ -28,6 +28,7 @@ pub use services::{
 pub use event_emitter::{
 	EventEmitter,
 	EventReceiver,
+	FilterCriteria,
 	ArcPortable,
 	Event,
 };

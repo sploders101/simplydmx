@@ -1,5 +1,4 @@
 pub mod plugins;
-pub mod type_extensions;
 
 use simplydmx_plugin_framework::{
 	PluginManager,

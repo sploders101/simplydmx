@@ -24,6 +24,7 @@ use crate::{
 	event_emitter::{
 		EventEmitter,
 		EventReceiver,
+		FilterCriteria,
 		BidirectionalPortable,
 		RegisterListenerError,
 	},
@@ -144,7 +145,7 @@ impl PluginContext {
 		plugins.insert(String::clone(&id), Arc::clone(&plugin));
 
 		// Signal that a new plugin has been registered
-		registry.evt_bus.write().await.emit(String::from("simplydmx.plugin_registered"), String::clone(&id)).await;
+		registry.evt_bus.write().await.emit(String::from("simplydmx.plugin_registered"), FilterCriteria::String(String::clone(&id)), String::clone(&id)).await;
 
 		// Create plugin context
 		let plugin_context = PluginContext (Arc::clone(&registry), plugin);
@@ -194,7 +195,7 @@ impl PluginContext {
 
 		// Advertise service via evt_bus
 		self.0.evt_bus.write().await
-			.emit(String::from("simplydmx.service_registered"), String::from(&self.1.id) + "." + &id).await;
+			.emit(String::from("simplydmx.service_registered"), FilterCriteria::None, String::from(&self.1.id) + "." + &id).await;
 
 		self.signal_dep(Dependency::Service{
 			plugin_id: self.1.id.clone(),
@@ -216,8 +217,9 @@ impl PluginContext {
 			.remove(svc_id);
 
 		// Advertise removal via evt_bus
+		let service_name = String::from(&self.1.id) + "." + svc_id;
 		self.0.evt_bus.write().await
-			.emit(String::from("simplydmx.service_removed"), String::from(&self.1.id) + "." + svc_id).await;
+			.emit(String::from("simplydmx.service_removed"), FilterCriteria::String(service_name.clone()), service_name).await;
 
 	}
 
@@ -262,16 +264,16 @@ impl PluginContext {
 
 	/// Sends an event on the bus. `T` gets cast to `Any`, boxed, wrapped in `Arc`,
 	/// and sent to all registered listeners.
-	pub async fn emit<T: BidirectionalPortable>(&self, event_name: String, message: T) {
-		self.0.evt_bus.write().await.emit(event_name, message).await;
+	pub async fn emit<T: BidirectionalPortable>(&self, event_name: String, filter: FilterCriteria, message: T) {
+		self.0.evt_bus.write().await.emit(event_name, filter, message).await;
 	}
 
 	/// Registers an event listener on the bus of the given type. Returns
 	/// an instance of `EventReceiver<T>` which filters for the desired type
 	/// and wraps resulting values in `ArcPortable<T>` to make usage of the data
 	/// simpler.
-	pub async fn on<T: BidirectionalPortable>(&self, event_name: String) -> Result<EventReceiver<T>, RegisterListenerError> {
-		return self.0.evt_bus.write().await.on::<T>(event_name);
+	pub async fn on<T: BidirectionalPortable>(&self, event_name: String, filter: FilterCriteria) -> Result<EventReceiver<T>, RegisterListenerError> {
+		return self.0.evt_bus.write().await.on::<T>(event_name, filter);
 	}
 
 	/// Spawn the specified task when the set of dependencies has finished.

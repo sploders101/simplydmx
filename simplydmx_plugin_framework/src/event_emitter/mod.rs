@@ -9,13 +9,14 @@ use std::{
 };
 
 use async_std::{
-	task,
 	channel::{
 		self,
 		Sender,
 		Receiver,
 	},
 };
+
+use uuid::Uuid;
 
 use simplydmx_plugin_macros::portable;
 
@@ -33,9 +34,18 @@ pub use event_receiver::Event;
 type PortableEvent = PortableEventGeneric<Box<dyn PortableMessage>>;
 type PortableJSONEvent = PortableEventGeneric<serde_json::Value>;
 type PortableBincodeEvent = PortableEventGeneric<Vec<u8>>;
-pub enum PortableEventGeneric<T> {
+pub enum PortableEventGeneric<T: Sync + Send> {
 	Msg(Arc<T>),
 	Shutdown,
+}
+
+impl<T: Sync + Send> Clone for PortableEventGeneric<T> {
+	fn clone(&self) -> Self {
+		return match self {
+			&PortableEventGeneric::Msg(ref message_arc) => { PortableEventGeneric::Msg(Arc::clone(message_arc)) },
+			&PortableEventGeneric::Shutdown => { PortableEventGeneric::Shutdown },
+		};
+	}
 }
 
 
@@ -96,7 +106,7 @@ impl EventEmitter {
 			// PortableEvent Listeners
 			let listeners = &mut listener_info.listeners;
 			while i < listeners.len() {
-				if listeners[i].receiver_count() == 0 {
+				if listeners[i].1.receiver_count() == 0 {
 					listeners.remove(i);
 				} else {
 					i += 1;
@@ -106,7 +116,7 @@ impl EventEmitter {
 			// JSON Listeners
 			let json_listeners = &mut listener_info.json_listeners;
 			while i < json_listeners.len() {
-				if json_listeners[i].receiver_count() == 0 {
+				if json_listeners[i].1.receiver_count() == 0 {
 					json_listeners.remove(i);
 				} else {
 					i += 1;
@@ -116,7 +126,7 @@ impl EventEmitter {
 			// Bincode listeners
 			let bincode_listeners = &mut listener_info.bincode_listeners;
 			while i < bincode_listeners.len() {
-				if bincode_listeners[i].receiver_count() == 0 {
+				if bincode_listeners[i].1.receiver_count() == 0 {
 					bincode_listeners.remove(i);
 				} else {
 					i += 1;
@@ -157,7 +167,7 @@ impl EventEmitter {
 	/// an instance of `EventReceiver<T>` which filters for the desired type
 	/// and wraps resulting values in `ArcPortable<T>` to make usage of the data
 	/// simpler.
-	pub fn on<T: BidirectionalPortable>(&mut self, event_name: String) -> Result<EventReceiver<T>, RegisterListenerError> {
+	pub fn on<T: BidirectionalPortable>(&mut self, event_name: String, filter: FilterCriteria) -> Result<EventReceiver<T>, RegisterListenerError> {
 		self.gc();
 
 		if !self.listeners.contains_key(&event_name) {
@@ -174,12 +184,12 @@ impl EventEmitter {
 
 		let (sender, receiver) = channel::unbounded();
 
-		listener_info.listeners.push(sender);
+		listener_info.listeners.push((filter, sender));
 		return Ok(EventReceiver::new(event_name, receiver));
 	}
 
 	/// Registers a listener on the event bus that receives pre-encoded JSON events
-	pub fn on_json(&mut self, event_name: String) -> Result<Receiver<PortableJSONEvent>, RegisterEncodedListenerError> {
+	pub fn on_json(&mut self, event_name: String, filter: FilterCriteria) -> Result<Receiver<PortableJSONEvent>, RegisterEncodedListenerError> {
 		self.gc();
 
 		if !self.listeners.contains_key(&event_name) {
@@ -189,12 +199,12 @@ impl EventEmitter {
 		let listener_info = self.listeners.get_mut(&event_name).unwrap();
 
 		let (sender, receiver) = channel::unbounded();
-		listener_info.json_listeners.push(sender);
+		listener_info.json_listeners.push((filter, sender));
 		return Ok(receiver);
 	}
 
 	/// Registers a listener on the bus that receives pre-encoded bincode events
-	pub fn on_bincode(&mut self, event_name: String) -> Result<Receiver<PortableBincodeEvent>, RegisterEncodedListenerError> {
+	pub fn on_bincode(&mut self, event_name: String, filter: FilterCriteria) -> Result<Receiver<PortableBincodeEvent>, RegisterEncodedListenerError> {
 		self.gc();
 
 		if !self.listeners.contains_key(&event_name) {
@@ -204,64 +214,31 @@ impl EventEmitter {
 		let listener_info = self.listeners.get_mut(&event_name).unwrap();
 
 		let (sender, receiver) = channel::unbounded();
-		listener_info.bincode_listeners.push(sender);
+		listener_info.bincode_listeners.push((filter, sender));
 		return Ok(receiver);
-	}
-
-	fn send_portablemessage(listener_info: &mut ListenerInfo, message: Box<dyn PortableMessage>) {
-		let message_arc = Arc::new(message);
-		for listener in listener_info.listeners.iter() {
-			let listener_cloned = listener.clone();
-			let message_arc_cloned = Arc::clone(&message_arc);
-			task::spawn(async move {
-				listener_cloned.send(PortableEvent::Msg(message_arc_cloned)).await.ok();
-			});
-		}
-	}
-
-	fn send_json(listener_info: &mut ListenerInfo, message: serde_json::Value) {
-		let message_arc = Arc::new(message);
-		for listener in listener_info.json_listeners.iter() {
-			let listener_cloned = listener.clone();
-			let message_arc_cloned = Arc::clone(&message_arc);
-			task::spawn(async move {
-				listener_cloned.send(PortableJSONEvent::Msg(message_arc_cloned)).await.ok();
-			});
-		}
-	}
-
-	fn send_bincode(listener_info: &mut ListenerInfo, message: Vec<u8>) {
-		let message_arc = Arc::new(message);
-		for listener in listener_info.bincode_listeners.iter() {
-			let listener_cloned = listener.clone();
-			let message_arc_cloned = Arc::clone(&message_arc);
-			task::spawn(async move {
-				listener_cloned.send(PortableBincodeEvent::Msg(message_arc_cloned)).await.ok();
-			});
-		}
 	}
 
 	/// Sends an event on the bus. `T` gets cast to `Any`, boxed, wrapped in `Arc`,
 	/// and sent to all registered listeners.
-	pub async fn emit<T: BidirectionalPortable>(&mut self, event_name: String, message: T) {
+	pub async fn emit<T: BidirectionalPortable>(&mut self, event_name: String, filter: FilterCriteria, message: T) {
 		self.gc();
 
 		if let Some(listeners) = self.listeners.get_mut(&event_name) {
 			// Re-broadcast JSON
-			if listeners.json_listeners.len() > 0 {
+			if relevant_listener(&filter, &listeners.json_listeners) {
 				if let Ok(translated) = message.serialize_json() {
-					Self::send_json(listeners, translated);
+					send_filtered(&filter, PortableJSONEvent::Msg(Arc::new(translated)), &listeners.json_listeners);
 				}
 			}
 
 			// Re-broadcast bincode
-			if listeners.bincode_listeners.len() > 0 {
+			if relevant_listener(&filter, &listeners.bincode_listeners) {
 				if let Ok(translated) = message.serialize_bincode() {
-					Self::send_bincode(listeners, translated);
+					send_filtered(&filter, PortableBincodeEvent::Msg(Arc::new(translated)), &listeners.bincode_listeners);
 				}
 			}
 
-			Self::send_portablemessage(listeners, Box::new(message));
+			send_filtered(&filter, PortableEvent::Msg(Arc::new(Box::new(message))), &listeners.listeners);
 		}
 
 	}
@@ -269,32 +246,32 @@ impl EventEmitter {
 	/// Emits a JSON value to the bus, deserializing for listeners of other formats if
 	/// necessary/possible. It will always be repeated to JSON listeners, but will silently
 	/// fail to repeat on listeners of other protocols if deserialization fails
-	pub async fn emit_json(&mut self, event_name: String, message: serde_json::Value) {
+	pub async fn emit_json(&mut self, event_name: String, filter: FilterCriteria, message: serde_json::Value) {
 		self.gc();
 
 		if let Some(listeners) = self.listeners.get_mut(&event_name) {
 
 			let deserialized: Option<Box<dyn PortableMessage>> = if
-				listeners.listeners.len() > 0
-				|| listeners.bincode_listeners.len() > 0
+				relevant_listener(&filter, &listeners.listeners)
+				|| relevant_listener(&filter, &listeners.bincode_listeners)
 			{ listeners.deserializer.deserialize_json(message.clone()).ok() }
 			else { None };
 
 			// Re-broadcast JSON
-			if listeners.json_listeners.len() > 0 {
-				Self::send_json(listeners, message.clone());
+			if relevant_listener(&filter, &listeners.json_listeners) {
+				send_filtered(&filter, PortableJSONEvent::Msg(Arc::new(message)), &listeners.json_listeners);
 			}
 
 			// Re-broadcast bincode
-			if listeners.bincode_listeners.len() > 0 {
+			if relevant_listener(&filter, &listeners.bincode_listeners) {
 				if let Ok(translated) = deserialized.as_ref().unwrap().serialize_bincode() {
-					Self::send_bincode(listeners, translated);
+					send_filtered(&filter, PortableBincodeEvent::Msg(Arc::new(translated)), &listeners.bincode_listeners);
 				}
 			}
 
 			// Deserialized
 			if let Some(deserialized) = deserialized {
-				Self::send_portablemessage(listeners, deserialized);
+				send_filtered(&filter, PortableEvent::Msg(Arc::new(deserialized)), &listeners.listeners);
 			}
 
 		}
@@ -303,32 +280,32 @@ impl EventEmitter {
 	/// Emits a Bincode value to the bus, deserializing for listeners of other formats if
 	/// necessary/possible. It will always be repeated to Bincode listeners, but will silently
 	/// fail to repeat on listeners of other protocols if deserialization fails
-	pub async fn emit_bincode(&mut self, event_name: String, message: Vec<u8>) {
+	pub async fn emit_bincode(&mut self, event_name: String, filter: FilterCriteria, message: Vec<u8>) {
 		self.gc();
 
 		if let Some(listeners) = self.listeners.get_mut(&event_name) {
 
 			let deserialized: Option<Box<dyn PortableMessage>> = if
-				listeners.listeners.len() > 0
-				|| listeners.json_listeners.len() > 0
+				relevant_listener(&filter, &listeners.listeners)
+				|| relevant_listener(&filter, &listeners.json_listeners)
 			{ listeners.deserializer.deserialize_bincode(&message).ok() }
 			else { None };
 
 			// Re-broadcast JSON
-			if listeners.json_listeners.len() > 0 {
+			if relevant_listener(&filter, &listeners.json_listeners) {
 				if let Ok(translated) = deserialized.as_ref().unwrap().serialize_json() {
-					Self::send_json(listeners, translated);
+					send_filtered(&filter, PortableJSONEvent::Msg(Arc::new(translated)), &listeners.json_listeners);
 				}
 			}
 
 			// Re-broadcast bincode
-			if listeners.bincode_listeners.len() > 0 {
-				Self::send_bincode(listeners, message);
+			if relevant_listener(&filter, &listeners.json_listeners) {
+				send_filtered(&filter, PortableBincodeEvent::Msg(Arc::new(message)), &listeners.bincode_listeners);
 			}
 
 			// Deserialized
 			if let Some(deserialized) = deserialized {
-				Self::send_portablemessage(listeners, deserialized);
+				send_filtered(&filter, PortableEvent::Msg(Arc::new(deserialized)), &listeners.listeners);
 			}
 
 		}
@@ -339,12 +316,9 @@ impl EventEmitter {
 
 		self.shutdown_sender.send(()).await.ok();
 		for listener_group in self.listeners.values() {
-			for listener in listener_group.listeners.iter() {
-				let listener_cloned = listener.clone();
-				task::spawn(async move {
-					listener_cloned.send(PortableEvent::Shutdown).await.ok();
-				});
-			}
+			send_shutdown(&listener_group.listeners).await;
+			send_shutdown(&listener_group.json_listeners).await;
+			send_shutdown(&listener_group.bincode_listeners).await;
 		}
 	}
 }
@@ -357,9 +331,9 @@ pub struct ListenerInfo {
 	pub type_id: TypeId,
 	pub persistent: bool,
 	pub deserializer: Box<dyn PortableMessageGenericDeserializer>,
-	pub listeners: Vec<Sender<PortableEvent>>,
-	pub json_listeners: Vec<Sender<PortableJSONEvent>>,
-	pub bincode_listeners: Vec<Sender<PortableBincodeEvent>>,
+	pub listeners: Vec<(FilterCriteria, Sender<PortableEvent>)>,
+	pub json_listeners: Vec<(FilterCriteria, Sender<PortableJSONEvent>)>,
+	pub bincode_listeners: Vec<(FilterCriteria, Sender<PortableBincodeEvent>)>,
 }
 
 impl ListenerInfo {
@@ -373,6 +347,46 @@ impl ListenerInfo {
 			bincode_listeners: Vec::new(),
 		};
 	}
+}
+
+fn relevant_listener<T: Sync + Send>(filter: &FilterCriteria, listeners: &[(FilterCriteria, Sender<PortableEventGeneric<T>>)]) -> bool {
+	for listener in listeners {
+		match listener.0 {
+			FilterCriteria::None => { return true; },
+			_ => {
+				if listener.0 == *filter {
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+fn send_filtered<T: Sync + Send + 'static>(filter: &FilterCriteria, message: PortableEventGeneric<T>, listeners: &[(FilterCriteria, Sender<PortableEventGeneric<T>>)]) {
+	for listener in listeners {
+		if let FilterCriteria::None = listener.0 {
+			let cloned_message = message.clone();
+			listener.1.try_send(cloned_message).ok();
+		} else if listener.0 == *filter {
+			let cloned_message = message.clone();
+			listener.1.try_send(cloned_message).ok();
+		}
+	}
+}
+
+async fn send_shutdown<T: Send + Sync>(listeners: &[(FilterCriteria, Sender<PortableEventGeneric<T>>)]) {
+	for listener in listeners {
+		listener.1.send(PortableEventGeneric::Shutdown).await.ok();
+	}
+}
+
+#[portable]
+#[derive(Eq, PartialEq)]
+pub enum FilterCriteria {
+	None,
+	String(String),
+	Uuid(Uuid),
 }
 
 #[portable]

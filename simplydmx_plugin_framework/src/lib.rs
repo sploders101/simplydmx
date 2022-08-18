@@ -55,15 +55,6 @@ pub use plugin::{
 pub use simplydmx_plugin_macros::*;
 
 #[macro_export]
-macro_rules! service_docs {
-	($id:literal, $name:literal, $description:literal) => {
-		fn get_service_id_internal() -> &'static str {$id}
-		fn get_service_name_internal() -> &'static str {$name}
-		fn get_service_description_internal() -> &'static str {$description}
-	};
-}
-
-#[macro_export]
 macro_rules! call_service {
 	($context:ident, $plugin:literal, $service:literal) => {
 		$context.get_service($plugin, $service).await.unwrap().call(vec!()).await.unwrap();

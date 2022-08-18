@@ -32,8 +32,8 @@ pub use arc_portable::ArcPortable;
 pub use event_receiver::Event;
 
 type PortableEvent = PortableEventGeneric<Box<dyn PortableMessage>>;
-type PortableJSONEvent = PortableEventGeneric<serde_json::Value>;
-type PortableBincodeEvent = PortableEventGeneric<Vec<u8>>;
+pub type PortableJSONEvent = PortableEventGeneric<serde_json::Value>;
+pub type PortableBincodeEvent = PortableEventGeneric<Vec<u8>>;
 pub enum PortableEventGeneric<T: Sync + Send> {
 	Msg(Arc<T>),
 	Shutdown,
@@ -148,6 +148,12 @@ impl EventEmitter {
 
 	}
 
+	/// Declares an event on the bus so it can be translated between data formats and included in self-documentation.
+	///
+	/// Events not declared here will not be handled by Rust, including translation between protocols. Pre-serialized
+	/// data (JSON and bincode, for example) will be repeated verbatim on the bus for any listeners of the same protocol.
+	///
+	/// The type parameter is used to construct a generic deserializer used for translation.
 	pub fn declare_event<T: BidirectionalPortable>(&mut self, event_name: String) -> Result<(), DeclareEventError> {
 		// Check if event already exists
 		if self.listeners.contains_key(&event_name) {

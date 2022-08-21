@@ -281,6 +281,9 @@ impl PluginContext {
 	pub async fn emit<T: BidirectionalPortable>(&self, event_name: String, filter: FilterCriteria, message: T) {
 		self.0.evt_bus.write().await.emit(event_name, filter, message).await;
 	}
+	pub async fn emit_borrowed<T: BidirectionalPortable + Clone>(&self, event_name: String, filter: FilterCriteria, message: Arc<T>) {
+		self.0.evt_bus.write().await.emit_borrowed(event_name, filter, message).await;
+	}
 
 	/// Emits a JSON value to the bus, deserializing for listeners of other formats if
 	/// necessary/possible. It will always be repeated to JSON listeners, but will silently

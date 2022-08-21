@@ -31,6 +31,11 @@ pub use event_emitter::{
 	FilterCriteria,
 	ArcPortable,
 	Event,
+	PortableJSONEvent,
+	PortableBincodeEvent,
+	DeclareEventError,
+	RegisterEncodedListenerError,
+	RegisterListenerError,
 };
 pub use keep_alive::{
 	KeepAliveRegistrationError,

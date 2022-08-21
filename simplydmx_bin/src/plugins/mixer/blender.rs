@@ -153,8 +153,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 							let bin_arc = Arc::new(bin_output);
 							ctx.output_cache.layer_bins.insert(layer_bin_id.clone(), Arc::clone(&bin_arc));
 							// Send events now that the cache has been updated
-							// TODO: Use arc instead of cloning
-							plugin_context_blender.emit(String::from("mixer.layer_bin_output"), FilterCriteria::Uuid(layer_bin_id.clone()), (*bin_arc).clone()).await;
+							plugin_context_blender.emit_borrowed(String::from("mixer.layer_bin_output"), FilterCriteria::Uuid(layer_bin_id.clone()), bin_arc).await;
 						}
 
 						let mut final_results: FullMixerOutput = (&patcher_data as &PatcherData).0.clone();
@@ -214,8 +213,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 						// Final output is ready
 						let final_results = Arc::new(final_results);
 						ctx.output_cache.final_output = Arc::clone(&final_results);
-						// TODO: Use arc instead of cloning
-						plugin_context_blender.emit(String::from("mixer.final_output"), FilterCriteria::None, (*final_results).clone()).await;
+						plugin_context_blender.emit_borrowed(String::from("mixer.final_output"), FilterCriteria::None, final_results).await;
 
 						#[cfg(feature = "blender-benchmark")]
 						call_service!(plugin_context_blender, "core", "log", format!("Blender took {:?} to run.", start.elapsed()));

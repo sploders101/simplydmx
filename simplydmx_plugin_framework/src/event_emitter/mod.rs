@@ -258,6 +258,32 @@ impl EventEmitter {
 
 	}
 
+	pub async fn emit_borrowed<T: BidirectionalPortable + Clone>(&mut self, event_name: String, filter: FilterCriteria, message: Arc<T>) {
+		self.gc();
+
+		if let Some(listeners) = self.listeners.get_mut(&event_name) {
+			// Re-broadcast JSON
+			if relevant_listener(&filter, &listeners.json_listeners) {
+				if let Ok(translated) = message.serialize_json() {
+					send_filtered(&filter, PortableJSONEvent::Msg(Arc::new(translated)), &listeners.json_listeners);
+				}
+			}
+
+			// Re-broadcast bincode
+			if relevant_listener(&filter, &listeners.bincode_listeners) {
+				if let Ok(translated) = message.serialize_bincode() {
+					send_filtered(&filter, PortableBincodeEvent::Msg(Arc::new(translated)), &listeners.bincode_listeners);
+				}
+			}
+
+			if relevant_listener(&filter, &listeners.listeners) {
+				send_filtered(&filter, PortableEvent::Msg(Arc::new(Box::new(T::clone(&message)))), &listeners.listeners);
+			}
+
+		}
+
+	}
+
 	/// Emits a JSON value to the bus, deserializing for listeners of other formats if
 	/// necessary/possible. It will always be repeated to JSON listeners, but will silently
 	/// fail to repeat on listeners of other protocols if deserialization fails

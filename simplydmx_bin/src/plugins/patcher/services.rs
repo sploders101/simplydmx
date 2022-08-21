@@ -2,7 +2,10 @@ use std::collections::HashMap;
 use async_std::sync::Arc;
 use simplydmx_plugin_framework::*;
 
-use crate::plugins::mixer::exported_types::FullMixerOutput;
+use crate::plugins::mixer::exported_types::{
+	FullMixerOutput,
+	FullMixerBlendingData,
+};
 
 #[interpolate_service(
 	"get_base_layer",
@@ -20,7 +23,7 @@ impl GetBaseLayer {
 	#[service_main(
 		("Outputs", "List of output types with presentable metadata"),
 	)]
-	async fn main(self) -> FullMixerOutput {
-		return HashMap::new();
+	async fn main(self) -> (FullMixerOutput, FullMixerBlendingData) {
+		return (HashMap::new(), HashMap::new());
 	}
 }

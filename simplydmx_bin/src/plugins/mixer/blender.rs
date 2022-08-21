@@ -40,6 +40,9 @@ pub enum UpdateList {
 	/// Indicates a re-blend of all cached `LayerBin` outputs is required (ex. Blind transitions)
 	LayerBin,
 
+	/// Indicates that the application is shutting down and blender ticking should break
+	Shutdown,
+
 }
 
 /// Start the blending engine
@@ -59,12 +62,15 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 					let event = listener.receive().await;
 					match event {
 						Event::Msg(_) => update_sender_patcher.send(UpdateList::PatcherUpdate).await.ok(),
-						Event::Shutdown => break,
+						Event::Shutdown => {
+							update_sender_patcher.send(UpdateList::Shutdown).await.ok();
+							break;
+						},
 					};
 				}
 			},
 			Err(error) => {
-				call_service!(plugin_context, "core", "show_error", format!("An error occurred when setting up the blender: {:?}", error));
+				call_service!(plugin_context, "core", "log_error", format!("An error occurred when setting up the blender: {:?}", error));
 			},
 		}
 	}).await;
@@ -76,9 +82,13 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 		Dependency::service("core", "log_error"),
 	], async move {
 		if let Some(mut patcher_data) = ArcAny::<(FullMixerOutput, FullMixerBlendingData)>::new(Arc::new(call_service!(plugin_context_blender, "patcher", "get_base_layer"))) {
+			let mut shutting_down = false;
 			loop {
 				match update_receiver.recv().await {
 					Ok(command) => {
+						if let UpdateList::Shutdown = command {
+							break;
+						}
 						let mut patcher_update = command == UpdateList::PatcherUpdate;
 						let mut all_update = command == UpdateList::All;
 						let mut reblend_submasters: Vec<Uuid> = if let UpdateList::Submaster(submaster_id) = command {
@@ -93,7 +103,15 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 								UpdateList::All => all_update = true,
 								UpdateList::Submaster(submaster_id) => reblend_submasters.push(submaster_id),
 								UpdateList::LayerBin => {}, // All commands initiate a LayerBin re-blend
+								UpdateList::Shutdown => {
+									shutting_down = true;
+									break;
+								},
 							}
+						}
+
+						if shutting_down {
+							break;
 						}
 
 						let mut ctx = ctx.lock().await;
@@ -207,7 +225,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 				};
 			}
 		} else {
-			call_service!(plugin_context_blender, "core", "log_error", "patcher.get_base_layer returned the wrong data type");
+			call_service!(plugin_context_blender, "core", "log_error", String::from("patcher.get_base_layer returned the wrong data type"));
 		}
 	}).await;
 

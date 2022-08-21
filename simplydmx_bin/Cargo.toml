@@ -19,7 +19,9 @@ bincode = "1.3.3"
 default = [
 	"stdout-logging",
 	"output-dmx-e131",
-	"blender-benchmark"
+	"blender",
+	"blender-benchmark",
+	"api",
 ]
 
 stdout-logging = [] # Log service in core
@@ -34,3 +36,5 @@ blender = []
 blender-benchmark = [
 	"blender",
 ]
+
+api = []

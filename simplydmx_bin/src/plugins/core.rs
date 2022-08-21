@@ -54,4 +54,5 @@ impl LogErrorService {
 pub async fn initialize(plugin_manager: PluginManager, plugin_context: PluginContext) {
 	plugin_context.register_service(true, ShutdownService(plugin_manager.clone())).await.unwrap();
 	plugin_context.register_service(true, LogService(plugin_context.clone())).await.unwrap();
+	plugin_context.register_service(true, LogErrorService(plugin_context.clone())).await.unwrap();
 }

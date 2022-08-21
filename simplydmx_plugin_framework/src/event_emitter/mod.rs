@@ -157,16 +157,23 @@ impl EventEmitter {
 	pub fn declare_event<T: BidirectionalPortable>(&mut self, event_name: String) -> Result<(), DeclareEventError> {
 		// Check if event already exists
 		if self.listeners.contains_key(&event_name) {
-			let listener_info = self.listeners.get(&event_name).unwrap();
-			if listener_info.type_id != TypeId::of::<T>() {
-				return Err(DeclareEventError::AlreadyDeclared);
+			let listener_info = self.listeners.get_mut(&event_name).unwrap();
+			if let Some(ref evt_info) = listener_info.evt_info {
+				if evt_info.type_id != TypeId::of::<T>() {
+					return Err(DeclareEventError::AlreadyDeclared);
+				} else {
+					return Ok(());
+				}
+			} else {
+				listener_info.declare::<T>();
+				return Ok(());
 			}
+		} else {
+			// Create and insert ListenerInfo for declared event
+			let new_listener_info = ListenerInfo::new_declared::<T>();
+			self.listeners.insert(event_name, new_listener_info);
+			return Ok(());
 		}
-
-		// Create and insert ListenerInfo for declared event
-		let new_listener_info = ListenerInfo::new::<T>();
-		self.listeners.insert(event_name, new_listener_info);
-		return Ok(());
 	}
 
 	/// Registers an event listener on the bus of the given type. Returns
@@ -177,15 +184,17 @@ impl EventEmitter {
 		self.gc();
 
 		if !self.listeners.contains_key(&event_name) {
-			return Err(RegisterListenerError::NotDeclared);
+			self.listeners.insert(String::clone(&event_name), ListenerInfo::new());
 		}
 
 		let listener_info = self.listeners.get_mut(&event_name).unwrap();
 
 		// Return error if types are incompatible. This is not required, but is done out of principle to
 		// ensure event types are consistent, which will help later with automated self-documentation.
-		if listener_info.type_id != TypeId::of::<T>() {
-			return Err(RegisterListenerError::EventClaimedAsType);
+		if let Some(ref evt_info) = listener_info.evt_info {
+			if evt_info.type_id != TypeId::of::<T>() {
+				return Err(RegisterListenerError::EventClaimedAsType);
+			}
 		}
 
 		let (sender, receiver) = channel::unbounded();
@@ -199,7 +208,7 @@ impl EventEmitter {
 		self.gc();
 
 		if !self.listeners.contains_key(&event_name) {
-			return Err(RegisterEncodedListenerError::NotDeclared);
+			self.listeners.insert(String::clone(&event_name), ListenerInfo::new());
 		}
 
 		let listener_info = self.listeners.get_mut(&event_name).unwrap();
@@ -214,7 +223,7 @@ impl EventEmitter {
 		self.gc();
 
 		if !self.listeners.contains_key(&event_name) {
-			return Err(RegisterEncodedListenerError::NotDeclared);
+			self.listeners.insert(String::clone(&event_name), ListenerInfo::new());
 		}
 
 		let listener_info = self.listeners.get_mut(&event_name).unwrap();
@@ -260,7 +269,7 @@ impl EventEmitter {
 			let deserialized: Option<Box<dyn PortableMessage>> = if
 				relevant_listener(&filter, &listeners.listeners)
 				|| relevant_listener(&filter, &listeners.bincode_listeners)
-			{ listeners.deserializer.deserialize_json(message.clone()).ok() }
+			{ if let Some(ref evt_info) = listeners.evt_info { evt_info.deserializer.deserialize_json(message.clone()).ok() } else { None } }
 			else { None };
 
 			// Re-broadcast JSON
@@ -294,7 +303,7 @@ impl EventEmitter {
 			let deserialized: Option<Box<dyn PortableMessage>> = if
 				relevant_listener(&filter, &listeners.listeners)
 				|| relevant_listener(&filter, &listeners.json_listeners)
-			{ listeners.deserializer.deserialize_bincode(&message).ok() }
+			{ if let Some(ref evt_info) = listeners.evt_info { evt_info.deserializer.deserialize_bincode(&message).ok() } else { None }}
 			else { None };
 
 			// Re-broadcast JSON
@@ -334,24 +343,46 @@ impl EventEmitter {
 /// self-documenting routines are accurate and simple. It also ensures that similar-but-different
 /// types don't get confused or create race conditions when deserialized.
 pub struct ListenerInfo {
-	pub type_id: TypeId,
+	pub evt_info: Option<EventInfo>,
 	pub persistent: bool,
-	pub deserializer: Box<dyn PortableMessageGenericDeserializer>,
 	pub listeners: Vec<(FilterCriteria, Sender<PortableEvent>)>,
 	pub json_listeners: Vec<(FilterCriteria, Sender<PortableJSONEvent>)>,
 	pub bincode_listeners: Vec<(FilterCriteria, Sender<PortableBincodeEvent>)>,
 }
 
+pub struct EventInfo {
+	pub type_id: TypeId,
+	pub deserializer: Box<dyn PortableMessageGenericDeserializer>,
+}
+
 impl ListenerInfo {
-	pub fn new<T: BidirectionalPortable>() -> Self {
+	pub fn new() -> Self {
 		return ListenerInfo {
-			persistent: true,
-			type_id: TypeId::of::<T>(),
-			deserializer: Box::new(PortableMessageDeserializer::<T>::new()),
+			evt_info: None,
+			persistent: false,
 			listeners: Vec::new(),
 			json_listeners: Vec::new(),
 			bincode_listeners: Vec::new(),
 		};
+	}
+	pub fn new_declared<T: BidirectionalPortable>() -> Self {
+		return ListenerInfo {
+			evt_info: Some(EventInfo {
+				type_id: TypeId::of::<T>(),
+				deserializer: Box::new(PortableMessageDeserializer::<T>::new()),
+			}),
+			persistent: true,
+			listeners: Vec::new(),
+			json_listeners: Vec::new(),
+			bincode_listeners: Vec::new(),
+		}
+	}
+
+	pub fn declare<T: BidirectionalPortable>(&mut self) {
+		self.evt_info = Some(EventInfo {
+			type_id: TypeId::of::<T>(),
+			deserializer: Box::new(PortableMessageDeserializer::<T>::new()),
+		});
 	}
 }
 
@@ -402,11 +433,9 @@ pub enum DeclareEventError {
 
 #[portable]
 pub enum RegisterListenerError {
-	NotDeclared,
 	EventClaimedAsType,
 }
 
 #[portable]
 pub enum RegisterEncodedListenerError {
-	NotDeclared,
 }

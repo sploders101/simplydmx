@@ -378,14 +378,14 @@ impl PluginContext {
 		}
 
 		// Remove cleared dependencies from original list
-		dependencies = dependencies.into_iter().filter(|dependency| known_dependencies.contains(dependency)).collect();
+		dependencies.retain(|dependency| !known_dependencies.contains(dependency));
 
 		// Spawn task to finish the process
 		return self.spawn(async move {
 			// Wait for dependencies to be resolved
 			while dependencies.len() > 0 {
 				if let Ok(next_dep) = receiver.recv().await {
-					dependencies = dependencies.into_iter().filter(|dependency| *dependency != *next_dep).collect();
+					dependencies.retain(|dependency| *dependency != *next_dep);
 				} else {
 					// The sender may be destroyed during shutdown, so
 					break;

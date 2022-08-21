@@ -19,7 +19,16 @@ async fn main() {
 		).await.unwrap()
 	).await;
 
-	plugins::mixer::initialize_mixer(
+	// Register API
+	#[cfg(feature = "api")]
+	plugins::api::initialize(
+		plugin_manager.register_plugin(
+			"api",
+			"API Server",
+		).await.unwrap(),
+	).await;
+
+	plugins::patcher::initialize(
 		plugin_manager.register_plugin(
 			"patcher",
 			"SimplyDMX Fixture Patcher",

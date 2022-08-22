@@ -20,12 +20,19 @@ use async_std::{
 };
 use simplydmx_plugin_framework::*;
 
-use state::MixerContext;
+use state::{
+	MixerContext,
+	FullMixerOutput,
+};
 
 pub async fn initialize_mixer(plugin_context: PluginContext) {
 
 	// Create mixer context
 	let mixer_context = Arc::new(Mutex::new(MixerContext::new()));
+
+	// Declare events
+	plugin_context.declare_event::<FullMixerOutput>(String::from("mixer.layer_bin_output")).await.unwrap();
+	plugin_context.declare_event::<FullMixerOutput>(String::from("mixer.final_output")).await.unwrap();
 
 	// Start blender task
 	let update_sender = blender::start_blender(plugin_context.clone(), Arc::clone(&mixer_context)).await;

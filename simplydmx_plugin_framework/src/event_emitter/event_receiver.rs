@@ -51,7 +51,7 @@ impl<T: BidirectionalPortable> EventReceiver<T> {
 			// Unwrapped because it *should* be impossible for the sender to be disconnected
 			let msg = self.receiver.recv().await.unwrap();
 			match msg {
-				PortableEvent::Msg(msg) => {
+				PortableEvent::Msg { data: msg } => {
 					if let Some(msg) = ArcPortable::new(msg) {
 						return Event::<T>::Msg(msg);
 					}

@@ -35,14 +35,16 @@ type PortableEvent = PortableEventGeneric<Box<dyn PortableMessage>>;
 pub type PortableJSONEvent = PortableEventGeneric<serde_json::Value>;
 pub type PortableBincodeEvent = PortableEventGeneric<Vec<u8>>;
 pub enum PortableEventGeneric<T: Sync + Send> {
-	Msg(Arc<T>),
+	Msg {
+		data: Arc<T>,
+	},
 	Shutdown,
 }
 
 impl<T: Sync + Send> Clone for PortableEventGeneric<T> {
 	fn clone(&self) -> Self {
 		return match self {
-			&PortableEventGeneric::Msg(ref message_arc) => { PortableEventGeneric::Msg(Arc::clone(message_arc)) },
+			&PortableEventGeneric::Msg {ref data} => { PortableEventGeneric::Msg { data: Arc::clone(data) } },
 			&PortableEventGeneric::Shutdown => { PortableEventGeneric::Shutdown },
 		};
 	}
@@ -242,18 +244,18 @@ impl EventEmitter {
 			// Re-broadcast JSON
 			if relevant_listener(&filter, &listeners.json_listeners) {
 				if let Ok(translated) = message.serialize_json() {
-					send_filtered(&filter, PortableJSONEvent::Msg(Arc::new(translated)), &listeners.json_listeners);
+					send_filtered(&filter, PortableJSONEvent::Msg { data: Arc::new(translated) }, &listeners.json_listeners);
 				}
 			}
 
 			// Re-broadcast bincode
 			if relevant_listener(&filter, &listeners.bincode_listeners) {
 				if let Ok(translated) = message.serialize_bincode() {
-					send_filtered(&filter, PortableBincodeEvent::Msg(Arc::new(translated)), &listeners.bincode_listeners);
+					send_filtered(&filter, PortableBincodeEvent::Msg { data: Arc::new(translated) }, &listeners.bincode_listeners);
 				}
 			}
 
-			send_filtered(&filter, PortableEvent::Msg(Arc::new(Box::new(message))), &listeners.listeners);
+			send_filtered(&filter, PortableEvent::Msg { data: Arc::new(Box::new(message)) }, &listeners.listeners);
 		}
 
 	}
@@ -265,19 +267,19 @@ impl EventEmitter {
 			// Re-broadcast JSON
 			if relevant_listener(&filter, &listeners.json_listeners) {
 				if let Ok(translated) = message.serialize_json() {
-					send_filtered(&filter, PortableJSONEvent::Msg(Arc::new(translated)), &listeners.json_listeners);
+					send_filtered(&filter, PortableJSONEvent::Msg { data: Arc::new(translated) }, &listeners.json_listeners);
 				}
 			}
 
 			// Re-broadcast bincode
 			if relevant_listener(&filter, &listeners.bincode_listeners) {
 				if let Ok(translated) = message.serialize_bincode() {
-					send_filtered(&filter, PortableBincodeEvent::Msg(Arc::new(translated)), &listeners.bincode_listeners);
+					send_filtered(&filter, PortableBincodeEvent::Msg { data: Arc::new(translated) }, &listeners.bincode_listeners);
 				}
 			}
 
 			if relevant_listener(&filter, &listeners.listeners) {
-				send_filtered(&filter, PortableEvent::Msg(Arc::new(Box::new(T::clone(&message)))), &listeners.listeners);
+				send_filtered(&filter, PortableEvent::Msg { data: Arc::new(Box::new(T::clone(&message))) }, &listeners.listeners);
 			}
 
 		}
@@ -300,19 +302,19 @@ impl EventEmitter {
 
 			// Re-broadcast JSON
 			if relevant_listener(&filter, &listeners.json_listeners) {
-				send_filtered(&filter, PortableJSONEvent::Msg(Arc::new(message)), &listeners.json_listeners);
+				send_filtered(&filter, PortableJSONEvent::Msg { data: Arc::new(message) }, &listeners.json_listeners);
 			}
 
 			// Re-broadcast bincode
 			if relevant_listener(&filter, &listeners.bincode_listeners) {
 				if let Ok(translated) = deserialized.as_ref().unwrap().serialize_bincode() {
-					send_filtered(&filter, PortableBincodeEvent::Msg(Arc::new(translated)), &listeners.bincode_listeners);
+					send_filtered(&filter, PortableBincodeEvent::Msg { data: Arc::new(translated) }, &listeners.bincode_listeners);
 				}
 			}
 
 			// Deserialized
 			if let Some(deserialized) = deserialized {
-				send_filtered(&filter, PortableEvent::Msg(Arc::new(deserialized)), &listeners.listeners);
+				send_filtered(&filter, PortableEvent::Msg { data: Arc::new(deserialized) }, &listeners.listeners);
 			}
 
 		}
@@ -335,18 +337,18 @@ impl EventEmitter {
 			// Re-broadcast JSON
 			if relevant_listener(&filter, &listeners.json_listeners) {
 				if let Ok(translated) = deserialized.as_ref().unwrap().serialize_json() {
-					send_filtered(&filter, PortableJSONEvent::Msg(Arc::new(translated)), &listeners.json_listeners);
+					send_filtered(&filter, PortableJSONEvent::Msg { data: Arc::new(translated) }, &listeners.json_listeners);
 				}
 			}
 
 			// Re-broadcast bincode
 			if relevant_listener(&filter, &listeners.json_listeners) {
-				send_filtered(&filter, PortableBincodeEvent::Msg(Arc::new(message)), &listeners.bincode_listeners);
+				send_filtered(&filter, PortableBincodeEvent::Msg { data: Arc::new(message) }, &listeners.bincode_listeners);
 			}
 
 			// Deserialized
 			if let Some(deserialized) = deserialized {
-				send_filtered(&filter, PortableEvent::Msg(Arc::new(deserialized)), &listeners.listeners);
+				send_filtered(&filter, PortableEvent::Msg { data: Arc::new(deserialized) }, &listeners.listeners);
 			}
 
 		}

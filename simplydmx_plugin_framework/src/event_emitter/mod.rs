@@ -37,6 +37,7 @@ pub type PortableBincodeEvent = PortableEventGeneric<Vec<u8>>;
 pub enum PortableEventGeneric<T: Sync + Send> {
 	Msg {
 		data: Arc<T>,
+		criteria: Arc<FilterCriteria>,
 	},
 	Shutdown,
 }
@@ -44,7 +45,7 @@ pub enum PortableEventGeneric<T: Sync + Send> {
 impl<T: Sync + Send> Clone for PortableEventGeneric<T> {
 	fn clone(&self) -> Self {
 		return match self {
-			&PortableEventGeneric::Msg {ref data} => { PortableEventGeneric::Msg { data: Arc::clone(data) } },
+			&PortableEventGeneric::Msg { ref data, ref criteria } => { PortableEventGeneric::Msg { data: Arc::clone(data), criteria: Arc::clone(criteria) } },
 			&PortableEventGeneric::Shutdown => { PortableEventGeneric::Shutdown },
 		};
 	}
@@ -241,21 +242,23 @@ impl EventEmitter {
 		self.gc();
 
 		if let Some(listeners) = self.listeners.get_mut(&event_name) {
+			let filter = Arc::new(filter);
+
 			// Re-broadcast JSON
 			if relevant_listener(&filter, &listeners.json_listeners) {
 				if let Ok(translated) = message.serialize_json() {
-					send_filtered(&filter, PortableJSONEvent::Msg { data: Arc::new(translated) }, &listeners.json_listeners);
+					send_filtered(&filter, PortableJSONEvent::Msg { data: Arc::new(translated), criteria: Arc::clone(&filter) }, &listeners.json_listeners);
 				}
 			}
 
 			// Re-broadcast bincode
 			if relevant_listener(&filter, &listeners.bincode_listeners) {
 				if let Ok(translated) = message.serialize_bincode() {
-					send_filtered(&filter, PortableBincodeEvent::Msg { data: Arc::new(translated) }, &listeners.bincode_listeners);
+					send_filtered(&filter, PortableBincodeEvent::Msg { data: Arc::new(translated), criteria: Arc::clone(&filter) }, &listeners.bincode_listeners);
 				}
 			}
 
-			send_filtered(&filter, PortableEvent::Msg { data: Arc::new(Box::new(message)) }, &listeners.listeners);
+			send_filtered(&filter, PortableEvent::Msg { data: Arc::new(Box::new(message)), criteria: Arc::clone(&filter) }, &listeners.listeners);
 		}
 
 	}
@@ -264,22 +267,24 @@ impl EventEmitter {
 		self.gc();
 
 		if let Some(listeners) = self.listeners.get_mut(&event_name) {
+			let filter = Arc::new(filter);
+
 			// Re-broadcast JSON
 			if relevant_listener(&filter, &listeners.json_listeners) {
 				if let Ok(translated) = message.serialize_json() {
-					send_filtered(&filter, PortableJSONEvent::Msg { data: Arc::new(translated) }, &listeners.json_listeners);
+					send_filtered(&filter, PortableJSONEvent::Msg { data: Arc::new(translated), criteria: Arc::clone(&filter) }, &listeners.json_listeners);
 				}
 			}
 
 			// Re-broadcast bincode
 			if relevant_listener(&filter, &listeners.bincode_listeners) {
 				if let Ok(translated) = message.serialize_bincode() {
-					send_filtered(&filter, PortableBincodeEvent::Msg { data: Arc::new(translated) }, &listeners.bincode_listeners);
+					send_filtered(&filter, PortableBincodeEvent::Msg { data: Arc::new(translated), criteria: Arc::clone(&filter) }, &listeners.bincode_listeners);
 				}
 			}
 
 			if relevant_listener(&filter, &listeners.listeners) {
-				send_filtered(&filter, PortableEvent::Msg { data: Arc::new(Box::new(T::clone(&message))) }, &listeners.listeners);
+				send_filtered(&filter, PortableEvent::Msg { data: Arc::new(Box::new(T::clone(&message))), criteria: Arc::clone(&filter) }, &listeners.listeners);
 			}
 
 		}
@@ -293,6 +298,7 @@ impl EventEmitter {
 		self.gc();
 
 		if let Some(listeners) = self.listeners.get_mut(&event_name) {
+			let filter = Arc::new(filter);
 
 			let deserialized: Option<Box<dyn PortableMessage>> = if
 				relevant_listener(&filter, &listeners.listeners)
@@ -302,19 +308,19 @@ impl EventEmitter {
 
 			// Re-broadcast JSON
 			if relevant_listener(&filter, &listeners.json_listeners) {
-				send_filtered(&filter, PortableJSONEvent::Msg { data: Arc::new(message) }, &listeners.json_listeners);
+				send_filtered(&filter, PortableJSONEvent::Msg { data: Arc::new(message), criteria: Arc::clone(&filter) }, &listeners.json_listeners);
 			}
 
 			// Re-broadcast bincode
 			if relevant_listener(&filter, &listeners.bincode_listeners) {
 				if let Ok(translated) = deserialized.as_ref().unwrap().serialize_bincode() {
-					send_filtered(&filter, PortableBincodeEvent::Msg { data: Arc::new(translated) }, &listeners.bincode_listeners);
+					send_filtered(&filter, PortableBincodeEvent::Msg { data: Arc::new(translated), criteria: Arc::clone(&filter) }, &listeners.bincode_listeners);
 				}
 			}
 
 			// Deserialized
 			if let Some(deserialized) = deserialized {
-				send_filtered(&filter, PortableEvent::Msg { data: Arc::new(deserialized) }, &listeners.listeners);
+				send_filtered(&filter, PortableEvent::Msg { data: Arc::new(deserialized), criteria: Arc::clone(&filter) }, &listeners.listeners);
 			}
 
 		}
@@ -327,6 +333,7 @@ impl EventEmitter {
 		self.gc();
 
 		if let Some(listeners) = self.listeners.get_mut(&event_name) {
+			let filter = Arc::new(filter);
 
 			let deserialized: Option<Box<dyn PortableMessage>> = if
 				relevant_listener(&filter, &listeners.listeners)
@@ -337,18 +344,18 @@ impl EventEmitter {
 			// Re-broadcast JSON
 			if relevant_listener(&filter, &listeners.json_listeners) {
 				if let Ok(translated) = deserialized.as_ref().unwrap().serialize_json() {
-					send_filtered(&filter, PortableJSONEvent::Msg { data: Arc::new(translated) }, &listeners.json_listeners);
+					send_filtered(&filter, PortableJSONEvent::Msg { data: Arc::new(translated), criteria: Arc::clone(&filter) }, &listeners.json_listeners);
 				}
 			}
 
 			// Re-broadcast bincode
 			if relevant_listener(&filter, &listeners.json_listeners) {
-				send_filtered(&filter, PortableBincodeEvent::Msg { data: Arc::new(message) }, &listeners.bincode_listeners);
+				send_filtered(&filter, PortableBincodeEvent::Msg { data: Arc::new(message), criteria: Arc::clone(&filter) }, &listeners.bincode_listeners);
 			}
 
 			// Deserialized
 			if let Some(deserialized) = deserialized {
-				send_filtered(&filter, PortableEvent::Msg { data: Arc::new(deserialized) }, &listeners.listeners);
+				send_filtered(&filter, PortableEvent::Msg { data: Arc::new(deserialized), criteria: Arc::clone(&filter) }, &listeners.listeners);
 			}
 
 		}
@@ -447,7 +454,8 @@ async fn send_shutdown<T: Send + Sync>(listeners: &[(FilterCriteria, Sender<Port
 }
 
 #[portable]
-#[derive(Eq, PartialEq)]
+#[derive(Hash, Eq, PartialEq)]
+#[serde(tag = "type", content = "data")]
 pub enum FilterCriteria {
 	None,
 	String(String),
@@ -455,15 +463,18 @@ pub enum FilterCriteria {
 }
 
 #[portable]
+#[serde(tag = "type")]
 pub enum DeclareEventError {
 	AlreadyDeclared,
 }
 
 #[portable]
+#[serde(tag = "type")]
 pub enum RegisterListenerError {
 	EventClaimedAsType,
 }
 
 #[portable]
+#[serde(tag = "type")]
 pub enum RegisterEncodedListenerError {
 }

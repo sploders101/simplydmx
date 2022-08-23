@@ -61,7 +61,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 				loop {
 					let event = listener.receive().await;
 					match event {
-						Event::Msg(_) => update_sender_patcher.send(UpdateList::PatcherUpdate).await.ok(),
+						Event::Msg { data: _, criteria: _ } => update_sender_patcher.send(UpdateList::PatcherUpdate).await.ok(),
 						Event::Shutdown => {
 							update_sender_patcher.send(UpdateList::Shutdown).await.ok();
 							break;

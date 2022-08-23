@@ -1,8 +1,13 @@
-use std::marker::PhantomData;
+use std::{
+	sync::Arc,
+	marker::PhantomData,
+};
 
 use async_std::channel::{
 	Receiver,
 };
+
+use crate::FilterCriteria;
 
 use super::{
 	PortableEvent,
@@ -20,7 +25,10 @@ pub struct EventReceiver<T: BidirectionalPortable> {
 }
 
 pub enum Event<T: 'static> {
-	Msg(ArcPortable<T>),
+	Msg {
+		data: ArcPortable<T>,
+		criteria: Arc<FilterCriteria>,
+	},
 	Shutdown,
 }
 
@@ -51,9 +59,9 @@ impl<T: BidirectionalPortable> EventReceiver<T> {
 			// Unwrapped because it *should* be impossible for the sender to be disconnected
 			let msg = self.receiver.recv().await.unwrap();
 			match msg {
-				PortableEvent::Msg { data: msg } => {
+				PortableEvent::Msg { data: msg, criteria } => {
 					if let Some(msg) = ArcPortable::new(msg) {
-						return Event::<T>::Msg(msg);
+						return Event::<T>::Msg { data: msg, criteria };
 					}
 					// else clause not needed; we will just wait for the next loop iteration
 					// to find a value

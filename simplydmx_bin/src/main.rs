@@ -1,3 +1,8 @@
+#![cfg_attr(
+	all(not(debug_assertions), target_os = "windows"),
+	windows_subsystem = "windows"
+)]
+
 pub mod plugins;
 pub mod api_utilities;
 
@@ -51,6 +56,14 @@ async fn main() {
 	// 		"E1.31/sACN DMX Output",
 	// 	).await.unwrap()
 	// ).await;
+
+	#[cfg(feature = "gui")]
+	plugins::gui::initialize(
+		plugin_manager.register_plugin(
+			"gui",
+			"SimplyDMX GUI",
+		).await.unwrap(),
+	).await;
 
 	// Wait for shutdown request
 	shutdown_receiver.recv().await.unwrap();

@@ -5,7 +5,7 @@ pub mod mixer;
 pub mod output_dmx;
 
 #[cfg(feature = "api")]
-pub mod api;
+pub mod stdio_api;
 
 #[cfg(feature = "output-dmx-e131")]
 pub mod output_dmx_e131;

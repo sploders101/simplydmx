@@ -1,4 +1,5 @@
 pub mod plugins;
+pub mod api_utilities;
 
 use simplydmx_plugin_framework::{
 	PluginManager,
@@ -21,7 +22,7 @@ async fn main() {
 
 	// Register API
 	#[cfg(feature = "api")]
-	plugins::api::initialize(
+	plugins::stdio_api::initialize(
 		plugin_manager.register_plugin(
 			"api",
 			"API Server",

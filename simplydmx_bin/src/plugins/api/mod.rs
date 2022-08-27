@@ -4,6 +4,7 @@ use events::EventJuggler;
 use async_std::{
 	io,
 	task,
+	channel,
 };
 use async_std::prelude::*;
 
@@ -84,15 +85,20 @@ pub async fn initialize(plugin_context: PluginContext) {
 }
 
 fn stdio_controller(plugin_context: PluginContext) {
+
+	// Channel
+	let (sender, receiver) = channel::unbounded();
+
+	// Receiver
 	task::spawn(async move {
-		let juggler = EventJuggler::new(&plugin_context);
+		let juggler = EventJuggler::new(&plugin_context, sender.clone());
 		let stdin = io::stdin();
 		loop {
 			let mut line = String::new();
 			if let Ok(read_length) = stdin.read_line(&mut line).await {
 				if read_length > 0 {
 					if let Ok(command) = serde_json::from_str::<JSONCommand>(&line) {
-						handle_command(plugin_context.clone(), command, juggler.clone());
+						handle_command(plugin_context.clone(), command, juggler.clone(), sender.clone());
 					} else {
 						call_service!(plugin_context, "core", "log", format!("Discarded unrecognized command: {}", line));
 					}
@@ -104,9 +110,25 @@ fn stdio_controller(plugin_context: PluginContext) {
 
 		call_service!(plugin_context, "core", "log", String::from("API host on stdio stopped."));
 	});
+
+	// Responder
+	task::spawn(async move {
+		loop {
+			let message = receiver.recv().await;
+			if let Ok(message) = message {
+				let mut stdout = io::stdout();
+				if let Ok(mut data) = serde_json::to_vec(&message) {
+					data.push(b"\n"[0]);
+					stdout.write_all(&data).await.ok();
+				}
+			} else {
+				break;
+			}
+		}
+	});
 }
 
-fn handle_command(plugin_context: PluginContext, command: JSONCommand, juggler: EventJuggler) {
+fn handle_command(plugin_context: PluginContext, command: JSONCommand, juggler: EventJuggler, sender: channel::Sender<JSONResponse>) {
 	task::spawn(async move {
 		match command {
 
@@ -116,36 +138,36 @@ fn handle_command(plugin_context: PluginContext, command: JSONCommand, juggler: 
 					Ok(service) => {
 						match service.call_json(args).await {
 							Ok(result) => {
-								send_response(JSONResponse::CallServiceResponse {
+								sender.send(JSONResponse::CallServiceResponse {
 									message_id,
 									result,
-								}).await;
+								}).await.ok();
 							},
 							Err(error) => {
-								send_response(JSONResponse::CallServiceError {
+								sender.send(JSONResponse::CallServiceError {
 									message_id,
 									error: match error {
 										CallServiceJSONError::DeserializationFailed => JSONCallServiceError::ArgDeserializationFailed,
 										CallServiceJSONError::SerializationFailed => JSONCallServiceError::ResponseSerializationFailed,
 									},
-								}).await;
+								}).await.ok();
 							},
 						}
 					},
 					Err(_) => {
-						send_response(JSONResponse::CallServiceError {
+						sender.send(JSONResponse::CallServiceError {
 							message_id,
 							error: JSONCallServiceError::ServiceNotFound,
-						}).await;
+						}).await.ok();
 					}
 				}
 			},
 
 			JSONCommand::GetServices { message_id } => {
-				send_response(JSONResponse::ServiceList {
+				sender.send(JSONResponse::ServiceList {
 					message_id,
 					list: plugin_context.list_services().await,
-				}).await;
+				}).await.ok();
 			},
 			JSONCommand::SendEvent { name, criteria, data } => {
 				plugin_context.emit_json(name, criteria.unwrap_or(FilterCriteria::None), data).await;
@@ -158,12 +180,4 @@ fn handle_command(plugin_context: PluginContext, command: JSONCommand, juggler: 
 			},
 		}
 	});
-}
-
-async fn send_response(message: JSONResponse) {
-	let mut stdout = io::stdout();
-	if let Ok(mut data) = serde_json::to_vec(&message) {
-		data.push(b"\n"[0]);
-		stdout.write_all(&data).await.ok();
-	}
 }

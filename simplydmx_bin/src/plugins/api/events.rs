@@ -15,10 +15,7 @@ use async_std::{
 
 use simplydmx_plugin_framework::*;
 
-use super::{
-	send_response,
-	JSONResponse,
-};
+use super::JSONResponse;
 
 #[derive(Hash, Eq, PartialEq)]
 struct EventDescriptor(String, FilterCriteria);
@@ -28,6 +25,7 @@ enum RelayCommand {
 }
 
 struct EventJugglerInfo {
+	sender: Sender<JSONResponse>,
 	has_criteria_none: HashSet<String>,
 	listeners: HashMap<EventDescriptor, Sender<RelayCommand>>,
 }
@@ -36,8 +34,9 @@ struct EventJugglerInfo {
 pub struct EventJuggler(PluginContext, Arc<RwLock<EventJugglerInfo>>);
 
 impl EventJuggler {
-	pub fn new(plugin_context: &PluginContext) -> Self {
+	pub fn new(plugin_context: &PluginContext, sender: Sender<JSONResponse>) -> Self {
 		return EventJuggler(plugin_context.clone(), Arc::new(RwLock::new(EventJugglerInfo {
+			sender,
 			has_criteria_none: HashSet::new(),
 			listeners: HashMap::new(),
 		})));
@@ -61,17 +60,18 @@ impl EventJuggler {
 						event = event_receiver.recv().fuse() => {
 							match event {
 								Ok(PortableJSONEvent::Msg { data, criteria }) => {
-									let has_no_filter = juggler.1.read().await.has_criteria_none.contains(&reusable_event_name);
+									let juggler_info = juggler.1.read().await;
+									let has_no_filter = juggler_info.has_criteria_none.contains(&reusable_event_name);
 									if (reusable_criteria != FilterCriteria::None && has_no_filter)
 										|| (reusable_criteria == FilterCriteria::None && !has_no_filter) {
 										continue;
 									}
 
-									send_response(JSONResponse::Event {
+									juggler_info.sender.send(JSONResponse::Event {
 										name: reusable_event_name.clone(),
 										criteria: FilterCriteria::clone(&criteria),
 										data: serde_json::Value::clone(&data),
-									}).await;
+									}).await.ok();
 								},
 								Ok(PortableJSONEvent::Shutdown) => break,
 								Err(_) => break,

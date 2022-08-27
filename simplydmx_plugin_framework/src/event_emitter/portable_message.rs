@@ -1,4 +1,5 @@
 use std::{
+	fmt,
 	any::Any,
 	marker::PhantomData,
 };
@@ -28,15 +29,35 @@ impl<T: PortableMessage + serde::de::DeserializeOwned> BidirectionalPortable for
 pub trait PortableMessage: Any + Sync + Send {
 	fn serialize_json(&self) -> Result<Value, serde_json::Error>;
 	fn serialize_bincode(&self) -> Result<Vec<u8>, bincode::Error>;
+	fn clone_portable_message(&self) -> Box<dyn PortableMessage>;
+	fn fmt_portable_message(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 }
 
 // Blanket message serializer implementation for all serializable data types
-impl<T: Serialize + Sync + Send + 'static> PortableMessage for T {
+impl<T: Serialize + Clone + fmt::Debug + Sync + Send + 'static> PortableMessage for T {
 	fn serialize_json(&self) -> Result<Value, serde_json::Error> {
 		return serde_json::to_value(&self);
 	}
 	fn serialize_bincode(&self) -> Result<Vec<u8>, bincode::Error> {
 		return bincode::serialize(&self);
+	}
+	fn clone_portable_message(&self) -> Box<dyn PortableMessage> {
+		return Box::new(Self::clone(self));
+	}
+	fn fmt_portable_message(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        return fmt::Debug::fmt(&self, f);
+    }
+}
+
+impl Clone for Box<dyn PortableMessage> {
+	fn clone(&self) -> Self {
+		return self.clone_portable_message();
+	}
+}
+
+impl fmt::Debug for Box<dyn PortableMessage> {
+	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+		return self.fmt_portable_message(f);
 	}
 }
 

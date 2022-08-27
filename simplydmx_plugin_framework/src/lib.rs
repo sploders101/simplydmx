@@ -36,6 +36,8 @@ pub use event_emitter::{
 	DeclareEventError,
 	RegisterEncodedListenerError,
 	RegisterListenerError,
+	PortableMessage,
+	PortableMessageDeserializer,
 };
 pub use keep_alive::{
 	KeepAliveRegistrationError,

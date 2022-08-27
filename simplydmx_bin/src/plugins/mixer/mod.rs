@@ -11,6 +11,7 @@ pub mod exported_types {
 		FullMixerOutput,
 		BlendingScheme,
 		FullMixerBlendingData,
+		SnapData,
 	};
 }
 

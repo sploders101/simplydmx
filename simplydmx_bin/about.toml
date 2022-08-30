@@ -1,0 +1,19 @@
+accepted = [
+    "Apache-2.0",
+    "MIT",
+    "BSD-3-Clause",
+    "Zlib",
+    "Unicode-DFS-2016",
+    "MPL-2.0",
+]
+
+targets = [
+    "x86_64-unknown-linux-gnu",
+    "x86_64-unknown-linux-musl",
+    "x86_64-pc-windows-msvc",
+    "x86_64-apple-darwin",
+]
+
+ignore-build-dependencies = true
+
+ignore-dev-dependencies = true

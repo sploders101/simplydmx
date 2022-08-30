@@ -2,11 +2,9 @@ mod events;
 use events::EventJuggler;
 
 use async_std::{
-	io,
 	task,
 	channel,
 };
-use async_std::prelude::*;
 
 use simplydmx_plugin_framework::*;
 

@@ -14,7 +14,7 @@ pub use services::{
 	internals::{
 		Service,
 		CallServiceError,
-		CallServiceJSONError,
+		CallServiceRPCError,
 		ServiceArgument,
 		ServiceArgumentModifiers,
 		ServiceDataTypes,

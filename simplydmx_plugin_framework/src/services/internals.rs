@@ -54,7 +54,7 @@ pub enum CallServiceError {
 
 #[portable]
 #[serde(tag = "type")]
-pub enum CallServiceJSONError {
+pub enum CallServiceRPCError {
 	DeserializationFailed,
 	SerializationFailed,
 }
@@ -77,5 +77,8 @@ pub trait Service {
 	fn call<'a>(&'a self, arguments: Vec<Box<dyn Any + Sync + Send>>) -> Pin<Box<dyn Future<Output = Result<Box<dyn Any + Sync + Send>, CallServiceError>> + Send + 'a>>;
 
 	/// Call the service using JSON values
-	fn call_json<'a>(&'a self, arguments: Vec<Value>) -> Pin<Box<dyn Future<Output = Result<Value, CallServiceJSONError>> + Send + 'a>>;
+	fn call_json<'a>(&'a self, arguments: Vec<Value>) -> Pin<Box<dyn Future<Output = Result<Value, CallServiceRPCError>> + Send + 'a>>;
+
+	// Call the service using Bincode values
+	fn call_bincode<'a>(&'a self, arguments: Vec<Vec<u8>>) -> Pin<Box<dyn Future<Output = Result<Vec<u8>, CallServiceRPCError>> + Send + 'a>>;
 }

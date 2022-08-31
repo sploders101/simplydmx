@@ -110,8 +110,8 @@ fn handle_command(plugin_context: PluginContext, command: JSONCommand, juggler: 
 								sender.send(JSONResponse::CallServiceError {
 									message_id,
 									error: match error {
-										CallServiceJSONError::DeserializationFailed => JSONCallServiceError::ArgDeserializationFailed,
-										CallServiceJSONError::SerializationFailed => JSONCallServiceError::ResponseSerializationFailed,
+										CallServiceRPCError::DeserializationFailed => JSONCallServiceError::ArgDeserializationFailed,
+										CallServiceRPCError::SerializationFailed => JSONCallServiceError::ResponseSerializationFailed,
 									},
 								}).await.ok();
 							},

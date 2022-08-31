@@ -179,6 +179,7 @@ fn interpolate_service_main(outer_type: Type, attr: TokenStream, body: ImplItemM
     // on from the generic `call` implementation
     let mut internal_arguments = Vec::<Box<dyn ToTokens>>::new();
     let mut internal_arguments_json = Vec::<Box<dyn ToTokens>>::new();
+    let mut internal_arguments_bincode = Vec::<Box<dyn ToTokens>>::new();
     let mut internal_argument_types = Vec::<Box<Type>>::new();
 
     // Number of arguments other than `self`
@@ -221,7 +222,13 @@ fn interpolate_service_main(outer_type: Type, attr: TokenStream, body: ImplItemM
                 internal_arguments_json.push(Box::new(quote! {
                     match serde_json::from_value::<#ty>(#value::clone(&arguments[#index])) {
                         Ok(arg) => arg,
-                        Err(_) => return Err(simplydmx_plugin_framework::CallServiceJSONError::DeserializationFailed),
+                        Err(_) => return Err(simplydmx_plugin_framework::CallServiceRPCError::DeserializationFailed),
+                    }
+                }));
+                internal_arguments_bincode.push(Box::new(quote! {
+                    match bincode::deserialize::<#ty>(&arguments[#index]) {
+                        Ok(arg) => arg,
+                        Err(_) => return Err(simplydmx_plugin_framework::CallServiceRPCError::DeserializationFailed),
                     }
                 }));
                 arg_count += 1;
@@ -298,13 +305,25 @@ fn interpolate_service_main(outer_type: Type, attr: TokenStream, body: ImplItemM
 
             return #box_::pin(run(#outer_type::clone(self), arguments));
         }
-        fn call_json<'a>(&'a self, arguments: Vec<#value>) -> #pin<#box_<dyn #future<Output = Result<#value, simplydmx_plugin_framework::CallServiceJSONError>> + Send + 'a>> {
-            async fn run(_self: #outer_type, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, simplydmx_plugin_framework::CallServiceJSONError> {
+        fn call_json<'a>(&'a self, arguments: Vec<#value>) -> #pin<#box_<dyn #future<Output = Result<#value, simplydmx_plugin_framework::CallServiceRPCError>> + Send + 'a>> {
+            async fn run(_self: #outer_type, arguments: Vec<serde_json::Value>) -> Result<serde_json::Value, simplydmx_plugin_framework::CallServiceRPCError> {
                 let ret_val = serde_json::to_value(#outer_type::#internal_call(_self, #(#internal_arguments_json),*)#inject_await);
                 return match ret_val {
                     Ok(ret_val) => Ok(ret_val),
-                    Err(_) => Err(simplydmx_plugin_framework::CallServiceJSONError::SerializationFailed),
+                    Err(_) => Err(simplydmx_plugin_framework::CallServiceRPCError::SerializationFailed),
                 };
+            }
+
+            return #box_::pin(run(#outer_type::clone(&self), arguments));
+        }
+
+        fn call_bincode<'a>(&'a self, arguments: Vec<Vec<u8>>) -> #pin<#box_<dyn #future<Output = Result<Vec<u8>, simplydmx_plugin_framework::CallServiceRPCError>> + Send + 'a>> {
+            async fn run(_self: #outer_type, arguments: Vec<Vec<u8>>) -> Result<Vec<u8>, simplydmx_plugin_framework::CallServiceRPCError> {
+                let ret_val = bincode::serialize(&#outer_type::#internal_call(_self, #(#internal_arguments_bincode),*)#inject_await);
+                return match ret_val {
+                    Ok(ret_val) => Ok(ret_val),
+                    Err(_) => Err(simplydmx_plugin_framework::CallServiceRPCError::SerializationFailed),
+                }
             }
 
             return #box_::pin(run(#outer_type::clone(&self), arguments));

@@ -63,10 +63,24 @@ pub use simplydmx_plugin_macros::*;
 
 #[macro_export]
 macro_rules! call_service {
-	($context:ident, $plugin:literal, $service:literal) => {
+	($context:expr, $plugin:literal, $service:literal) => {
 		$context.get_service($plugin, $service).await.unwrap().call(vec!()).await.unwrap();
 	};
-	($context:ident, $plugin:literal, $service:literal, $($args:expr),*) => {
+	($context:expr, $plugin:literal, $service:literal, $($args:expr),*) => {
 		$context.get_service($plugin, $service).await.unwrap().call(vec!($(Box::new($args)),+)).await.unwrap();
+	};
+}
+
+#[macro_export]
+macro_rules! log_error {
+	($context:expr, $($args:expr),*) => {
+		call_service!($context, "core", "log_error", format!($($args),*));
+	};
+}
+
+#[macro_export]
+macro_rules! log {
+	($context:expr, $($args:expr),*) => {
+		call_service!($context, "core", "log", format!($($args),*));
 	};
 }

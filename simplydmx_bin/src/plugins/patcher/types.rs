@@ -1,36 +1,58 @@
 use simplydmx_plugin_framework::*;
+use uuid::Uuid;
 use crate::plugins::mixer::exported_types::SnapData;
 use std::collections::HashMap;
 
 use crate::plugins::mixer::exported_types::BlendingScheme;
 
 #[portable]
-pub struct FixtureInfo {
-	name: String,
-	short_name: Option<String>,
-
-	metadata: FixtureMeta,
-
-	channels: HashMap<String, Channel>,
-	personalities: HashMap<String, Personality>,
-	output_info: OutputInfo,
+pub struct FixtureBundle {
+	pub id: Uuid,
+	pub fixture_info: FixtureInfo,
+	pub controller: (String, String),
+	pub output_info: SerializedData,
 }
 
 #[portable]
-pub enum OutputInfo {
-	DMX(String)
+#[serde(untagged)]
+pub enum SerializedData {
+	JSON(serde_json::Value),
+	Bincode(Vec<u8>),
+}
+
+#[portable]
+pub struct FixtureInfo {
+	pub name: String,
+	pub short_name: Option<String>,
+
+	pub metadata: FixtureMeta,
+
+	pub channels: HashMap<String, Channel>,
+	pub personalities: HashMap<String, Personality>,
+	pub output_info: OutputInfo,
+}
+
+/// Plugin-specific output info
+#[portable]
+pub struct OutputInfo {
+	pub plugin_id: String,
+	pub update: String,
+	pub export_json: String,
+	pub export_bincode: String,
 }
 
 #[portable]
 pub struct FixtureMeta {
-	manufacturer: Option<String>,
-	manual_link: Option<String>,
+	pub manufacturer: Option<String>,
+	pub manual_link: Option<String>,
 }
 
 #[portable]
 pub struct Channel {
-	size: ChannelSize,
-	ch_type: ChannelType,
+	pub size: ChannelSize,
+	#[serde(default)]
+	pub default: u16,
+	pub ch_type: ChannelType,
 }
 
 #[portable]
@@ -55,10 +77,10 @@ pub enum ChannelType {
 #[portable]
 /// Identifies a segment used in a segmented channel
 pub struct Segment {
-	start: u16,
-	end: u16,
-	name: String,
-	id: String,
+	pub start: u16,
+	pub end: u16,
+	pub name: String,
+	pub id: String,
 }
 
 #[portable]
@@ -68,5 +90,5 @@ pub struct Segment {
 /// should be stored in the output data for use by the output plugin.
 pub struct Personality {
 	/// A vector of channel IDs used in the personality
-	available_channels: Vec<String>,
+	pub available_channels: Vec<String>,
 }

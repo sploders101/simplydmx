@@ -162,10 +162,10 @@ pub struct BlendingData {
 	pub allow_wrap: bool,
 
 	/// Specifies the maximum value for the attribute
-	pub max_value: Option<u16>,
+	pub max_value: u16,
 
 	/// Specifies the minimum value for the attribute
-	pub min_value: Option<u16>,
+	pub min_value: u16,
 
 }
 

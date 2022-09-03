@@ -12,7 +12,7 @@ use crate::plugins::mixer::exported_types::{
 	SnapData,
 };
 
-use super::super::{
+use super::{
 	state::PatcherContext,
 	fixture_types::{
 		ChannelType,

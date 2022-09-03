@@ -1,4 +1,3 @@
-mod services;
 mod state;
 mod fixture_types;
 
@@ -6,7 +5,9 @@ use async_std::sync::{
 	Arc,
 	RwLock,
 };
-pub use services::PatcherInterface;
+
+mod interface;
+pub use interface::PatcherInterface;
 
 use simplydmx_plugin_framework::*;
 

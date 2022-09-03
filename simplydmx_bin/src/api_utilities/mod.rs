@@ -87,7 +87,7 @@ pub fn spawn_api_facet_controller(plugin_context: PluginContext, receiver: chann
 			}
 		}
 
-		call_service!(plugin_context, "core", "log", String::from("API host on stdio stopped."));
+		log!(plugin_context, "API host on stdio stopped.");
 	});
 }
 

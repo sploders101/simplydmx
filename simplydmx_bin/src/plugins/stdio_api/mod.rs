@@ -26,7 +26,7 @@ pub async fn initialize(plugin_context: PluginContext) {
 					if let Ok(command) = serde_json::from_str::<JSONCommand>(&line) {
 						request_sender.send(command).await.unwrap();
 					} else {
-						call_service!(plugin_context, "core", "log", format!("Discarded unrecognized command: {}", line));
+						log_error!(plugin_context, "Discarded unrecognized command: {}", line);
 					}
 				}
 			} else {
@@ -34,7 +34,7 @@ pub async fn initialize(plugin_context: PluginContext) {
 			}
 		}
 
-		call_service!(plugin_context, "core", "log", String::from("API host on stdio stopped."));
+		log!(plugin_context, "API host on stdio stopped.");
 	});
 
 	// Responder

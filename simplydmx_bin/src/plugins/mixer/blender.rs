@@ -72,7 +72,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 				}
 			},
 			Err(error) => {
-				call_service!(plugin_context, "core", "log_error", format!("An error occurred when setting up the blender: {:?}", error));
+				log_error!(plugin_context, "An error occurred when setting up the blender: {:?}", error);
 			},
 		}
 	}).await;
@@ -83,127 +83,126 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 		Dependency::service("patcher", "get_base_layer"),
 		Dependency::service("core", "log_error"),
 	], async move {
-		if let mut patcher_data = get_base_layer.main().await {
-			let mut shutting_down = false;
-			loop {
-				match update_receiver.recv().await {
-					Ok(command) => {
-						if let UpdateList::Shutdown = command {
-							break;
+		let mut patcher_data = get_base_layer.main().await;
+		let mut shutting_down = false;
+		loop {
+			match update_receiver.recv().await {
+				Ok(command) => {
+					if let UpdateList::Shutdown = command {
+						break;
+					}
+					let mut patcher_update = command == UpdateList::PatcherUpdate;
+					let mut all_update = command == UpdateList::All;
+					let mut reblend_submasters: Vec<Uuid> = if let UpdateList::Submaster(submaster_id) = command {
+						vec![submaster_id]
+					} else {
+						vec![]
+					};
+
+					while let Ok(command) = update_receiver.try_recv() {
+						match command {
+							UpdateList::PatcherUpdate => patcher_update = true,
+							UpdateList::All => all_update = true,
+							UpdateList::Submaster(submaster_id) => reblend_submasters.push(submaster_id),
+							UpdateList::LayerBin => {}, // All commands initiate a LayerBin re-blend
+							UpdateList::Shutdown => {
+								shutting_down = true;
+								break;
+							},
 						}
-						let mut patcher_update = command == UpdateList::PatcherUpdate;
-						let mut all_update = command == UpdateList::All;
-						let mut reblend_submasters: Vec<Uuid> = if let UpdateList::Submaster(submaster_id) = command {
-							vec![submaster_id]
-						} else {
-							vec![]
-						};
+					}
 
-						while let Ok(command) = update_receiver.try_recv() {
-							match command {
-								UpdateList::PatcherUpdate => patcher_update = true,
-								UpdateList::All => all_update = true,
-								UpdateList::Submaster(submaster_id) => reblend_submasters.push(submaster_id),
-								UpdateList::LayerBin => {}, // All commands initiate a LayerBin re-blend
-								UpdateList::Shutdown => {
-									shutting_down = true;
-									break;
-								},
-							}
-						}
+					if shutting_down {
+						break;
+					}
 
-						if shutting_down {
-							break;
-						}
+					let mut ctx = ctx.lock().await;
 
-						let mut ctx = ctx.lock().await;
+					#[cfg(feature = "blender-benchmark")]
+					let start = Instant::now();
 
-						#[cfg(feature = "blender-benchmark")]
-						let start = Instant::now();
+					// Patcher updates come first, since they may have data necessary for blending
+					if patcher_update {
+						patcher_data = get_base_layer.main().await;
+						prune_blender(&mut ctx, &patcher_data).await;
+					}
 
-						// Patcher updates come first, since they may have data necessary for blending
-						if patcher_update {
-							patcher_data = get_base_layer.main().await;
-							prune_blender(&mut ctx, &patcher_data).await;
-						}
-
-						// Blend any relevant `LayerBin`s based on `all_update` and `reblend_submasters`
-						let mut intermediate_bin_cache = Vec::<(Uuid, FullMixerOutput)>::new();
-						for layer_bin_id in ctx.layer_bin_order.iter() {
-							if let Some(layer_bin_data) = ctx.layer_bins.get(layer_bin_id) {
-								// Check relevance of current layer
-								let mut found_relevant_layer = all_update;
-								if !found_relevant_layer {
-									for layer_id in reblend_submasters.iter() {
-										if layer_bin_data.layer_order.contains(&layer_id) {
-											found_relevant_layer = true;
-											break;
-										}
+					// Blend any relevant `LayerBin`s based on `all_update` and `reblend_submasters`
+					let mut intermediate_bin_cache = Vec::<(Uuid, FullMixerOutput)>::new();
+					for layer_bin_id in ctx.layer_bin_order.iter() {
+						if let Some(layer_bin_data) = ctx.layer_bins.get(layer_bin_id) {
+							// Check relevance of current layer
+							let mut found_relevant_layer = all_update;
+							if !found_relevant_layer {
+								for layer_id in reblend_submasters.iter() {
+									if layer_bin_data.layer_order.contains(&layer_id) {
+										found_relevant_layer = true;
+										break;
 									}
 								}
+							}
 
-								// If relevant, start blending
-								if found_relevant_layer {
-									let bin_output = blend_bin(&patcher_data, &ctx, &layer_bin_data).await;
-									// Save to separate variable to get around active immutable reference
-									intermediate_bin_cache.push((layer_bin_id.clone(), bin_output));
-								}
+							// If relevant, start blending
+							if found_relevant_layer {
+								let bin_output = blend_bin(&patcher_data, &ctx, &layer_bin_data).await;
+								// Save to separate variable to get around active immutable reference
+								intermediate_bin_cache.push((layer_bin_id.clone(), bin_output));
 							}
 						}
-						// Update the bin cache now that the immutible reference has been dropped
-						for (layer_bin_id, bin_output) in intermediate_bin_cache {
-							let bin_arc = Arc::new(bin_output);
-							ctx.output_cache.layer_bins.insert(layer_bin_id.clone(), Arc::clone(&bin_arc));
-							// Send events now that the cache has been updated
-							plugin_context_blender.emit_borrowed(String::from("mixer.layer_bin_output"), FilterCriteria::Uuid(layer_bin_id.clone()), bin_arc).await;
-						}
+					}
+					// Update the bin cache now that the immutible reference has been dropped
+					for (layer_bin_id, bin_output) in intermediate_bin_cache {
+						let bin_arc = Arc::new(bin_output);
+						ctx.output_cache.layer_bins.insert(layer_bin_id.clone(), Arc::clone(&bin_arc));
+						// Send events now that the cache has been updated
+						plugin_context_blender.emit_borrowed(String::from("mixer.layer_bin_output"), FilterCriteria::Uuid(layer_bin_id.clone()), bin_arc).await;
+					}
 
-						let mut final_results: FullMixerOutput = (&patcher_data as &PatcherData).0.clone();
+					let mut final_results: FullMixerOutput = (&patcher_data as &PatcherData).0.clone();
 
-						// Blend layer bins together
-						// TODO: Make this more efficient. We could open all layer bins at once and loop the attributes.
-						for layer_bin_id in ctx.layer_bin_order.iter() {
-							if let (
-								Some(layer_bin_data),
-								Some(layer_bin_opacity),
-							) = (
-								ctx.output_cache.layer_bins.get(layer_bin_id),
-								ctx.layer_bin_opacities.get(layer_bin_id),
-							) {
-								// All layer_bin blending is LTP static, with potential snapping
-								for (fixture_id, fixture_data) in layer_bin_data.iter() {
-									if let Some(light_data) = (&patcher_data as &PatcherData).1.get(fixture_id) {
-										for (attribute_id, attribute_value) in fixture_data.iter() {
-											if let (
-												Some(attribute_data),
-												Some(fixture_result),
-											) = (
-												light_data.get(attribute_id),
-												final_results.get_mut(fixture_id),
-											) {
-												if let Some(attribute_result) = fixture_result.get_mut(attribute_id) {
-													// attribute_data: used for snapping
-													// attribute_value: value to blend
-													// fixture_id: used for indexing running results
-													// attribute_id: used for indexing running results
-													// attribute_result: Current, running value
-													// layer_bin_opacity: Opacity of the current layer bin
-													match attribute_data.snap {
-														SnapData::NoSnap => {
-															// Always LTP for layer bin blending
-															let faded_value = blend_ltp(
-																attribute_result.clone(),
-																attribute_value.clone(),
-																layer_bin_opacity.clone()
-															);
-															*attribute_result = faded_value;
-														},
-														SnapData::SnapAt(snap_threshold) => {
-															if layer_bin_opacity > &snap_threshold {
-																*attribute_result = attribute_value.clone();
-															}
-														},
-													}
+					// Blend layer bins together
+					// TODO: Make this more efficient. We could open all layer bins at once and loop the attributes.
+					for layer_bin_id in ctx.layer_bin_order.iter() {
+						if let (
+							Some(layer_bin_data),
+							Some(layer_bin_opacity),
+						) = (
+							ctx.output_cache.layer_bins.get(layer_bin_id),
+							ctx.layer_bin_opacities.get(layer_bin_id),
+						) {
+							// All layer_bin blending is LTP static, with potential snapping
+							for (fixture_id, fixture_data) in layer_bin_data.iter() {
+								if let Some(light_data) = (&patcher_data as &PatcherData).1.get(fixture_id) {
+									for (attribute_id, attribute_value) in fixture_data.iter() {
+										if let (
+											Some(attribute_data),
+											Some(fixture_result),
+										) = (
+											light_data.get(attribute_id),
+											final_results.get_mut(fixture_id),
+										) {
+											if let Some(attribute_result) = fixture_result.get_mut(attribute_id) {
+												// attribute_data: used for snapping
+												// attribute_value: value to blend
+												// fixture_id: used for indexing running results
+												// attribute_id: used for indexing running results
+												// attribute_result: Current, running value
+												// layer_bin_opacity: Opacity of the current layer bin
+												match attribute_data.snap {
+													SnapData::NoSnap => {
+														// Always LTP for layer bin blending
+														let faded_value = blend_ltp(
+															attribute_result.clone(),
+															attribute_value.clone(),
+															layer_bin_opacity.clone()
+														);
+														*attribute_result = faded_value;
+													},
+													SnapData::SnapAt(snap_threshold) => {
+														if layer_bin_opacity > &snap_threshold {
+															*attribute_result = attribute_value.clone();
+														}
+													},
 												}
 											}
 										}
@@ -211,21 +210,18 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 								}
 							}
 						}
+					}
 
-						// Final output is ready
-						let final_results = Arc::new(final_results);
-						ctx.output_cache.final_output = Arc::clone(&final_results);
-						plugin_context_blender.emit_borrowed(String::from("mixer.final_output"), FilterCriteria::None, final_results).await;
+					// Final output is ready
+					let final_results = Arc::new(final_results);
+					ctx.output_cache.final_output = Arc::clone(&final_results);
+					plugin_context_blender.emit_borrowed(String::from("mixer.final_output"), FilterCriteria::None, final_results).await;
 
-						#[cfg(feature = "blender-benchmark")]
-						call_service!(plugin_context_blender, "core", "log", format!("Blender took {:?} to run.", start.elapsed()));
-
-					},
-					Err(_) => break,
-				};
-			}
-		} else {
-			call_service!(plugin_context_blender, "core", "log_error", String::from("patcher.get_base_layer returned the wrong data type"));
+					#[cfg(feature = "blender-benchmark")]
+					log!(plugin_context_blender, "Blender took {:?} to run", start.elapsed());
+				},
+				Err(_) => break,
+			};
 		}
 	}).await;
 

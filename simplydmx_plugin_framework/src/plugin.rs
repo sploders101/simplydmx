@@ -31,6 +31,7 @@ use crate::{
 		PortableJSONEvent,
 		RegisterEncodedListenerError,
 		PortableBincodeEvent,
+		PortableMessageGenericDeserializer,
 	},
 	keep_alive::KeepAlive,
 	services::{
@@ -43,6 +44,7 @@ use crate::{
 			DropdownOptionJSON,
 		},
 	},
+	PortableMessageDeserializer,
 };
 
 use crate::keep_alive::{
@@ -54,6 +56,7 @@ pub struct Plugin {
 	pub id: String,
 	pub name: String,
 	services: RwLock<HashMap<String, Arc<Box<dyn Service + Sync + Send>>>>,
+	deserializers: RwLock<HashMap<String, Arc<Box<dyn PortableMessageGenericDeserializer>>>>,
 	init_flags: RwLock<HashSet<String>>,
 }
 
@@ -144,6 +147,7 @@ impl PluginContext {
 			id: String::clone(&id),
 			name: name,
 			services: RwLock::new(HashMap::new()),
+			deserializers: RwLock::new(HashMap::new()),
 			init_flags: RwLock::new(HashSet::new()),
 		});
 		plugins.insert(String::clone(&id), Arc::clone(&plugin));
@@ -166,6 +170,24 @@ impl PluginContext {
 			flag_id: flag_name,
 		};
 		self.signal_dep(dependency).await;
+	}
+
+	pub async fn register_deserializer<T: BidirectionalPortable>(&self, deserializer_id: String) {
+		let mut deserializers = self.1.deserializers.write().await;
+		deserializers.insert(deserializer_id, Arc::new(Box::new(PortableMessageDeserializer::<T>::new())));
+	}
+
+	pub async fn get_deserializer(&self, plugin_id: &str, deserializer_id: &str) -> Option<Arc<Box<dyn PortableMessageGenericDeserializer>>> {
+		let plugins = self.0.plugins.read().await;
+		if let Some(plugin) = plugins.get(plugin_id) {
+			if let Some(deserializer) = plugin.deserializers.read().await.get(deserializer_id) {
+				return Some(Arc::clone(&deserializer));
+			} else {
+				return None;
+			}
+		} else {
+			return None;
+		}
 	}
 
 	/// Register a new service with the system. This service can be discovered and called by other plugins, either by

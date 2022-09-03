@@ -11,10 +11,8 @@ pub struct FixtureBundle {
 	/// Contains information about the fixture used for blending, identification, and capability detection
 	pub fixture_info: FixtureInfo,
 
-	/// Service to call with arguments: (Uuid, CustomDataType).
-	///
-	/// The service's JSON or Bincode RPC API will be invoked depending on bundle serialization method
-	pub controller: (String, String),
+	/// The registered output plugin
+	pub controller: String,
 
 	/// Stores output information for the controller
 	pub output_info: SerializedData,

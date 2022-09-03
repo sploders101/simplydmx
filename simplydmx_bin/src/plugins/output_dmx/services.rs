@@ -1,10 +1,13 @@
 use std::sync::Arc;
+use async_std::sync::RwLock;
 
 use simplydmx_plugin_framework::*;
-use super::types::{
-	OutputContext,
-	OutputDescriptor,
-	DisplayableOutput,
+use super::state::{
+	DMXState,
+};
+use super::driver_types::{
+	DMXDriverDescriptor,
+	DisplayableDMXDriver,
 };
 
 
@@ -15,9 +18,9 @@ use super::types::{
 )]
 impl RegisterOutputType {
 
-	#![inner_raw(PluginContext, Arc::<OutputContext>)]
+	#![inner_raw(PluginContext, Arc::<RwLock::<DMXState>>)]
 
-	pub fn new(plugin_context: PluginContext, output_context: Arc<OutputContext>) -> RegisterOutputType {
+	pub fn new(plugin_context: PluginContext, output_context: Arc::<RwLock::<DMXState>>) -> RegisterOutputType {
 		return RegisterOutputType(plugin_context, output_context);
 	}
 
@@ -35,21 +38,21 @@ impl RegisterOutputType {
 		name: String,
 		description: String,
 		plugin_id: String,
-		register_universe_id: String,
-		delete_universe_id: String,
-		output_channel: String,
+		register_universe_service: String,
+		delete_universe_service: String,
+		output_service: String,
 	) {
-		let mut available_outputs = self.1.output_types.write().await;
-		available_outputs.insert(String::clone(&id), OutputDescriptor {
+		let mut ctx = self.1.write().await;
+		ctx.output_types.insert(String::clone(&id), DMXDriverDescriptor {
 			id: String::clone(&id),
 			name,
 			description,
 			plugin_id,
-			register_universe_id,
-			delete_universe_id,
-			output_channel,
+			register_universe_service,
+			delete_universe_service,
+			output_service,
 		});
-		drop(available_outputs);
+		drop(ctx);
 		self.0.emit("output_dmx.output_registered".into(), FilterCriteria::None, id).await;
 	}
 
@@ -63,18 +66,18 @@ impl RegisterOutputType {
 )]
 impl QueryOutputTypes {
 
-	#![inner(OutputContext)]
+	#![inner_raw(Arc::<RwLock::<DMXState>>)]
 
-	pub fn new(output_context: Arc<OutputContext>) -> QueryOutputTypes {
+	pub fn new(output_context: Arc::<RwLock::<DMXState>>) -> QueryOutputTypes {
 		return QueryOutputTypes(output_context);
 	}
 
 	#[service_main(
 		("Outputs", "List of output types with presentable metadata"),
 	)]
-	async fn main(self) -> Vec<DisplayableOutput> {
-		let output_types = self.0.output_types.write().await;
-		return output_types.values().map(|output| DisplayableOutput {
+	async fn main(self) -> Vec<DisplayableDMXDriver> {
+		let ctx = self.0.write().await;
+		return ctx.output_types.values().map(|output| DisplayableDMXDriver {
 			id: String::clone(&output.id),
 			name: String::clone(&output.name),
 			description: String::clone(&output.name),

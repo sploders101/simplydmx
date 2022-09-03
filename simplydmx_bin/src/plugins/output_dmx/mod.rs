@@ -1,9 +1,10 @@
 pub mod services;
-pub mod types;
+pub mod driver_types;
+pub mod fixture_types;
+pub mod state;
 
 use std::{
 	sync::Arc,
-	collections::HashMap,
 };
 use async_std::sync::{
 	RwLock,
@@ -14,9 +15,7 @@ use simplydmx_plugin_framework::*;
 pub async fn initialize(plugin_context: PluginContext) {
 
 	// Create container for DMX outputs
-	let output_context = Arc::new(types::OutputContext {
-		output_types: RwLock::new(HashMap::new()),
-	});
+	let output_context = Arc::new(RwLock::new(state::DMXState::new()));
 
 	// Register services
 	plugin_context.register_service(true, services::RegisterOutputType::new(plugin_context.clone(), Arc::clone(&output_context))).await.unwrap();

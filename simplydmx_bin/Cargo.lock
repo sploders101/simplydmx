@@ -2657,6 +2657,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-big-array"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3323f09a748af288c3dc2474ea6803ee81f118321775bffa3ac8f7e65c5e90e7"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "serde_derive"
 version = "1.0.136"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2795,6 +2804,7 @@ dependencies = [
  "futures",
  "sacn",
  "serde",
+ "serde-big-array",
  "serde_json",
  "simplydmx_plugin_framework",
  "tauri",

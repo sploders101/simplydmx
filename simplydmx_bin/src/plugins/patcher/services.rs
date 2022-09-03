@@ -13,8 +13,8 @@ use crate::plugins::mixer::exported_types::{
 };
 
 use super::{
-	patcher_context::PatcherContext,
-	types::{
+	state::PatcherContext,
+	fixture_types::{
 		ChannelType,
 		ChannelSize,
 		Segment,

@@ -10,7 +10,13 @@ use async_std::{sync::RwLock, channel::Sender};
 use simplydmx_plugin_framework::*;
 use uuid::Uuid;
 
-use self::dmxsource_controller::{E131Command, initialize_controller};
+use crate::plugins::output_dmx::driver_types::{
+	DMXFrame,
+};
+use self::dmxsource_controller::{
+	E131Command,
+	initialize_controller,
+};
 
 pub struct E131State {
 	controller: Sender<E131Command>,
@@ -86,30 +92,6 @@ impl DestroyE131Universe {
 	}
 }
 
-#[portable]
-#[serde(untagged)]
-pub enum DMXFrame {
-	#[serde(skip)]
-	FixedLength([u8; 512]),
-	Vec(Vec<u8>),
-}
-impl Into<[u8; 512]> for DMXFrame {
-	fn into(self) -> [u8; 512] {
-		return match self {
-			Self::FixedLength(fixed_length) => fixed_length,
-			Self::Vec(vec_frame) => {
-				let mut new_frame = [0u8; 512];
-				for (i, item) in vec_frame.into_iter().enumerate() {
-					if i <= 512 {
-						new_frame[i] = item;
-					}
-				}
-				new_frame
-			},
-		};
-	}
-}
-
 #[interpolate_service(
 	"send_frame",
 	"Send DMX frame",
@@ -120,13 +102,12 @@ impl SendOutput {
 	#![inner_raw(PluginContext, Arc::<RwLock::<E131State>>)]
 
 	#[service_main(
-		("Internal Universe ID", "The universe UUID used internally for this output", "output::int-universe-id"),
-		("DMX Data", "The DMX data, pre-serialized and ready to send", "output::dmx-data"),
+		("DMX Data", "The DMX data, pre-serialized and ready to send", "output::dmx-frame"),
 	)]
-	async fn main(self, int_id: Uuid, data: DMXFrame) -> () {
+	async fn main(self, frame: DMXFrame) -> () {
 		let ctx = self.1.read().await;
-		if let Some(ext_universe) = ctx.universes.get(&int_id) {
-			if let Err(_) = ctx.controller.send(E131Command::SendOutput(*ext_universe, data.into())).await {
+		if let Some(ext_universe) = ctx.universes.get(&frame.id) {
+			if let Err(_) = ctx.controller.send(E131Command::SendOutput(*ext_universe, frame.frame)).await {
 				log_error!(self.0, "The E.131 controller exited early!");
 			}
 		}

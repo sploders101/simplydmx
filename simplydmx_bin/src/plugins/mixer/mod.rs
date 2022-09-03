@@ -32,9 +32,19 @@ pub async fn initialize_mixer(plugin_context: PluginContext) {
 	// Create mixer context
 	let mixer_context = Arc::new(Mutex::new(MixerContext::new()));
 
+
 	// Declare events
-	plugin_context.declare_event::<FullMixerOutput>(String::from("mixer.layer_bin_output")).await.unwrap();
-	plugin_context.declare_event::<FullMixerOutput>(String::from("mixer.final_output")).await.unwrap();
+
+	plugin_context.declare_event::<FullMixerOutput>(
+		"mixer.layer_bin_output".to_owned(),
+		Some("Emitted when a layer bin has been updated in the mixer".to_owned()),
+	).await.unwrap();
+
+	plugin_context.declare_event::<FullMixerOutput>(
+		"mixer.final_output".to_owned(),
+		Some("Emitted when the mixer's final output has been updated".to_owned()),
+	).await.unwrap();
+
 
 	// Start blender task
 	let update_sender = blender::start_blender(plugin_context.clone(), Arc::clone(&mixer_context)).await;

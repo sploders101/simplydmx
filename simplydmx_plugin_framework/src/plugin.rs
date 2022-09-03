@@ -272,8 +272,10 @@ impl PluginContext {
 	/// data (JSON and bincode, for example) will be repeated verbatim on the bus for any listeners of the same protocol.
 	///
 	/// The type parameter is used to construct a generic deserializer used for translation.
-	pub async fn declare_event<T: BidirectionalPortable>(&self, event_name: String) -> Result<(), DeclareEventError> {
-		return self.0.evt_bus.write().await.declare_event::<T>(event_name);
+	///
+	/// Event description will be used for the SDK, and was added for future-proofing
+	pub async fn declare_event<T: BidirectionalPortable>(&self, event_name: String, _event_description: Option<String>) -> Result<(), DeclareEventError> {
+		return self.0.evt_bus.write().await.declare_event::<T>(event_name.into());
 	}
 
 	/// Sends an event on the bus. `T` gets cast to `Any`, boxed, wrapped in `Arc`,

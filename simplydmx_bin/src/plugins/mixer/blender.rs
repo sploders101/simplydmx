@@ -22,6 +22,8 @@ use super::state::{
 	SnapData,
 };
 
+use crate::plugins::patcher::PatcherInterface;
+
 type PatcherData = (FullMixerOutput, FullMixerBlendingData);
 
 #[portable]
@@ -48,7 +50,7 @@ pub enum UpdateList {
 /// Start the blending engine
 ///
 /// This function creates a task for
-pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerContext>>) -> Sender<UpdateList> {
+pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerContext>>, get_base_layer: PatcherInterface) -> Sender<UpdateList> {
 	let (update_sender, update_receiver) = channel::bounded::<UpdateList>(5);
 
 	// Subscribe to patcher updates and notify blending process when they occur
@@ -81,7 +83,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 		Dependency::service("patcher", "get_base_layer"),
 		Dependency::service("core", "log_error"),
 	], async move {
-		if let Some(mut patcher_data) = ArcAny::<(FullMixerOutput, FullMixerBlendingData)>::new(Arc::new(call_service!(plugin_context_blender, "patcher", "get_base_layer"))) {
+		if let mut patcher_data = get_base_layer.main().await {
 			let mut shutting_down = false;
 			loop {
 				match update_receiver.recv().await {
@@ -121,7 +123,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 
 						// Patcher updates come first, since they may have data necessary for blending
 						if patcher_update {
-							patcher_data = ArcAny::new(Arc::new(call_service!(plugin_context_blender, "patcher", "get_base_layer"))).unwrap();
+							patcher_data = get_base_layer.main().await;
 							prune_blender(&mut ctx, &patcher_data).await;
 						}
 

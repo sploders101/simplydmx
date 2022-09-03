@@ -62,7 +62,7 @@ async fn async_main(plugin_manager: PluginManager, shutdown_receiver: Receiver<(
 		).await.unwrap(),
 	).await;
 
-	plugins::patcher::initialize(
+	let patcher_interface = plugins::patcher::initialize(
 		plugin_manager.register_plugin(
 			"patcher",
 			"SimplyDMX Fixture Patcher",
@@ -75,6 +75,7 @@ async fn async_main(plugin_manager: PluginManager, shutdown_receiver: Receiver<(
 			"mixer",
 			"SimplyDMX Mixer",
 		).await.unwrap(),
+		patcher_interface,
 	).await;
 
 	// #[cfg(target = "output-dmx-e131")]

@@ -21,23 +21,15 @@ use super::super::{
 	},
 };
 
-#[interpolate_service(
-	"get_base_layer",
-	"Query output types",
-	"Queries a list of valid output types with presentable metadata for the UI",
-)]
-impl GetBaseLayer {
-
-	#![inner_raw(PluginContext, Arc::<RwLock::<PatcherContext>>)]
+#[derive(Clone)]
+pub struct PatcherInterface(PluginContext, Arc::<RwLock::<PatcherContext>>);
+impl PatcherInterface {
 
 	pub fn new(plugin_context: PluginContext, patcher_ctx: Arc::<RwLock::<PatcherContext>>) -> Self {
-		return GetBaseLayer(plugin_context, patcher_ctx);
+		return PatcherInterface(plugin_context, patcher_ctx);
 	}
 
-	#[service_main(
-		("Outputs", "List of output types with presentable metadata"),
-	)]
-	async fn main(self) -> (FullMixerOutput, FullMixerBlendingData) {
+	pub async fn main(&self) -> (FullMixerOutput, FullMixerBlendingData) {
 		let mut default_values: FullMixerOutput = HashMap::new();
 		let mut blending_data: FullMixerBlendingData = HashMap::new();
 

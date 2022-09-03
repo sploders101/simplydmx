@@ -27,7 +27,9 @@ use state::{
 	FullMixerOutput,
 };
 
-pub async fn initialize_mixer(plugin_context: PluginContext) {
+use super::patcher::PatcherInterface;
+
+pub async fn initialize_mixer(plugin_context: PluginContext, get_base_layer: PatcherInterface) {
 
 	// Create mixer context
 	let mixer_context = Arc::new(Mutex::new(MixerContext::new()));
@@ -47,7 +49,7 @@ pub async fn initialize_mixer(plugin_context: PluginContext) {
 
 
 	// Start blender task
-	let update_sender = blender::start_blender(plugin_context.clone(), Arc::clone(&mixer_context)).await;
+	let update_sender = blender::start_blender(plugin_context.clone(), Arc::clone(&mixer_context), get_base_layer).await;
 
 	// Register services
 	plugin_context.register_service(true, commands::EnterBlindMode::new(plugin_context.clone(), Arc::clone(&mixer_context))).await.unwrap();

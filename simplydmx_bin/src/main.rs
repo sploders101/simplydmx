@@ -5,6 +5,7 @@
 
 pub mod plugins;
 pub mod api_utilities;
+pub mod utilities;
 
 use std::thread;
 use async_std::{
@@ -75,16 +76,26 @@ async fn async_main(plugin_manager: PluginManager, shutdown_receiver: Receiver<(
 			"mixer",
 			"SimplyDMX Mixer",
 		).await.unwrap(),
-		patcher_interface,
+		patcher_interface.clone(),
 	).await;
 
-	// #[cfg(target = "output-dmx-e131")]
-	// plugins::output_dmx_e131::initialize(
-	// 	plugin_manager.register_plugin(
-	// 		"output-dmx-e131",
-	// 		"E1.31/sACN DMX Output",
-	// 	).await.unwrap()
-	// ).await;
+	#[cfg(feature = "output-dmx")]
+	let dmx_interface = plugins::output_dmx::initialize(
+		plugin_manager.register_plugin(
+			"output-dmx",
+			"E1.31/sACN DMX Output",
+		).await.unwrap(),
+		patcher_interface.clone(),
+	).await;
+
+	#[cfg(feature = "output-dmx-e131")]
+	plugins::output_dmx_e131::initialize(
+		plugin_manager.register_plugin(
+			"output-dmx-e131",
+			"E1.31/sACN DMX Output",
+		).await.unwrap(),
+		dmx_interface.clone(),
+	).await;
 
 	// Wait for shutdown request
 	shutdown_receiver.recv().await.unwrap();

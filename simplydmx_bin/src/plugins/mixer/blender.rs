@@ -83,7 +83,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 		Dependency::service("patcher", "get_base_layer"),
 		Dependency::service("core", "log_error"),
 	], async move {
-		let mut patcher_data = get_base_layer.main().await;
+		let mut patcher_data = get_base_layer.get_base_layer().await;
 		let mut shutting_down = false;
 		loop {
 			match update_receiver.recv().await {
@@ -123,7 +123,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 
 					// Patcher updates come first, since they may have data necessary for blending
 					if patcher_update {
-						patcher_data = get_base_layer.main().await;
+						patcher_data = get_base_layer.get_base_layer().await;
 						prune_blender(&mut ctx, &patcher_data).await;
 					}
 

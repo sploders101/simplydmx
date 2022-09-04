@@ -1,33 +1,42 @@
+use std::collections::HashMap;
+
 use simplydmx_plugin_framework::*;
 use uuid::Uuid;
-use serde_big_array::BigArray;
+use async_trait::async_trait;
 
-/// Descriptor indicating parameters for communicating with a DMX driver
-///
-/// Drivers are implemented as a collection of services, referenced by this descriptor.
-#[portable]
-pub struct DMXDriverDescriptor {
+use crate::{
+	utilities::{
+		forms::FormDescriptor,
+		serialized_data::SerializedData,
+	},
+	impl_deserialize_err,
+};
+
+
+/// Trait indicating parameters for communicating with a DMX driver
+#[async_trait]
+pub trait DMXDriver: Send + Sync + 'static {
 
 	/// The unique ID of the DMX driver
-	pub id: String,
+	fn get_id(&self) -> String;
 
 	/// The human-readable name of the DMX driver
-	pub name: String,
+	fn get_name(&self) -> String;
 
 	/// A human-readable description of the driver, such as what devices and protocols it uses
-	pub description: String,
+	fn get_description(&self) -> String;
 
-	/// The plugin ID of the DMX driver
-	pub plugin_id: String,
+	/// Gets a form used by the UI for linking a universe to this driver
+	async fn get_register_universe_form(&self) -> FormDescriptor;
 
-	/// The ID of the "Register Universe" service
-	pub register_universe_service: String,
+	/// Registers a universe using data from a filled-in form
+	async fn register_universe(&self, id: &Uuid, form: SerializedData) -> Result<(), RegisterUniverseError>;
 
-	/// The ID of the "Delete Universe" service
-	pub delete_universe_service: String,
+	/// Deletes a universe from the driver
+	async fn delete_universe(&self, id: &Uuid);
 
-	/// The ID of the "Send DMX Frame" service
-	pub output_service: String,
+	/// Sends new, updated frames to the driver for output
+	async fn send_dmx(&self, universes: HashMap<Uuid, [u8; 512]>);
 
 }
 
@@ -39,10 +48,14 @@ pub struct DisplayableDMXDriver {
 	pub description: String,
 }
 
-/// "Portable",  representation of a DMX frame that implements Into<[u8; 512]>
+/// A single collection of values to send to a DMX universe
+pub type DMXFrame = [u8; 512];
+
+/// An error that occurs while registering a universe
 #[portable]
-pub struct DMXFrame {
-	pub id: Uuid,
-	#[serde(with = "BigArray")]
-	pub frame: [u8; 512],
+pub enum RegisterUniverseError {
+	InvalidData,
+	Other(String),
+	Unknown,
 }
+impl_deserialize_err!(RegisterUniverseError, Self::InvalidData);

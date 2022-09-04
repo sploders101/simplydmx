@@ -5,12 +5,11 @@ use simplydmx_plugin_framework::*;
 
 use super::{
 	fixture_types::DMXFixtureData,
-	driver_types::DMXDriverDescriptor,
+	driver_types::DMXDriver,
 };
 
-#[portable]
 pub struct DMXState {
-	pub output_types: HashMap<String, DMXDriverDescriptor>,
+	pub drivers: HashMap<String, Box<dyn DMXDriver>>,
 	pub library: HashMap<Uuid, DMXFixtureData>,
 	pub fixtures: HashMap<Uuid, FixtureInstance>,
 	pub universes: HashMap<Uuid, UniverseInstance>,
@@ -18,7 +17,7 @@ pub struct DMXState {
 impl DMXState {
 	pub fn new() -> Self {
 		return DMXState {
-			output_types: HashMap::new(),
+			drivers: HashMap::new(),
 			library: HashMap::new(),
 			fixtures: HashMap::new(),
 			universes: HashMap::new(),
@@ -28,15 +27,12 @@ impl DMXState {
 
 #[portable]
 pub struct FixtureInstance {
-	pub universe: Uuid,
-	pub offset: u16,
+	pub universe: Option<Uuid>,
+	pub offset: Option<u16>,
 }
 
 #[portable]
 pub struct UniverseInstance {
 	pub id: Uuid,
-	pub controller: Option<UniverseController>,
+	pub controller: Option<String>,
 }
-
-#[portable]
-pub struct UniverseController {}

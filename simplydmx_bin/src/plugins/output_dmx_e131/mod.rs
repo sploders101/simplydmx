@@ -1,116 +1,16 @@
-mod dmxsource_controller;
+pub mod interface;
+pub mod dmxsource_controller;
+pub mod state;
 
-use std::{
-	collections::HashMap,
-	sync::Arc,
-};
+use simplydmx_plugin_framework::PluginContext;
+use interface::E131DMXDriver;
 
-use async_std::{sync::RwLock, channel::Sender};
+use super::output_dmx::interface::DMXInterface;
 
-use simplydmx_plugin_framework::*;
-use uuid::Uuid;
+pub async fn initialize(plugin_context: PluginContext, dmx_interface: DMXInterface) -> E131DMXDriver {
+	let interface = E131DMXDriver::new(plugin_context);
 
-use crate::plugins::output_dmx::driver_types::{
-	DMXFrame,
-};
-use self::dmxsource_controller::{
-	E131Command,
-	initialize_controller,
-};
+	dmx_interface.register_output(interface.clone()).await;
 
-pub struct E131State {
-	controller: Sender<E131Command>,
-	universes: HashMap<Uuid, u16>,
-}
-impl E131State {
-	pub fn new() -> Self {
-		return E131State {
-			controller: initialize_controller(),
-			universes: HashMap::new(),
-		}
-	}
-}
-
-#[interpolate_service(
-	"create_universe",
-	"Create Universe",
-	"Creates an E.131/sACN universe for transmission of DMX over the network",
-)]
-impl CreateE131Universe {
-
-	#![inner_raw(PluginContext, Arc::<RwLock::<E131State>>)]
-
-	#[service_main(
-		("Internal Universe ID", "The universe UUID used internally for this output", "output::int-universe-uuid"),
-		("External Universe ID", "The universe ID used on any associated sACN lights or gateways.", "output::user-sourced"),
-		("Result", "The result of the request", "output::result-static"),
-	)]
-	async fn main(self, int_id: Uuid, ext_id: u16) -> Result<(), &'static str> {
-		let mut ctx = self.1.write().await;
-
-		if let Some(_) = ctx.universes.values().find(|universe_id| **universe_id == ext_id) {
-			return Err("This external universe ID is taken");
-		}
-
-		if ctx.universes.len() == 0 {
-			if let Err(_) = ctx.controller.send(E131Command::CreateOutput).await {
-				log_error!(self.0, "The E.131 controller exited early!");
-			}
-		}
-		ctx.universes.insert(int_id, ext_id);
-
-		return Ok(());
-	}
-}
-
-
-#[interpolate_service(
-	"destroy_universe",
-	"Destroy Universe",
-	"Destroys an E.131/sACN universe, signaling end of transmission",
-)]
-impl DestroyE131Universe {
-
-	#![inner_raw(PluginContext, Arc::<RwLock::<E131State>>)]
-
-	#[service_main(
-		("Internal Universe ID", "The universe UUID used internally for this output", "output::int-universe-uuid"),
-	)]
-	async fn main(self, int_id: Uuid) -> () {
-		let mut ctx = self.1.write().await;
-
-		if let Some(ext_id) = ctx.universes.remove(&int_id) {
-			if let Err(_) = ctx.controller.send(E131Command::TerminateUniverse(ext_id)).await {
-				log_error!(self.0, "The E.131 controller exited early!");
-			}
-			if ctx.universes.len() == 0 {
-				if let Err(_) = ctx.controller.send(E131Command::DestroyOutput).await {
-					log_error!(self.0, "The E.131 controller exited early!");
-				}
-			}
-		}
-	}
-}
-
-#[interpolate_service(
-	"send_frame",
-	"Send DMX frame",
-	"Sends a DMX frame for the specified universe "
-)]
-impl SendOutput {
-
-	#![inner_raw(PluginContext, Arc::<RwLock::<E131State>>)]
-
-	#[service_main(
-		("DMX Data", "The DMX data, pre-serialized and ready to send", "output::dmx-frame"),
-	)]
-	async fn main(self, frame: DMXFrame) -> () {
-		let ctx = self.1.read().await;
-		if let Some(ext_universe) = ctx.universes.get(&frame.id) {
-			if let Err(_) = ctx.controller.send(E131Command::SendOutput(*ext_universe, frame.frame)).await {
-				log_error!(self.0, "The E.131 controller exited early!");
-			}
-		}
-	}
-
+	return interface;
 }

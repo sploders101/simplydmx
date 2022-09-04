@@ -1,4 +1,7 @@
-use std::thread;
+use std::{
+	thread,
+	collections::HashMap,
+};
 use async_std::{
 	channel,
 	task::block_on,
@@ -10,7 +13,7 @@ pub enum E131Command {
 	CreateOutput,
 	DestroyOutput,
 	TerminateUniverse(u16),
-	SendOutput(u16, [u8; 512]),
+	SendOutput(HashMap<u16, [u8; 512]>),
 }
 
 pub fn initialize_controller() -> channel::Sender<E131Command> {
@@ -40,9 +43,11 @@ pub fn initialize_controller() -> channel::Sender<E131Command> {
 							controller.terminate_stream(universe_id).ok();
 						}
 					},
-					E131Command::SendOutput(universe_id, data) => {
+					E131Command::SendOutput(output_data) => {
 						if let Some(ref controller) = controller {
-							controller.send(universe_id, &data).ok();
+							for (universe_id, data) in output_data {
+								controller.send(universe_id, &data).ok();
+							}
 						}
 					},
 				}

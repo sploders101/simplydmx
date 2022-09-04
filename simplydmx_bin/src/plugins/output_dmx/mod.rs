@@ -1,24 +1,22 @@
-pub mod services;
+pub mod interface;
 pub mod driver_types;
 pub mod fixture_types;
 pub mod state;
 
-use std::{
-	sync::Arc,
-};
-use async_std::sync::{
-	RwLock,
-};
-
 use simplydmx_plugin_framework::*;
 
-pub async fn initialize(plugin_context: PluginContext) {
+use self::interface::DMXInterface;
 
-	// Create container for DMX outputs
-	let output_context = Arc::new(RwLock::new(state::DMXState::new()));
+use super::patcher::PatcherInterface;
 
-	// Register services
-	plugin_context.register_service(true, services::RegisterOutputType::new(plugin_context.clone(), Arc::clone(&output_context))).await.unwrap();
-	plugin_context.register_service(true, services::QueryOutputTypes::new(Arc::clone(&output_context))).await.unwrap();
+
+pub async fn initialize(plugin_context: PluginContext, patcher_interface: PatcherInterface) -> DMXInterface {
+
+	// Create plugin interface
+	let output_context = DMXInterface::new(plugin_context);
+
+	patcher_interface.register_output(output_context.clone()).await;
+
+	return output_context;
 
 }

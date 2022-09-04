@@ -1,6 +1,9 @@
 use simplydmx_plugin_framework::*;
 use uuid::Uuid;
-use crate::plugins::mixer::exported_types::SnapData;
+use crate::{
+	plugins::mixer::exported_types::SnapData,
+	utilities::serialized_data::SerializedData,
+};
 use std::collections::HashMap;
 
 use crate::plugins::mixer::exported_types::BlendingScheme;
@@ -17,16 +20,6 @@ pub struct FixtureBundle {
 	/// Stores output information for the controller
 	pub output_info: SerializedData,
 
-}
-
-/// Data type used to hold a serialized instance of an arbitrary data type.
-///
-/// This is intended to encapsulate dynamically-typed data intended for deserialization by the output plugin
-#[portable]
-#[serde(tag = "t", content = "c")]
-pub enum SerializedData {
-	Bincode(Vec<u8>),
-	JSON(serde_json::Value),
 }
 
 /// Data type that contains generic, protocol-erased information about a fixture such as name,
@@ -60,20 +53,8 @@ pub struct FixtureInfo {
 	/// Personalities, or modes, available on a light. They can contain alternative channel layouts.
 	pub personalities: HashMap<String, Personality>,
 
-	///
-	pub output_info: OutputInfo,
-
-}
-
-/// Stores information about the output controller
-#[portable]
-pub struct OutputInfo {
-
-	/// The plugin ID of the output controller
-	pub plugin_id: String,
-
-	/// The name of the service to be called for exporting protocol-specific fixture data
-	pub exporter: String,
+	/// Contains a string referencing the output driver associated with the fixture.
+	pub output_driver: String,
 
 }
 

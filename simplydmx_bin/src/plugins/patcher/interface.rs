@@ -18,7 +18,7 @@ use super::{
 		ChannelType,
 		ChannelSize,
 		Segment,
-	},
+	}, driver_plugin_api::OutputPlugin,
 };
 
 #[derive(Clone)]
@@ -29,14 +29,15 @@ impl PatcherInterface {
 		return PatcherInterface(plugin_context, patcher_ctx);
 	}
 
-	pub async fn main(&self) -> (FullMixerOutput, FullMixerBlendingData) {
+	/// Gets the initial background layer for the mixer to blend data with.
+	pub async fn get_base_layer(&self) -> (FullMixerOutput, FullMixerBlendingData) {
 		let mut default_values: FullMixerOutput = HashMap::new();
 		let mut blending_data: FullMixerBlendingData = HashMap::new();
 
 		let ctx = self.1.read().await;
 
-		for (fixture_id, fixture_data) in ctx.fixtures.iter() {
-			if let Some(fixture_info) = ctx.library.get(fixture_id) {
+		for (fixture_id, fixture_data) in ctx.sharable.fixtures.iter() {
+			if let Some(fixture_info) = ctx.sharable.library.get(fixture_id) {
 				if let Some(fixture_personality) = fixture_info.personalities.get(&fixture_data.personality) {
 					// Create containers for this fixture
 					let mut fixture_defaults = HashMap::new();
@@ -88,6 +89,12 @@ impl PatcherInterface {
 		}
 
 		return (default_values, blending_data);
+	}
+
+	/// Registers an output plugin for use by the patcher.
+	pub async fn register_output<T: OutputPlugin>(&self, plugin: T) {
+		let mut ctx = self.1.write().await;
+		ctx.output_drivers.insert(plugin.get_id(), Box::new(plugin));
 	}
 
 }

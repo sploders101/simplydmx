@@ -1,3 +1,4 @@
+pub mod driver_plugin_api;
 mod state;
 mod fixture_types;
 

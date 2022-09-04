@@ -1,25 +1,33 @@
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use super::fixture_types::FixtureInfo;
+use super::{fixture_types::FixtureInfo, driver_plugin_api::OutputPlugin};
 
 use simplydmx_plugin_framework::*;
 
-#[portable]
 pub struct PatcherContext {
-	pub library: HashMap<Uuid, FixtureInfo>,
-	pub fixture_order: Vec<Uuid>,
-	pub fixtures: HashMap<Uuid, FixtureInstance>,
+	pub output_drivers: HashMap<String, Box<dyn OutputPlugin>>,
+	pub sharable: SharablePatcherState,
 }
-
 impl PatcherContext {
 	pub fn new() -> Self {
 		return PatcherContext {
-			library: HashMap::new(),
-			fixture_order: Vec::new(),
-			fixtures: HashMap::new(),
-		};
+			output_drivers: HashMap::new(),
+			sharable: SharablePatcherState {
+				library: HashMap::new(),
+				fixture_order: Vec::new(),
+				fixtures: HashMap::new(),
+			},
+		}
 	}
+}
+
+
+#[portable]
+pub struct SharablePatcherState {
+	pub library: HashMap<Uuid, FixtureInfo>,
+	pub fixture_order: Vec<Uuid>,
+	pub fixtures: HashMap<Uuid, FixtureInstance>,
 }
 
 

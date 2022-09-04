@@ -9,6 +9,7 @@ pub mod exported_types {
 		AbstractLayerLight,
 		BlenderValue,
 		FullMixerOutput,
+		FixtureMixerOutput,
 		BlendingScheme,
 		FullMixerBlendingData,
 		SnapData,

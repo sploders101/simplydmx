@@ -36,9 +36,10 @@ impl PatcherInterface {
 		let mut blending_data: FullMixerBlendingData = HashMap::new();
 
 		let ctx = self.1.read().await;
+		let sharable_ctx = ctx.sharable.read().await;
 
-		for (fixture_id, fixture_data) in ctx.sharable.fixtures.iter() {
-			if let Some(fixture_info) = ctx.sharable.library.get(fixture_id) {
+		for (fixture_id, fixture_data) in sharable_ctx.fixtures.iter() {
+			if let Some(fixture_info) = sharable_ctx.library.get(fixture_id) {
 				if let Some(fixture_personality) = fixture_info.personalities.get(&fixture_data.personality) {
 					// Create containers for this fixture
 					let mut fixture_defaults = HashMap::new();

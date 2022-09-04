@@ -9,5 +9,5 @@ pub struct DMXFixtureData {
 
 #[portable]
 pub struct DMXPersonalityData {
-	dmx_channel_order: Vec<String>,
+	pub dmx_channel_order: Vec<String>,
 }

@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+	collections::HashMap,
+	sync::Arc,
+};
 use uuid::Uuid;
 
 use simplydmx_plugin_framework::*;
@@ -9,9 +12,9 @@ use super::{
 };
 
 pub struct DMXState {
-	pub drivers: HashMap<String, Box<dyn DMXDriver>>,
+	pub drivers: HashMap<String, Arc<Box<dyn DMXDriver>>>,
 	pub library: HashMap<Uuid, DMXFixtureData>,
-	pub fixtures: HashMap<Uuid, FixtureInstance>,
+	pub fixtures: HashMap<Uuid, DMXFixtureInstance>,
 	pub universes: HashMap<Uuid, UniverseInstance>,
 }
 impl DMXState {
@@ -26,7 +29,7 @@ impl DMXState {
 }
 
 #[portable]
-pub struct FixtureInstance {
+pub struct DMXFixtureInstance {
 	pub universe: Option<Uuid>,
 	pub offset: Option<u16>,
 }

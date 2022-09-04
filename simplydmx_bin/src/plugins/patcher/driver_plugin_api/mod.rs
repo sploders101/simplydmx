@@ -1,7 +1,6 @@
-use async_std::sync::{
-	Arc,
-	RwLockReadGuard,
-};
+use std::ops::Deref;
+
+use async_std::sync::{Arc, RwLockReadGuard};
 pub use uuid::Uuid;
 use crate::{
 	impl_deserialize_err,
@@ -13,6 +12,8 @@ pub use crate::utilities::forms::FormDescriptor;
 use async_trait::async_trait;
 use simplydmx_plugin_framework::*;
 
+pub use super::PatcherInterface;
+use super::state::PatcherContext;
 pub use super::{
 	fixture_types::*,
 	state::{
@@ -20,6 +21,19 @@ pub use super::{
 		FixtureInstance,
 	},
 };
+
+pub struct SharableStateWrapper<'a>(RwLockReadGuard<'a, PatcherContext>);
+impl<'a> SharableStateWrapper<'a> {
+	pub fn new(lock_guard: RwLockReadGuard<'a, PatcherContext>) -> SharableStateWrapper<'a> {
+		return SharableStateWrapper(lock_guard);
+	}
+}
+impl<'a> Deref for SharableStateWrapper<'a> {
+	type Target = SharablePatcherState;
+	fn deref(&self) -> &Self::Target {
+		return &self.0.sharable;
+	}
+}
 
 #[async_trait]
 pub trait OutputDriver: Send + Sync + 'static {
@@ -61,15 +75,16 @@ pub trait OutputDriver: Send + Sync + 'static {
 
 	/// Sends updates to the output.
 	///
-	/// `fixture_data` contains a read guard to the patcher's fixture data to serve as an easy & performant reference.
-	/// Make sure that this is properly released, or it could cause the application to lock up.
+	/// `patcher_interface` serves purely as a means of accessing fixture data by calling
+	/// `patcher_interface.get_sharable_state().await`. Use of this interface for any other purpose is undefined behavior
+	/// and could result in a deadlock. This reference is not to be stored.
 	///
 	/// One solution to prevent slowing down the rest of the application if updates take too long is to implement a message
 	/// queue that gets drained on each loop iteration, taking the most recent event, and push to that queue, returning
 	/// immediately.
 	///
-	/// `data` is not actually the full mixer output, but rather filtered to only include fixtures relevant to the plugin
-	async fn send_updates(&self, fixture_data: Arc<RwLockReadGuard<'_, SharablePatcherState>>, data: FullMixerOutput);
+	/// `data` is the full mixer output. It is the responsibility of the driver to filter for items it cares about
+	async fn send_updates(&self, patcher_interface: PatcherInterface, data: Arc<FullMixerOutput>);
 
 }
 

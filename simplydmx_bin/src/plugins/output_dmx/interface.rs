@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
-use async_std::{
-	sync::{
-		Arc,
-		RwLock, RwLockReadGuard,
-	},
-	task,
+use async_std::sync::{
+	Arc,
+	RwLock,
+};
+
+use futures::{
+	future::join_all,
+	FutureExt,
 };
 
 use uuid::Uuid;
@@ -134,7 +136,8 @@ impl OutputDriver for DMXInterface {
 
 	// Updates
 
-	async fn send_updates(&self, patcher_data: Arc<RwLockReadGuard<'_, SharablePatcherState>>, data: FullMixerOutput) {
+	async fn send_updates(&self, patcher_interface: PatcherInterface, data: Arc<FullMixerOutput>) {
+		let patcher_data = patcher_interface.get_sharable_state().await;
 		let ctx = self.1.read().await;
 		// let mut active_universes = HashSet::<String>::new();
 
@@ -202,14 +205,16 @@ impl OutputDriver for DMXInterface {
 		}
 
 		// Spawn a task for each controller, sending it relevant DMX data
+		let mut futures = Vec::new();
 		for (controller_id, universes) in sorted_universes {
 			if let Some(controller) = ctx.drivers.get(&controller_id) {
 				let controller = Arc::clone(controller);
-				task::spawn(async move {
+				futures.push(async move {
 					controller.send_dmx(universes).await;
-				});
+				}.fuse());
 			}
 		}
+		join_all(futures).await;
 	}
 
 

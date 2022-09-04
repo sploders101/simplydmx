@@ -17,7 +17,7 @@ pub enum E131Command {
 }
 
 pub fn initialize_controller() -> channel::Sender<E131Command> {
-	let (sender, receiver) = channel::unbounded::<E131Command>();
+	let (sender, receiver) = channel::bounded::<E131Command>(1);
 	thread::spawn(move || {
 		let mut controller: Option<DmxSource> = None;
 

@@ -1,8 +1,5 @@
 use std::collections::HashMap;
-use async_std::sync::{
-	Arc,
-	RwLock,
-};
+use async_std::sync::Arc;
 use uuid::Uuid;
 
 use super::{fixture_types::FixtureInfo, driver_plugin_api::OutputDriver};
@@ -10,18 +7,18 @@ use super::{fixture_types::FixtureInfo, driver_plugin_api::OutputDriver};
 use simplydmx_plugin_framework::*;
 
 pub struct PatcherContext {
-	pub output_drivers: HashMap<String, Box<dyn OutputDriver>>,
-	pub sharable: Arc<RwLock<SharablePatcherState>>,
+	pub output_drivers: HashMap<String, Arc<Box<dyn OutputDriver>>>,
+	pub sharable: SharablePatcherState,
 }
 impl PatcherContext {
 	pub fn new() -> Self {
 		return PatcherContext {
 			output_drivers: HashMap::new(),
-			sharable: Arc::new(RwLock::new(SharablePatcherState {
+			sharable: SharablePatcherState {
 				library: HashMap::new(),
 				fixture_order: Vec::new(),
 				fixtures: HashMap::new(),
-			})),
+			},
 		}
 	}
 }

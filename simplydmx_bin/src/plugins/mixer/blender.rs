@@ -50,7 +50,7 @@ pub enum UpdateList {
 /// Start the blending engine
 ///
 /// This function creates a task for
-pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerContext>>, get_base_layer: PatcherInterface) -> Sender<UpdateList> {
+pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerContext>>, patcher_interface: PatcherInterface) -> Sender<UpdateList> {
 	let (update_sender, update_receiver) = channel::bounded::<UpdateList>(5);
 
 	// Subscribe to patcher updates and notify blending process when they occur
@@ -83,7 +83,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 		Dependency::service("patcher", "get_base_layer"),
 		Dependency::service("core", "log_error"),
 	], async move {
-		let mut patcher_data = get_base_layer.get_base_layer().await;
+		let mut patcher_data = patcher_interface.get_base_layer().await;
 		let mut shutting_down = false;
 		loop {
 			match update_receiver.recv().await {
@@ -123,7 +123,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 
 					// Patcher updates come first, since they may have data necessary for blending
 					if patcher_update {
-						patcher_data = get_base_layer.get_base_layer().await;
+						patcher_data = patcher_interface.get_base_layer().await;
 						prune_blender(&mut ctx, &patcher_data).await;
 					}
 
@@ -212,13 +212,15 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 						}
 					}
 
+					#[cfg(feature = "blender-benchmark")]
+					log!(plugin_context_blender, "Blender took {:?} to run", start.elapsed());
+
 					// Final output is ready
 					let final_results = Arc::new(final_results);
 					ctx.output_cache.final_output = Arc::clone(&final_results);
-					plugin_context_blender.emit_borrowed(String::from("mixer.final_output"), FilterCriteria::None, final_results).await;
+					plugin_context_blender.emit_borrowed(String::from("mixer.final_output"), FilterCriteria::None, Arc::clone(&final_results)).await;
+					patcher_interface.write_values(final_results).await;
 
-					#[cfg(feature = "blender-benchmark")]
-					log!(plugin_context_blender, "Blender took {:?} to run", start.elapsed());
 				},
 				Err(_) => break,
 			};

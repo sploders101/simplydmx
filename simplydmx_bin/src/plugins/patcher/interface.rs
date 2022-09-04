@@ -3,6 +3,10 @@ use async_std::sync::{
 	Arc,
 	RwLock,
 };
+use futures::{
+	FutureExt,
+	future::join_all,
+};
 use simplydmx_plugin_framework::*;
 
 use crate::plugins::mixer::exported_types::{
@@ -19,7 +23,7 @@ use super::{
 		ChannelSize,
 		Segment,
 	},
-	driver_plugin_api::OutputDriver,
+	driver_plugin_api::{OutputDriver, SharableStateWrapper},
 };
 
 #[derive(Clone)]
@@ -36,10 +40,9 @@ impl PatcherInterface {
 		let mut blending_data: FullMixerBlendingData = HashMap::new();
 
 		let ctx = self.1.read().await;
-		let sharable_ctx = ctx.sharable.read().await;
 
-		for (fixture_id, fixture_data) in sharable_ctx.fixtures.iter() {
-			if let Some(fixture_info) = sharable_ctx.library.get(fixture_id) {
+		for (fixture_id, fixture_data) in ctx.sharable.fixtures.iter() {
+			if let Some(fixture_info) = ctx.sharable.library.get(fixture_id) {
 				if let Some(fixture_personality) = fixture_info.personalities.get(&fixture_data.personality) {
 					// Create containers for this fixture
 					let mut fixture_defaults = HashMap::new();
@@ -96,7 +99,23 @@ impl PatcherInterface {
 	/// Registers an output plugin for use by the patcher.
 	pub async fn register_output_driver<T: OutputDriver>(&self, plugin: T) {
 		let mut ctx = self.1.write().await;
-		ctx.output_drivers.insert(plugin.get_id(), Box::new(plugin));
+		ctx.output_drivers.insert(plugin.get_id(), Arc::new(Box::new(plugin)));
+	}
+
+	pub async fn write_values(&self, data: Arc<FullMixerOutput>) {
+		let ctx = self.1.read().await;
+
+		let mut futures = Vec::new();
+		let data = Arc::new(data);
+		for driver in ctx.output_drivers.values() {
+			futures.push(driver.send_updates(PatcherInterface::clone(self), Arc::clone(&data)).fuse());
+		}
+		join_all(futures).await;
+	}
+
+	pub async fn get_sharable_state<'a>(&'a self) -> SharableStateWrapper<'a> {
+		let ctx = self.1.read().await;
+		return SharableStateWrapper::new(ctx);
 	}
 
 }

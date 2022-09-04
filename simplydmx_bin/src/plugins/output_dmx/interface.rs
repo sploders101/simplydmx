@@ -21,8 +21,8 @@ impl DMXInterface {
 		return DMXInterface(plugin_context, Arc::new(RwLock::new(DMXState::new())));
 	}
 
-	/// Registers an output plugin for use by the patcher.
-	pub async fn register_output<T: DMXDriver>(&self, plugin: T) {
+	/// Registers an DMX driver for sending universe frames
+	pub async fn register_dmx_driver<T: DMXDriver>(&self, plugin: T) {
 		let mut ctx = self.1.write().await;
 		ctx.drivers.insert(plugin.get_id(), Box::new(plugin));
 	}
@@ -31,7 +31,7 @@ impl DMXInterface {
 
 // Implement the patcher's OutputPlugin trait for the DMX plugin's interface object
 #[async_trait]
-impl OutputPlugin for DMXInterface {
+impl OutputDriver for DMXInterface {
 
 
 	// Metadata

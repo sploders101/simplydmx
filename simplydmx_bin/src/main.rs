@@ -54,7 +54,6 @@ async fn async_main(plugin_manager: PluginManager, shutdown_receiver: Receiver<(
 		).await.unwrap()
 	).await;
 
-	// Register API
 	#[cfg(feature = "api")]
 	plugins::stdio_api::initialize(
 		plugin_manager.register_plugin(
@@ -70,7 +69,6 @@ async fn async_main(plugin_manager: PluginManager, shutdown_receiver: Receiver<(
 		).await.unwrap(),
 	).await;
 
-	// Register other plugins
 	plugins::mixer::initialize_mixer(
 		plugin_manager.register_plugin(
 			"mixer",

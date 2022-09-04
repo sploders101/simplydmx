@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use simplydmx_plugin_framework::*;
 
 #[async_trait]
-pub trait OutputPlugin: Send + Sync + 'static {
+pub trait OutputDriver: Send + Sync + 'static {
 
 	// Metadata
 	fn get_id(&self) -> String;

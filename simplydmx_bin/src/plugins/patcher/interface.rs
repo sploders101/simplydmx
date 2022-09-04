@@ -18,7 +18,8 @@ use super::{
 		ChannelType,
 		ChannelSize,
 		Segment,
-	}, driver_plugin_api::OutputPlugin,
+	},
+	driver_plugin_api::OutputDriver,
 };
 
 #[derive(Clone)]
@@ -92,7 +93,7 @@ impl PatcherInterface {
 	}
 
 	/// Registers an output plugin for use by the patcher.
-	pub async fn register_output<T: OutputPlugin>(&self, plugin: T) {
+	pub async fn register_output_driver<T: OutputDriver>(&self, plugin: T) {
 		let mut ctx = self.1.write().await;
 		ctx.output_drivers.insert(plugin.get_id(), Box::new(plugin));
 	}

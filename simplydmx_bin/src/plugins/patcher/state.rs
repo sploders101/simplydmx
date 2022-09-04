@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use super::{fixture_types::FixtureInfo, driver_plugin_api::OutputPlugin};
+use super::{fixture_types::FixtureInfo, driver_plugin_api::OutputDriver};
 
 use simplydmx_plugin_framework::*;
 
 pub struct PatcherContext {
-	pub output_drivers: HashMap<String, Box<dyn OutputPlugin>>,
+	pub output_drivers: HashMap<String, Box<dyn OutputDriver>>,
 	pub sharable: SharablePatcherState,
 }
 impl PatcherContext {

@@ -15,7 +15,7 @@ pub async fn initialize(plugin_context: PluginContext, patcher_interface: Patche
 	// Create plugin interface
 	let output_context = DMXInterface::new(plugin_context);
 
-	patcher_interface.register_output(output_context.clone()).await;
+	patcher_interface.register_output_driver(output_context.clone()).await;
 
 	return output_context;
 

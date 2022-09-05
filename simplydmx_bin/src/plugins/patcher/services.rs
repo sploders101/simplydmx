@@ -16,6 +16,8 @@ impl ImportFixtureDefinition {
 
 	#![inner_raw(PatcherInterface)]
 
+	pub fn new(patcher_interface: PatcherInterface) -> Self { Self(patcher_interface) }
+
 	#[service_main(
 		("Fixture Bundle", "The fixture bundle you would like to import"),
 		("Result", "Whether or not the import succeeded"),
@@ -35,6 +37,8 @@ impl ImportFixtureDefinition {
 impl CreateFixture {
 
 	#![inner_raw(PatcherInterface)]
+
+	pub fn new(patcher_interface: PatcherInterface) -> Self { Self(patcher_interface) }
 
 	#[service_main(
 		("Fixture Type", "The UUID of the fixture description from the library that this new fixture should be based on"),

@@ -5,7 +5,7 @@ use simplydmx_plugin_framework::*;
 ///
 /// This is intended to encapsulate dynamically-typed data intended for deserialization by the output plugin
 #[portable]
-#[serde(tag = "t", content = "c")]
+#[serde(untagged)]
 pub enum SerializedData {
 	Bincode(Vec<u8>),
 	JSON(serde_json::Value),

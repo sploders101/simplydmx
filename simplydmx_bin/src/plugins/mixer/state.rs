@@ -91,6 +91,7 @@ pub type SubmasterDelta = HashMap<Uuid, HashMap<String, Option<BlenderValue>>>;
 
 /// Value to be used in a submaster with instructions for mixing it into the result
 #[portable]
+#[serde(tag = "type", content = "value")]
 pub enum BlenderValue {
 
 	/// Static value, meaning at 100%, the channel should be exactly this value

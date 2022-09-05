@@ -79,10 +79,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 
 	// Spawn the blender task when its dependencies have been satisfied.
 	let plugin_context_blender = plugin_context.clone();
-	plugin_context.spawn_when_volatile(vec![
-		Dependency::service("patcher", "get_base_layer"),
-		Dependency::service("core", "log_error"),
-	], async move {
+	plugin_context.spawn_volatile(async move {
 		let mut patcher_data = patcher_interface.get_base_layer().await;
 		let mut shutting_down = false;
 		loop {
@@ -220,6 +217,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 					// Final output is ready
 					let final_results = Arc::new(final_results);
 					ctx.output_cache.final_output = Arc::clone(&final_results);
+					drop(ctx);
 					#[cfg(feature = "verbose-debugging")]
 					println!("Lock released in blender loop");
 					plugin_context_blender.emit_borrowed(String::from("mixer.final_output"), FilterCriteria::None, Arc::clone(&final_results)).await;

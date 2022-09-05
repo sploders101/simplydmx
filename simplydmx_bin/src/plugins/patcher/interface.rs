@@ -51,7 +51,7 @@ impl PatcherInterface {
 		let ctx = self.1.read().await;
 
 		for (fixture_id, fixture_data) in ctx.sharable.fixtures.iter() {
-			if let Some(fixture_info) = ctx.sharable.library.get(fixture_id) {
+			if let Some(fixture_info) = ctx.sharable.library.get(&fixture_data.fixture_id) {
 				if let Some(fixture_personality) = fixture_info.personalities.get(&fixture_data.personality) {
 					// Create containers for this fixture
 					let mut fixture_defaults = HashMap::new();
@@ -149,6 +149,7 @@ impl PatcherInterface {
 						name,
 						comments,
 					});
+					self.0.emit("patcher.patch_updated".into(), FilterCriteria::None, ()).await;
 					return Ok(instance_uuid);
 				}
 			} else {
@@ -164,11 +165,19 @@ impl PatcherInterface {
 		let ctx = self.1.read().await;
 
 		let mut futures = Vec::new();
-		let data = Arc::new(data);
-		for driver in ctx.output_drivers.values() {
-			futures.push(driver.send_updates(PatcherInterface::clone(self), Arc::clone(&data)).fuse());
+		#[cfg(feature = "verbose-debugging")]
+		println!("Pushing values");
+		for driver in ctx.output_drivers.values().cloned() {
+			let patcher_interface = PatcherInterface::clone(self);
+			let data = Arc::clone(&data);
+			futures.push(async move {
+				driver.send_updates(patcher_interface, data).fuse().await;
+			});
 		}
+		drop(ctx);
 		join_all(futures).await;
+		#[cfg(feature = "verbose-debugging")]
+		println!("Finished pushing values");
 	}
 
 	pub async fn get_sharable_state<'a>(&'a self) -> SharableStateWrapper<'a> {

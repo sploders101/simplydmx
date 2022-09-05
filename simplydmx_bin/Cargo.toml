@@ -32,6 +32,8 @@ default = [
 	"tauri/custom-protocol",
 ]
 
+verbose-debugging = []
+
 stdout-logging = [] # Log service in core
 
 output-dmx = []

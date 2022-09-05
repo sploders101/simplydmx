@@ -53,6 +53,7 @@ pub fn initialize(plugin_context: PluginContext) {
 		.run(tauri::generate_context!())
 		.expect("error while running tauri application");
 
+	#[cfg(feature = "verbose-debugging")]
 	println!("Tauri call completed");
 
 }

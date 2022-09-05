@@ -116,6 +116,8 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 						break;
 					}
 
+					#[cfg(feature = "verbose-debugging")]
+					println!("Aquiring lock in blender loop");
 					let mut ctx = ctx.lock().await;
 
 					#[cfg(feature = "blender-benchmark")]
@@ -218,6 +220,8 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 					// Final output is ready
 					let final_results = Arc::new(final_results);
 					ctx.output_cache.final_output = Arc::clone(&final_results);
+					#[cfg(feature = "verbose-debugging")]
+					println!("Lock released in blender loop");
 					plugin_context_blender.emit_borrowed(String::from("mixer.final_output"), FilterCriteria::None, Arc::clone(&final_results)).await;
 					patcher_interface.write_values(final_results).await;
 

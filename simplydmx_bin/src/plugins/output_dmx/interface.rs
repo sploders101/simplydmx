@@ -137,8 +137,14 @@ impl OutputDriver for DMXInterface {
 	// Updates
 
 	async fn send_updates(&self, patcher_interface: PatcherInterface, data: Arc<FullMixerOutput>) {
+		#[cfg(feature = "verbose-debugging")]
+		println!("Getting sharable state");
 		let patcher_data = patcher_interface.get_sharable_state().await;
+		#[cfg(feature = "verbose-debugging")]
+		println!("Got sharable state. Getting DMX context");
 		let ctx = self.1.read().await;
+		#[cfg(feature = "verbose-debugging")]
+		println!("Got DMX context");
 		// let mut active_universes = HashSet::<String>::new();
 
 		// Create default universes
@@ -185,6 +191,8 @@ impl OutputDriver for DMXInterface {
 			}
 		}
 		drop(patcher_data);
+		#[cfg(feature = "verbose-debugging")]
+		println!("Dropped sharable state");
 
 		// Sort universes into designated controller-centric HashMaps
 		let mut sorted_universes = HashMap::<String, HashMap::<Uuid, DMXFrame>>::new();

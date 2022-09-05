@@ -130,7 +130,11 @@ impl PatcherInterface {
 
 	/// Create a fixture
 	pub async fn create_fixture(&self, fixture_type: Uuid, personality: String, name: Option<String>, comments: Option<String>, form_data: SerializedData) -> Result<Uuid, CreateFixtureError> {
+		#[cfg(feature = "verbose-debugging")]
+		println!("Getting writable lock for create_fixture");
 		let mut ctx = self.1.write().await;
+		#[cfg(feature = "verbose-debugging")]
+		println!("Got writable lock for create_fixture");
 		if let Some(fixture_type_info) = ctx.sharable.library.get(&fixture_type) {
 			if let Some(controller) = ctx.output_drivers.get(&fixture_type_info.output_driver) {
 				let instance_uuid = Uuid::new_v4();

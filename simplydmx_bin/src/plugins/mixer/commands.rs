@@ -203,12 +203,16 @@ impl CreateLayer {
 	)]
 	async fn main(self) -> Uuid {
 		let uuid = Uuid::new_v4();
+		#[cfg(feature = "verbose-debugging")]
+		println!("Aquiring lock in create_layer");
 		let mut context = self.1.lock().await;
 
 		context.submasters.insert(uuid, Submaster {
 			data: HashMap::new(),
 		});
 
+		#[cfg(feature = "verbose-debugging")]
+		println!("Dropping lock in create_layer");
 		return uuid;
 	}
 }
@@ -231,6 +235,8 @@ impl SetLayerContents {
 		("Success", "Boolean indicating whether or not the set was successful"),
 	)]
 	async fn main(self, uuid: Uuid, submaster_delta: SubmasterDelta) -> bool {
+		#[cfg(feature = "verbose-debugging")]
+		println!("Aquiring lock in set_layer_contents");
 		let mut ctx = self.1.lock().await;
 
 		// Check if the specified submaster exists
@@ -260,8 +266,12 @@ impl SetLayerContents {
 
 			}
 			self.2.send(UpdateList::Submaster(uuid)).await.ok();
+			#[cfg(feature = "verbose-debugging")]
+			println!("Dropping lock in set_layer_contents");
 			return true;
 		} else {
+			#[cfg(feature = "verbose-debugging")]
+			println!("Dropping lock in set_layer_contents");
 			return false;
 		}
 	}
@@ -313,6 +323,8 @@ impl SetLayerOpacity {
 		("Success", "A boolean indicating if the opacity setting was successfully applied."),
 	)]
 	async fn main(self, uuid: Uuid, opacity: u16, auto_insert: bool, layer_bin_id: Option::<Uuid>) -> bool {
+		#[cfg(feature = "verbose-debugging")]
+		println!("Aquiring lock in set_layer_opacity");
 		let mut ctx = self.1.lock().await;
 		let default_layer_bin = ctx.default_layer_bin;
 		if let Some(layer_bin) = ctx.layer_bins.get_mut(&layer_bin_id.unwrap_or(default_layer_bin)) {
@@ -325,8 +337,12 @@ impl SetLayerOpacity {
 			}
 			layer_bin.layer_opacities.insert(uuid, opacity);
 			self.2.send(UpdateList::Submaster(uuid)).await.ok();
+			#[cfg(feature = "verbose-debugging")]
+			println!("Dopping lock in set_layer_opacity");
 			return true;
 		} else {
+			#[cfg(feature = "verbose-debugging")]
+			println!("Dopping lock in set_layer_opacity");
 			return false;
 		}
 	}

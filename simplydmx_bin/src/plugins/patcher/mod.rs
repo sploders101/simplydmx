@@ -1,6 +1,7 @@
 pub mod driver_plugin_api;
 mod state;
 mod fixture_types;
+mod services;
 
 use async_std::sync::{
 	Arc,

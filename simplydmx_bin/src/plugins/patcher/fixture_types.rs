@@ -14,9 +14,6 @@ pub struct FixtureBundle {
 	/// Contains information about the fixture used for blending, identification, and capability detection
 	pub fixture_info: FixtureInfo,
 
-	/// The registered output plugin
-	pub controller: String,
-
 	/// Stores output information for the controller
 	pub output_info: SerializedData,
 

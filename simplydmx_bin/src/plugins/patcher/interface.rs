@@ -8,12 +8,16 @@ use futures::{
 	future::join_all,
 };
 use simplydmx_plugin_framework::*;
+use uuid::Uuid;
 
-use crate::plugins::mixer::exported_types::{
-	FullMixerOutput,
-	FullMixerBlendingData,
-	BlendingData,
-	SnapData,
+use crate::{
+	plugins::mixer::exported_types::{
+		FullMixerOutput,
+		FullMixerBlendingData,
+		BlendingData,
+		SnapData,
+	},
+	utilities::serialized_data::SerializedData,
 };
 
 use super::{
@@ -23,7 +27,12 @@ use super::{
 		ChannelSize,
 		Segment,
 	},
-	driver_plugin_api::{OutputDriver, SharableStateWrapper},
+	driver_plugin_api::{
+		self,
+		OutputDriver,
+		SharableStateWrapper,
+		FixtureBundle, FixtureInstance,
+	},
 };
 
 #[derive(Clone)]
@@ -102,6 +111,51 @@ impl PatcherInterface {
 		ctx.output_drivers.insert(plugin.get_id(), Arc::new(Box::new(plugin)));
 	}
 
+	/// Import a fixture bundle
+	pub async fn import_fixture(&self, fixture_bundle: FixtureBundle) -> Result<(), ImportFixtureError> {
+		let mut ctx = self.1.write().await;
+		if let Some(output_driver) = ctx.output_drivers.get(&fixture_bundle.fixture_info.output_driver) {
+			if let Err(controller_error) = output_driver.import_fixture(&fixture_bundle.fixture_info.id, fixture_bundle.output_info).await {
+				return Err(ImportFixtureError::ErrorFromController(controller_error));
+			} else {
+				// Controller successfully loaded protocol-specific details
+				ctx.sharable.library.insert(fixture_bundle.fixture_info.id.clone(), fixture_bundle.fixture_info);
+				self.0.emit("patcher.new_fixture".into(), FilterCriteria::None, ()).await;
+				return Ok(());
+			}
+		} else {
+			return Err(ImportFixtureError::UnknownController);
+		}
+	}
+
+	/// Create a fixture
+	pub async fn create_fixture(&self, fixture_type: Uuid, personality: String, name: Option<String>, comments: Option<String>, form_data: SerializedData) -> Result<Uuid, CreateFixtureError> {
+		let mut ctx = self.1.write().await;
+		if let Some(fixture_type_info) = ctx.sharable.library.get(&fixture_type) {
+			if let Some(controller) = ctx.output_drivers.get(&fixture_type_info.output_driver) {
+				let instance_uuid = Uuid::new_v4();
+				if let Err(controller_error) = controller.create_fixture_instance(&instance_uuid, form_data).await {
+					return Err(CreateFixtureError::ErrorFromController(controller_error));
+				} else {
+					// Controller successfully loaded protocol-specific details
+					ctx.sharable.fixtures.insert(instance_uuid.clone(), FixtureInstance {
+						id: instance_uuid.clone(),
+						fixture_id: fixture_type,
+						personality,
+						name,
+						comments,
+					});
+					return Ok(instance_uuid);
+				}
+			} else {
+				return Err(CreateFixtureError::ControllerMissing);
+			}
+		} else {
+			return Err(CreateFixtureError::FixtureTypeMissing);
+		}
+	}
+
+	/// Write values to the output plugins
 	pub async fn write_values(&self, data: Arc<FullMixerOutput>) {
 		let ctx = self.1.read().await;
 
@@ -155,4 +209,17 @@ fn get_min_value_segments(segments: &[Segment]) -> u16 {
 	}
 
 	return min_value.unwrap_or(0);
+}
+
+#[portable]
+pub enum ImportFixtureError {
+	UnknownController,
+	ErrorFromController(driver_plugin_api::ImportError),
+}
+
+#[portable]
+pub enum CreateFixtureError {
+	FixtureTypeMissing,
+	ControllerMissing,
+	ErrorFromController(driver_plugin_api::CreateInstanceError),
 }

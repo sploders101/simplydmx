@@ -139,6 +139,7 @@ pub enum BlendingScheme {
 }
 
 #[portable]
+#[serde(tag = "type", content = "data")]
 pub enum SnapData {
 
 	/// Do not snap values. Output without transforming

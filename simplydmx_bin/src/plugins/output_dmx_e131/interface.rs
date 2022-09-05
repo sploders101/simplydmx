@@ -17,12 +17,9 @@ use crate::{
 	utilities::serialized_data::SerializedData,
 };
 
-use super::{
-	dmxsource_controller::E131Command,
-	state::{
-		E131State,
-		E131Universe,
-	},
+use super::state::{
+	E131State,
+	E131Universe,
 };
 
 
@@ -41,8 +38,9 @@ impl E131DMXDriver {
 		}
 
 		if ctx.universes.len() == 0 {
-			if let Err(_) = ctx.controller.send(E131Command::CreateOutput).await {
-				log_error!(self.0, "The E.131 controller exited early!");
+			let mut controller_lock = ctx.controller.lock().await;
+			if let None = *controller_lock {
+				*controller_lock = Some(HashMap::new());
 			}
 		}
 		ctx.universes.insert(int_id, data);
@@ -54,12 +52,12 @@ impl E131DMXDriver {
 		let mut ctx = self.1.write().await;
 
 		if let Some(ext_data) = ctx.universes.remove(&int_id) {
-			if let Err(_) = ctx.controller.send(E131Command::TerminateUniverse(ext_data.external_universe)).await {
-				log_error!(self.0, "The E.131 controller exited early!");
-			}
+			let mut controller = ctx.controller.lock().await;
 			if ctx.universes.len() == 0 {
-				if let Err(_) = ctx.controller.send(E131Command::DestroyOutput).await {
-					log_error!(self.0, "The E.131 controller exited early!");
+				*controller = None;
+			} else {
+				if let Some(ref mut controller) = *controller {
+					controller.remove(&ext_data.external_universe);
 				}
 			}
 		}
@@ -68,13 +66,20 @@ impl E131DMXDriver {
 	async fn send_frames(self, frames: HashMap<Uuid, DMXFrame>) -> () {
 		let ctx = self.1.read().await;
 		let mut dereferenced_data = HashMap::<u16, [u8; 512]>::new();
+
+		// Build hashmap of sACN IDs -> DMXFrames
 		for (internal_id, frame) in frames {
 			if let Some(external_data) = ctx.universes.get(&internal_id) {
 				dereferenced_data.insert(external_data.external_universe, frame);
 			}
 		}
-		if let Err(_) = ctx.controller.send(E131Command::SendOutput(dereferenced_data)).await {
-			log_error!(self.0, "The E.131 controller exited early!");
+
+		// Push new hashmap to sacn controller
+		let mut controller_lock = ctx.controller.lock().await;
+		if dereferenced_data.len() > 0 {
+			*controller_lock = Some(dereferenced_data);
+		} else {
+			*controller_lock = None;
 		}
 	}
 

@@ -1,18 +1,17 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
-use async_std::channel::Sender;
+use async_std::sync::Mutex;
 
 use simplydmx_plugin_framework::*;
 use uuid::Uuid;
 
-use super::dmxsource_controller::{
-	E131Command,
-	initialize_controller,
-};
+use crate::plugins::output_dmx::driver_types::DMXFrame;
+
+use super::dmxsource_controller::initialize_controller;
 
 
 pub struct E131State {
-	pub controller: Sender<E131Command>,
+	pub controller: Arc<Mutex<Option<HashMap<u16, DMXFrame>>>>,
 	pub universes: HashMap<Uuid, E131Universe>,
 }
 impl E131State {

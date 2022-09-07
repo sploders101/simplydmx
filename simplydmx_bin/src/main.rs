@@ -7,11 +7,6 @@ pub mod plugins;
 pub mod api_utilities;
 pub mod utilities;
 
-use std::thread;
-use async_std::{
-	task,
-	channel::Receiver,
-};
 use simplydmx_plugin_framework::{
 	PluginManager,
 };
@@ -23,27 +18,31 @@ fn main() {
 
 	#[cfg(feature = "gui")]
 	{
-		// Spawn the rest of SimplyDMX in a new thread
-		let plugin_manager_copy = plugin_manager.clone();
-		thread::spawn(move || {
-			task::block_on(async_main(plugin_manager_copy, shutdown_receiver));
-		});
-
 		// Call tauri and block main thread due to MacOS GUI limitation
 		plugins::gui::initialize(
-			task::block_on(plugin_manager.register_plugin(
-				"gui",
-				"SimplyDMX GUI",
-			)).unwrap(),
+			plugin_manager,
+			shutdown_receiver,
 		);
 	}
 
 	#[cfg(not(feature = "gui"))]
-	task::block_on(async_main(plugin_manager, shutdown_receiver));
+	{
+		task::block_on(async_main(plugin_manager, shutdown_receiver));
+
+		// Wait for shutdown request
+		shutdown_receiver.recv().await.unwrap();
+
+		// Finish shutdown
+		plugin_manager.finish_shutdown().await;
+
+		#[cfg(feature = "verbose-debugging")]
+		println!("Successfully shut down.");
+	}
 
 }
 
-async fn async_main(plugin_manager: PluginManager, shutdown_receiver: Receiver<()>) {
+// Public so the GUI plugin can run it
+pub async fn async_main(plugin_manager: PluginManager) {
 
 	// Register core plugin
 	plugins::core::initialize(
@@ -94,11 +93,5 @@ async fn async_main(plugin_manager: PluginManager, shutdown_receiver: Receiver<(
 		).await.unwrap(),
 		dmx_interface.clone(),
 	).await;
-
-	// Wait for shutdown request
-	shutdown_receiver.recv().await.unwrap();
-
-	// Finish shutdown
-	plugin_manager.finish_shutdown().await;
 
 }

@@ -62,7 +62,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 	// Subscribe to patcher updates and notify blending process when they occur
 	let plugin_context_patcher_updates = plugin_context.clone();
 	let update_sender_patcher = update_sender.clone();
-	plugin_context.spawn_volatile(async move {
+	plugin_context.spawn_volatile("Blender patcher listener (need to remove)", async move {
 		let plugin_context = plugin_context_patcher_updates;
 		match plugin_context.on::<()>(String::from("patcher.patch_updated"), FilterCriteria::None).await {
 			Ok(listener) => {
@@ -85,7 +85,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 
 	// Spawn the blender task when its dependencies have been satisfied.
 	let plugin_context_blender = plugin_context.clone();
-	plugin_context.spawn_volatile(async move {
+	plugin_context.spawn_volatile("Blender", async move {
 		let mut patcher_data = patcher_interface.get_base_layer().await;
 		let mut shutting_down = false;
 		loop {

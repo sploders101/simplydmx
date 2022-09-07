@@ -342,7 +342,7 @@ impl PluginContext {
 	}
 
 	/// Spawn the specified task when the set of dependencies has finished.
-	pub async fn spawn_when<'a, F>(&self, mut dependencies: Vec<Dependency>, blocker: F) -> Result<(), KeepAliveRegistrationError>
+	pub async fn spawn_when<'a, F>(&self, name: impl Into<String>, mut dependencies: Vec<Dependency>, blocker: F) -> Result<(), KeepAliveRegistrationError>
 	where
 		F: Future<Output = ()> + Send + 'static
 	{
@@ -408,7 +408,7 @@ impl PluginContext {
 		dependencies.retain(|dependency| !known_dependencies.contains(dependency));
 
 		// Spawn task to finish the process
-		return self.spawn(async move {
+		return self.spawn(name, async move {
 			// Wait for dependencies to be resolved
 			while dependencies.len() > 0 {
 				if let Ok(next_dep) = receiver.recv().await {
@@ -426,11 +426,11 @@ impl PluginContext {
 	/// Spawn the specified task when the set of dependencies has finished.
 	///
 	/// Ignore errors resulting from imminent shutdown
-	pub async fn spawn_when_volatile<'a, F>(&self, dependencies: Vec<Dependency>, blocker: F) -> ()
+	pub async fn spawn_when_volatile<'a, F>(&self, name: impl Into<String>, dependencies: Vec<Dependency>, blocker: F) -> ()
 	where
 		F: Future<Output = ()> + Send + 'static
 	{
-		let result = self.spawn_when(dependencies, blocker).await;
+		let result = self.spawn_when(name, dependencies, blocker).await;
 		match result {
 			Ok(()) => (),
 			Err(err) => match err {
@@ -442,12 +442,12 @@ impl PluginContext {
 	/// Spawns a task that prevents application shutdown until complete.
 	///
 	/// `blocker`: The future to let finish before shutting down
-	pub async fn spawn<F>(&self, blocker: F) -> Result<(), KeepAliveRegistrationError>
+	pub async fn spawn<F>(&self, name: impl Into<String>, blocker: F) -> Result<(), KeepAliveRegistrationError>
 	where
 		F: Future<Output = ()> + Send + 'static,
 	{
 		let keep_alive = self.0.keep_alive.write().await;
-		return keep_alive.register_blocker(blocker).await;
+		return keep_alive.register_blocker(name, blocker).await;
 	}
 
 	/// Spawns a task that prevents application shutdown until complete.
@@ -455,11 +455,11 @@ impl PluginContext {
 	/// `blocker`: The future to let finish before shutting down
 	///
 	/// Ignore errors resulting from imminent shutdown
-	pub async fn spawn_volatile<F>(&self, blocker: F) -> ()
+	pub async fn spawn_volatile<F>(&self, name: impl Into<String>, blocker: F) -> ()
 	where
 		F: Future<Output = ()> + Send + 'static,
 	{
-		let result = self.spawn(blocker).await;
+		let result = self.spawn(name, blocker).await;
 		match result {
 			Ok(()) => (),
 			Err(err) => match err {
@@ -472,12 +472,12 @@ impl PluginContext {
 	/// sockets, notifying clients of shutdown, saving files, etc.
 	///
 	/// `finisher`: The future to drive during shutdown
-	pub async fn register_finisher<F>(&self, finisher: F) -> Result<Uuid, KeepAliveRegistrationError>
+	pub async fn register_finisher<F>(&self, name: impl Into<String>, finisher: F) -> Result<Uuid, KeepAliveRegistrationError>
 	where
 		F: Future<Output = ()> + Send + 'static,
 	{
 		let mut keep_alive = self.0.keep_alive.write().await;
-		return keep_alive.register_finisher(finisher).await;
+		return keep_alive.register_finisher(name, finisher).await;
 	}
 
 	/// Unregisters a previously-registered finisher, removing it from the list of things to do during shutdown

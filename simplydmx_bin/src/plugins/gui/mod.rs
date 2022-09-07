@@ -1,9 +1,22 @@
+use std::sync::Arc;
+
 use async_std::{
 	task,
-	channel,
+	channel::{
+		self,
+		Receiver,
+	},
+	sync::RwLock,
 };
-use tauri::Manager;
-use crate::api_utilities::*;
+use tauri::{
+	Manager,
+	async_runtime,
+	WindowEvent,
+};
+use crate::{
+	api_utilities::*,
+	async_main,
+};
 use simplydmx_plugin_framework::*;
 
 
@@ -25,7 +38,17 @@ async fn sdmx(sender: tauri::State<'_, channel::Sender<JSONCommand>>, message: J
 /// This initializes the graphical interface and creates a communication channel with SimplyDMX's
 /// JSON API service. Tauri-specific functions are only used as a connector to SimplyDMX's built-in
 /// APIs so that the UI has full access to all features and remains framework-agnostic.
-pub fn initialize(plugin_context: PluginContext) {
+pub fn initialize(plugin_manager: PluginManager, shutdown_receiver: Receiver<()>) {
+
+	// Create the GUI plugin context
+	let plugin_context = task::block_on(plugin_manager.register_plugin(
+		"gui",
+		"SimplyDMX GUI",
+	)).unwrap();
+
+	// Spawn the rest of SimplyDMX in a new thread
+	let plugin_manager_copy = plugin_manager.clone();
+	task::block_on(async_main(plugin_manager_copy));
 
 	// Channels
 	let (request_sender, request_receiver) = channel::unbounded();
@@ -33,18 +56,62 @@ pub fn initialize(plugin_context: PluginContext) {
 
 	spawn_api_facet_controller(plugin_context.clone(), request_receiver, response_sender);
 
+
+	let shutting_down = Arc::new(RwLock::new(false));
+
+
+	let plugin_manager_win_evt = plugin_manager.clone();
 	tauri::Builder::default()
 		.manage(request_sender)
 		.invoke_handler(tauri::generate_handler![sdmx])
-		.setup(move |app| {
-			let app = app.app_handle();
-			task::spawn(async move {
+		.on_window_event(move |event| match event.event() {
+			WindowEvent::CloseRequested { api, .. } => {
+
+				// Prevent close
+				api.prevent_close();
+
+
+				// Issue shutdown
+				let plugin_manager_win_evt = plugin_manager_win_evt.clone();
+				let shutting_down = Arc::clone(&shutting_down);
+				async_runtime::spawn(async move {
+					let mut shutting_down = shutting_down.write().await;
+					if *shutting_down {
+						return;
+					}
+					*shutting_down = true;
+					drop(shutting_down);
+					plugin_manager_win_evt.shutdown().await;
+				});
+
+			},
+			_ => {},
+		})
+		.setup(move |app_ref| {
+			let app = app_ref.app_handle();
+			async_runtime::spawn(async move {
 				loop {
 					if let Ok(msg) = response_receiver.recv().await {
 						app.emit_all("sdmx", msg).ok();
 					} else {
 						break;
 					}
+				}
+			});
+
+			let app = app_ref.app_handle();
+			async_runtime::spawn(async move {
+				// Wait for shutdown request
+				shutdown_receiver.recv().await.unwrap();
+
+				// Finish shutdown
+				plugin_manager.finish_shutdown().await;
+
+				#[cfg(feature = "verbose-debugging")]
+				println!("Successfully shut down.");
+
+				for window in app.windows().values() {
+					window.close().unwrap();
 				}
 			});
 

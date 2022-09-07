@@ -51,12 +51,18 @@ struct KeepAliveInternal {
 
 	/// Blockers are run immediately and prevent the application from closing until
 	/// they finish.
-	blockers: Mutex<HashMap<Uuid, JoinHandle<()>>>,
+	blockers: Mutex<HashMap<Uuid, WithName<JoinHandle<()>>>>,
 
 	/// Finishers are run when the application is about to exit, and prevent the
 	/// application from closing until they finish.
-	finishers: Mutex<HashMap<Uuid, Pin<Box<dyn Future<Output = ()> + Send + 'static>>>>,
+	finishers: Mutex<HashMap<Uuid, WithName<Pin<Box<dyn Future<Output = ()> + Send + 'static>>>>>,
 
+}
+
+struct WithName<T> {
+	#[cfg(feature = "shutdown-debug")]
+	name: String,
+	data: T,
 }
 
 impl KeepAlive {
@@ -74,7 +80,7 @@ impl KeepAlive {
 	/// Anything that should not be interrupted should be run through this function. If the
 	/// application is already shutting down, any call to this function will fail with
 	/// `KeepAliveRegistrationError::ShuttingDown`.
-	pub async fn register_blocker<F>(&self, blocker: F) -> Result<(), KeepAliveRegistrationError>
+	pub async fn register_blocker<F>(&self, _name: impl Into<String>, blocker: F) -> Result<(), KeepAliveRegistrationError>
 	where
 		F: Future<Output = ()> + Send + 'static,
 	{
@@ -91,7 +97,11 @@ impl KeepAlive {
 					internal_data.blockers.lock().await.remove(&uuid);
 				}
 			});
-			self.internal_data.blockers.lock().await.insert(Uuid::clone(&uuid), future);
+			self.internal_data.blockers.lock().await.insert(Uuid::clone(&uuid), WithName {
+				#[cfg(feature = "shutdown-debug")]
+				name: _name.into(),
+				data: future,
+			});
 			return Ok(());
 		}
 	}
@@ -99,7 +109,7 @@ impl KeepAlive {
 	/// Registers a finisher function and returns a UUID representing it.
 	/// Finisher functions are run before application exit, and allow for
 	/// things like saving data quickly before exiting.
-	pub async fn register_finisher<F>(&mut self, finisher: F) -> Result<Uuid, KeepAliveRegistrationError>
+	pub async fn register_finisher<F>(&mut self, _name: impl Into<String>, finisher: F) -> Result<Uuid, KeepAliveRegistrationError>
 	where
 		F: Future<Output = ()> + Send + 'static,
 	{
@@ -107,7 +117,11 @@ impl KeepAlive {
 			return Err(KeepAliveRegistrationError::ShuttingDown);
 		} else {
 			let uuid = Uuid::new_v4();
-			self.internal_data.finishers.lock().await.insert(Uuid::clone(&uuid), Box::pin(finisher));
+			self.internal_data.finishers.lock().await.insert(Uuid::clone(&uuid), WithName {
+				#[cfg(feature = "shutdown-debug")]
+				name: _name.into(),
+				data: Box::pin(finisher),
+			});
 			return Ok(uuid);
 		}
 	}
@@ -131,10 +145,12 @@ impl KeepAlive {
 		*self.internal_data.shutting_down.write().await = true;
 
 		// Wait for all blockers to finish
-		for handle in self.internal_data.blockers.lock().await.values_mut() {
+		for (_id, handle) in self.internal_data.blockers.lock().await.drain() {
 			// This await does not drive the future, since it was created
 			// using task::spawn(...)
-			handle.await;
+			#[cfg(feature = "shutdown-debug")]
+			println!("Waiting on {}", handle.name);
+			handle.data.await;
 		}
 
 		// Run all finishers in parallel
@@ -142,7 +158,7 @@ impl KeepAlive {
 		let finisher_keys = finisher_futures.keys().cloned().collect::<Vec<Uuid>>();
 		let finisher_tasks = finisher_keys.into_iter().map(move |finisher_key| {
 			let finisher = finisher_futures.remove(&finisher_key).expect("`finishers` was modified while locked!");
-			return task::spawn(finisher);
+			return task::spawn(finisher.data);
 		});
 
 		// Wait for all finishers to complete

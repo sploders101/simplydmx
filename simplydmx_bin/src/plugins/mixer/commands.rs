@@ -58,6 +58,7 @@ impl EnterBlindMode {
 		// Set new bin as default
 		let old_layer_bin = ctx.default_layer_bin;
 		ctx.default_layer_bin = new_uuid;
+		ctx.transitional_layer_bin = Some(old_layer_bin.clone());
 
 		// No blending needed as the opacity of all new data is zero.
 
@@ -332,11 +333,15 @@ impl SetLayerOpacity {
 				if opacity > 0 && !layer_bin.layer_order.contains(&uuid) {
 					layer_bin.layer_order.push(uuid.clone());
 				} else if opacity == 0 && layer_bin.layer_order.contains(&uuid) {
-					layer_bin.layer_order.retain(|x| x != &uuid);
+					layer_bin.layer_order.retain(|x| *x != uuid);
 				}
 			}
 			layer_bin.layer_opacities.insert(uuid, opacity);
-			self.2.send(UpdateList::Submaster(uuid)).await.ok();
+			if opacity == 0 && auto_insert {
+				self.2.send(UpdateList::All).await.ok();
+			} else {
+				self.2.send(UpdateList::Submaster(uuid)).await.ok();
+			}
 			#[cfg(feature = "verbose-debugging")]
 			println!("Dopping lock in set_layer_opacity");
 			return true;

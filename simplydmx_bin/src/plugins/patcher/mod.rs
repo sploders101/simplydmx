@@ -29,6 +29,11 @@ pub async fn initialize(plugin_context: PluginContext) -> PatcherInterface {
 		Some("Event emitted by the patcher when a fixture is updated, intended for use by the mixer to trigger a re-blend of the entire show.".to_owned()),
 	).await.unwrap();
 
+	plugin_context.declare_event::<()>(
+		"patcher.new_fixture".into(),
+		Some("Event emitted when a new fixture type has been successfully imported into SimplyDMX".into()),
+	).await.unwrap();
+
 	plugin_context.register_service(true, ImportFixtureDefinition::new(patcher_interface.clone())).await.unwrap();
 	plugin_context.register_service(true, CreateFixture::new(patcher_interface.clone())).await.unwrap();
 

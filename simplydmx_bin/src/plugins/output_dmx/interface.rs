@@ -25,10 +25,14 @@ use crate::{
 	utilities::serialized_data::SerializedData,
 };
 use super::{
-	state::DMXState,
+	state::{
+		DMXState,
+		UniverseInstance,
+	},
 	driver_types::{
 		DMXDriver,
 		DMXFrame,
+		RegisterUniverseError,
 	},
 	fixture_types::DMXFixtureData,
 };
@@ -46,6 +50,81 @@ impl DMXInterface {
 		let mut ctx = self.1.write().await;
 		ctx.drivers.insert(plugin.get_id(), Arc::new(Box::new(plugin)));
 	}
+
+	/// Creates a new universe
+	pub async fn create_universe(&self) -> Uuid {
+		let mut ctx = self.1.write().await;
+		let new_id = Uuid::new_v4();
+		ctx.universes.insert(new_id.clone(), UniverseInstance {
+			id: new_id.clone(),
+			controller: None,
+		});
+		return new_id;
+	}
+
+	/// Delete a universe from the registry
+	pub async fn delete_universe(&self, universe_id: Uuid) {
+		let mut ctx = self.1.write().await;
+		if ctx.universes.contains_key(&universe_id) {
+			// Unlink fixtures from universe
+			for fixture_info in ctx.fixtures.values_mut() {
+				if fixture_info.universe == Some(universe_id) {
+					fixture_info.universe = None;
+					fixture_info.offset = None;
+				}
+			}
+
+			// Unlink universe from controller
+			if let Some(universe_data) = ctx.universes.get(&universe_id) {
+				if let Some(ref driver_id) = universe_data.controller {
+					if let Some(ref driver) = ctx.drivers.get(driver_id) {
+						driver.delete_universe(&universe_id).await;
+					}
+				}
+			}
+
+			// Delete universe
+			ctx.universes.remove(&universe_id);
+
+			// Emit event for any plugins that care
+			self.0.emit("dmx.universe_removed".into(), FilterCriteria::Uuid(universe_id), ()).await;
+		}
+	}
+
+	/// Links an existing universe to a driver
+	pub async fn link_universe(&self, universe_id: &Uuid, driver: String, form_data: SerializedData) -> Result<(), LinkUniverseError> {
+		let mut ctx = self.1.write().await;
+		if ctx.universes.contains_key(universe_id) {
+			if let Some(controller) = ctx.drivers.get(&driver) {
+				if let Err(err) = controller.register_universe(universe_id, form_data).await {
+					return Err(LinkUniverseError::ErrorFromController(err));
+				}
+			} else {
+				return Err(LinkUniverseError::ControllerNotFound);
+			}
+		} else {
+			return Err(LinkUniverseError::UniverseNotFound);
+		}
+
+		ctx.universes.get_mut(universe_id).unwrap().controller = Some(driver);
+		return Ok(());
+	}
+
+	/// Unlinks an existing universe from its driver
+	pub async fn unlink_universe(&self, universe_id: &Uuid) {
+		let mut ctx = self.1.write().await;
+		let mut existing_controller = None;
+		if let Some(universe) = ctx.universes.get_mut(universe_id) {
+			existing_controller = universe.controller.clone();
+			universe.controller = None;
+		}
+		if let Some(ref controller_id) = existing_controller {
+			if let Some(controller) = ctx.drivers.get(controller_id) {
+				controller.delete_universe(universe_id).await;
+			}
+		}
+	}
+
 }
 
 
@@ -265,4 +344,12 @@ fn insert_fixture_data(
 			}
 		}
 	}
+}
+
+#[portable]
+#[serde(tag = "type", content = "data")]
+pub enum LinkUniverseError {
+	ErrorFromController(RegisterUniverseError),
+	UniverseNotFound,
+	ControllerNotFound,
 }

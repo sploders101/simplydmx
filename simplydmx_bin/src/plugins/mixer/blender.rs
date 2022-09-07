@@ -1,4 +1,7 @@
-use std::time::Instant;
+use std::time::{
+	Instant,
+	Duration,
+};
 use async_std::{
 	channel::{
 		self,
@@ -8,6 +11,7 @@ use async_std::{
 		Arc,
 		Mutex,
 	},
+	task,
 };
 use simplydmx_plugin_framework::*;
 use uuid::Uuid;
@@ -51,7 +55,9 @@ pub enum UpdateList {
 ///
 /// This function creates a task for
 pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerContext>>, patcher_interface: PatcherInterface) -> Sender<UpdateList> {
-	let (update_sender, update_receiver) = channel::bounded::<UpdateList>(5);
+	// Tried bounded. Results in a deadlock unless weird workarounds are used.
+	// Given that this function drains the queue on every iteration, the backlog shouldn't grow too large
+	let (update_sender, update_receiver) = channel::unbounded::<UpdateList>();
 
 	// Subscribe to patcher updates and notify blending process when they occur
 	let plugin_context_patcher_updates = plugin_context.clone();
@@ -83,6 +89,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 		let mut patcher_data = patcher_interface.get_base_layer().await;
 		let mut shutting_down = false;
 		loop {
+			let start = Instant::now();
 			match update_receiver.recv().await {
 				Ok(command) => {
 					if let UpdateList::Shutdown = command {
@@ -116,6 +123,8 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 					#[cfg(feature = "verbose-debugging")]
 					println!("Aquiring lock in blender loop");
 					let mut ctx = ctx.lock().await;
+					#[cfg(feature = "verbose-debugging")]
+					println!("Lock aquired in blender loop");
 
 					#[cfg(feature = "blender-benchmark")]
 					let start = Instant::now();
@@ -226,6 +235,8 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 				},
 				Err(_) => break,
 			};
+			// Rate-limit the blender to cut down on unnecessary CPU usage
+			task::sleep(Duration::from_millis(18).saturating_sub(start.elapsed())).await;
 		}
 	}).await;
 

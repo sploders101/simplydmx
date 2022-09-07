@@ -55,7 +55,7 @@ pub fn initialize_controller() -> Arc<Mutex<Option<HashMap<u16, [u8; 512]>>>> {
 				}
 			}
 
-			let sleep_duration = Duration::from_millis(20).saturating_sub(started_loop.elapsed());
+			let sleep_duration = Duration::from_millis(18).saturating_sub(started_loop.elapsed());
 			if !sleep_duration.is_zero() {
 				thread::sleep(sleep_duration);
 			}

@@ -1,0 +1,77 @@
+use simplydmx_plugin_framework::*;
+use uuid::Uuid;
+
+use crate::utilities::serialized_data::SerializedData;
+
+use super::interface::{DMXInterface, LinkUniverseError};
+
+#[interpolate_service(
+	"create_universe",
+	"Create Universe",
+	"Creates a new, unlinked universe for DMX output",
+)]
+impl CreateUniverse {
+	#![inner_raw(DMXInterface)]
+	pub fn new(interface: DMXInterface) -> Self { Self(interface) }
+
+	#[service_main(
+		("New universe ID", "Returns the UUID of the new universe", "DMX::universe-id"),
+	)]
+	async fn main(self) -> Uuid {
+		return self.0.create_universe().await;
+	}
+}
+
+#[interpolate_service(
+	"delete_universe",
+	"Delete Universe",
+	"Deletes an existing universe, unlinking any associated lights or controllers",
+)]
+impl DeleteUniverse {
+	#![inner_raw(DMXInterface)]
+	pub fn new(interface: DMXInterface) -> Self { Self(interface) }
+
+	#[service_main(
+		("Universe ID", "The ID of the universe you would like to delete"),
+	)]
+	async fn main(self, universe_id: Uuid) -> () {
+		return self.0.delete_universe(universe_id).await;
+	}
+}
+
+#[interpolate_service(
+	"link_universe",
+	"Link Universe",
+	"Links an existing universe to a DMX driver",
+)]
+impl LinkUniverse {
+	#![inner_raw(DMXInterface)]
+	pub fn new(interface: DMXInterface) -> Self { Self(interface) }
+
+	#[service_main(
+		("Universe ID", "The ID of the universe you would like to link"),
+		("Driver ID", "The ID of the driver you would like to link the universe to"),
+		("Form Data", "The form data, as described by `get_link_form()`"),
+		("Result", "Result describing the error, if one occurred"),
+	)]
+	async fn main(self, universe_id: Uuid, driver: String, form_data: SerializedData) -> Result<(), LinkUniverseError> {
+		return self.0.link_universe(&universe_id, driver, form_data).await;
+	}
+}
+
+#[interpolate_service(
+	"unlink_universe",
+	"Unlink Universe",
+	"Unlinks an existing universe from its driver",
+)]
+impl UnlinkUniverse {
+	#![inner_raw(DMXInterface)]
+	pub fn new(interface: DMXInterface) -> Self { Self(interface) }
+
+	#[service_main(
+		("Universe ID", "The ID of the universe you would like to unlink"),
+	)]
+	async fn main(self, universe_id: Uuid) {
+		return self.0.unlink_universe(&universe_id).await;
+	}
+}

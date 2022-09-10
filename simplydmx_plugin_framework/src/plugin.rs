@@ -77,16 +77,20 @@ pub struct PluginManager(Arc<PluginRegistry>);
 impl PluginManager {
 	/// Creates a new PluginRegistry, returning a shutdown receiver so the main thread can block,
 	/// waiting for a shutdown request, them properly initiate it via the integrated KeepAlive.
-	pub fn new() -> (PluginManager, Receiver<()>) {
-		let (evt_bus, shutdown_receiver) = EventEmitter::new();
-		return (PluginManager(Arc::new(PluginRegistry {
+	pub fn new() -> PluginManager {
+		let evt_bus = EventEmitter::new();
+		return PluginManager(Arc::new(PluginRegistry {
 			discoverable_services: RwLock::new(HashMap::new()),
 			init_bus: RwLock::new(HashMap::new()),
 			evt_bus: RwLock::new(evt_bus),
 			keep_alive: RwLock::new(KeepAlive::new()),
 			type_specifiers: RwLock::new(HashMap::new()),
 			plugins: RwLock::new(HashMap::new()),
-		})), shutdown_receiver);
+		}));
+	}
+
+	pub async fn on_shutdown(&self) -> Receiver<()> {
+		return self.0.evt_bus.write().await.on_shutdown();
 	}
 
 	/// Creates a new plugin context to be passed to a plugin so it can interact with the rest of the
@@ -170,6 +174,10 @@ impl PluginContext {
 			flag_id: flag_name,
 		};
 		self.signal_dep(dependency).await;
+	}
+
+	pub async fn on_shutdown(&self) -> Receiver<()> {
+		return self.0.evt_bus.write().await.on_shutdown();
 	}
 
 	pub async fn register_deserializer<T: BidirectionalPortable>(&self, deserializer_id: String) {

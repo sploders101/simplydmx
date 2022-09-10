@@ -8,7 +8,7 @@ use interface::E131DMXDriver;
 use super::output_dmx::interface::DMXInterface;
 
 pub async fn initialize(plugin_context: PluginContext, dmx_interface: DMXInterface) -> E131DMXDriver {
-	let interface = E131DMXDriver::new(plugin_context);
+	let interface = E131DMXDriver::new(plugin_context).await;
 
 	dmx_interface.register_dmx_driver(interface.clone()).await;
 

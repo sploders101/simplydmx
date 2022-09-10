@@ -17,17 +17,20 @@ use crate::{
 	utilities::serialized_data::SerializedData,
 };
 
-use super::state::{
-	E131State,
-	E131Universe,
+use super::{
+	state::{
+		E131State,
+		E131Universe,
+	},
+	dmxsource_controller::initialize_controller,
 };
 
 
 #[derive(Clone)]
 pub struct E131DMXDriver(PluginContext, Arc::<RwLock::<E131State>>);
 impl E131DMXDriver {
-	pub fn new(plugin_context: PluginContext) -> Self {
-		return E131DMXDriver(plugin_context, Arc::new(RwLock::new(E131State::new())));
+	pub async fn new(plugin_context: PluginContext) -> Self {
+		return E131DMXDriver(plugin_context.clone(), Arc::new(RwLock::new(E131State::new(initialize_controller(plugin_context).await))));
 	}
 
 	async fn create_universe(self, int_id: Uuid, data: E131Universe) -> Result<(), &'static str> {

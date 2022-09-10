@@ -2,10 +2,13 @@ mod events;
 use events::EventJuggler;
 
 use async_std::{
-	task,
 	channel,
 };
 
+use futures::{
+	select,
+	FutureExt,
+};
 use simplydmx_plugin_framework::*;
 
 #[portable]
@@ -75,24 +78,30 @@ pub enum JSONCallServiceError {
 	ResponseSerializationFailed,
 }
 
-pub fn spawn_api_facet_controller(plugin_context: PluginContext, receiver: channel::Receiver<JSONCommand>, sender: channel::Sender<JSONResponse>) {
+pub async fn spawn_api_facet_controller(plugin_context: PluginContext, receiver: channel::Receiver<JSONCommand>, sender: channel::Sender<JSONResponse>) {
 	// Receiver
-	task::spawn(async move {
+	let shutdown_receiver = plugin_context.on_shutdown().await;
+	plugin_context.clone().spawn_volatile("API Facet Controller", async move {
 		let juggler = EventJuggler::new(&plugin_context, sender.clone());
 		loop {
-			if let Ok(command) = receiver.recv().await {
-				handle_command(plugin_context.clone(), command, juggler.clone(), sender.clone());
-			} else {
-				break;
+			select! {
+				command = receiver.recv().fuse() => {
+					if let Ok(command) = command {
+						handle_command(plugin_context.clone(), command, juggler.clone(), sender.clone()).await;
+					} else {
+						break;
+					}
+				},
+				_ = shutdown_receiver.recv().fuse() => break,
 			}
 		}
 
-		log!(plugin_context, "API host on stdio stopped.");
-	});
+		log!(plugin_context, "API host has stopped.");
+	}).await;
 }
 
-fn handle_command(plugin_context: PluginContext, command: JSONCommand, juggler: EventJuggler, sender: channel::Sender<JSONResponse>) {
-	task::spawn(async move {
+async fn handle_command(plugin_context: PluginContext, command: JSONCommand, juggler: EventJuggler, sender: channel::Sender<JSONResponse>) {
+	plugin_context.clone().spawn_volatile("API Command Runner", async move {
 		match command {
 
 			JSONCommand::CallService { message_id, plugin_id, service_id, args } => {
@@ -154,5 +163,5 @@ fn handle_command(plugin_context: PluginContext, command: JSONCommand, juggler: 
 				juggler.remove_event_listener(name, criteria.unwrap_or(FilterCriteria::None)).await;
 			},
 		}
-	});
+	}).await;
 }

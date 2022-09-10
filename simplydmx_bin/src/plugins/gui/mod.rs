@@ -2,10 +2,7 @@ use std::sync::Arc;
 
 use async_std::{
 	task,
-	channel::{
-		self,
-		Receiver,
-	},
+	channel,
 	sync::RwLock,
 };
 use tauri::{
@@ -38,7 +35,9 @@ async fn sdmx(sender: tauri::State<'_, channel::Sender<JSONCommand>>, message: J
 /// This initializes the graphical interface and creates a communication channel with SimplyDMX's
 /// JSON API service. Tauri-specific functions are only used as a connector to SimplyDMX's built-in
 /// APIs so that the UI has full access to all features and remains framework-agnostic.
-pub fn initialize(plugin_manager: PluginManager, shutdown_receiver: Receiver<()>) {
+pub async fn initialize(plugin_manager: PluginManager) {
+
+	let shutdown_receiver = plugin_manager.on_shutdown().await;
 
 	// Create the GUI plugin context
 	let plugin_context = task::block_on(plugin_manager.register_plugin(
@@ -54,7 +53,7 @@ pub fn initialize(plugin_manager: PluginManager, shutdown_receiver: Receiver<()>
 	let (request_sender, request_receiver) = channel::unbounded();
 	let (response_sender, response_receiver) = channel::unbounded();
 
-	spawn_api_facet_controller(plugin_context.clone(), request_receiver, response_sender);
+	spawn_api_facet_controller(plugin_context.clone(), request_receiver, response_sender).await;
 
 
 	let shutting_down = Arc::new(RwLock::new(false));

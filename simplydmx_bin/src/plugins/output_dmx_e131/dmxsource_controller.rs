@@ -8,6 +8,10 @@ use std::{
 		Duration,
 		Instant,
 	},
+	sync::atomic::{
+		AtomicBool,
+		Ordering,
+	},
 };
 use async_std::{
 	task::block_on,
@@ -15,19 +19,36 @@ use async_std::{
 		Arc,
 		Mutex,
 	},
+	channel,
 };
 
 use sacn::DmxSource;
+use simplydmx_plugin_framework::PluginContext;
 
-pub fn initialize_controller() -> Arc<Mutex<Option<HashMap<u16, [u8; 512]>>>> {
+pub type ControllerCache = Arc<Mutex<Option<HashMap<u16, [u8; 512]>>>>;
+
+pub async fn initialize_controller(plugin_context: PluginContext) -> ControllerCache {
+
 	let cache = Arc::new(Mutex::new(Some(HashMap::<u16, [u8; 512]>::new())));
 	let e131_cache = Arc::clone(&cache);
+
+	let (shutdown_confirm_sender, shutdown_confirm_receiver) = channel::bounded::<()>(1);
+	let shutting_down: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
+	let shutting_down_loader = Arc::clone(&shutting_down);
 
 	thread::spawn(move || {
 		let mut controller: Option<DmxSource> = None;
 		let mut previous_universes = HashSet::<u16>::new();
 
 		loop {
+			if shutting_down_loader.load(Ordering::Relaxed) {
+				if let Some(controller) = controller {
+					for universe_id in previous_universes {
+						controller.terminate_stream(universe_id).ok();
+					}
+				}
+				break;
+			}
 			let unlocked_cache = block_on(e131_cache.lock());
 			let mut current_universes = HashSet::<u16>::new();
 			let started_loop = Instant::now();
@@ -60,7 +81,14 @@ pub fn initialize_controller() -> Arc<Mutex<Option<HashMap<u16, [u8; 512]>>>> {
 				thread::sleep(sleep_duration);
 			}
 		}
+
+		block_on(shutdown_confirm_sender.send(())).ok();
 	});
+
+	plugin_context.register_finisher("E.131 Shutdown", async move {
+		shutting_down.store(true, Ordering::Relaxed); // Mark controller thread for shutdown on next iteration
+		shutdown_confirm_receiver.recv().await.ok(); // Wait for controller thread to shut down
+	}).await.unwrap();
 
 	return cache;
 }

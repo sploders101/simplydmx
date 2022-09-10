@@ -7,6 +7,7 @@ pub mod plugins;
 pub mod api_utilities;
 pub mod utilities;
 
+use async_std::task;
 use simplydmx_plugin_framework::{
 	PluginManager,
 };
@@ -14,29 +15,12 @@ use simplydmx_plugin_framework::{
 fn main() {
 
 	// Create plugin manager
-	let (plugin_manager, shutdown_receiver) = PluginManager::new();
+	let plugin_manager = PluginManager::new();
 
 	#[cfg(feature = "gui")]
 	{
 		// Call tauri and block main thread due to MacOS GUI limitation
-		plugins::gui::initialize(
-			plugin_manager,
-			shutdown_receiver,
-		);
-	}
-
-	#[cfg(not(feature = "gui"))]
-	{
-		task::block_on(async_main(plugin_manager, shutdown_receiver));
-
-		// Wait for shutdown request
-		shutdown_receiver.recv().await.unwrap();
-
-		// Finish shutdown
-		plugin_manager.finish_shutdown().await;
-
-		#[cfg(feature = "verbose-debugging")]
-		println!("Successfully shut down.");
+		task::block_on(plugins::gui::initialize(plugin_manager));
 	}
 
 }
@@ -51,14 +35,6 @@ pub async fn async_main(plugin_manager: PluginManager) {
 			"core",
 			"SimplyDMX Core",
 		).await.unwrap()
-	).await;
-
-	#[cfg(feature = "api")]
-	plugins::stdio_api::initialize(
-		plugin_manager.register_plugin(
-			"api",
-			"API Server",
-		).await.unwrap(),
 	).await;
 
 	let patcher_interface = plugins::patcher::initialize(

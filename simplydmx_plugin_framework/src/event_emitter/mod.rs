@@ -81,19 +81,17 @@ impl<T: Sync + Send> Clone for PortableEventGeneric<T> {
 /// derives for your convenience.
 pub struct EventEmitter {
 	listeners: HashMap<String, ListenerInfo>,
-
-	shutdown_sender: Sender<()>,
+	shutdown_listeners: Vec<Sender<()>>,
 }
 
 impl EventEmitter {
 
 	/// Creates a new EventEmitter.
-	pub fn new() -> (EventEmitter, Receiver<()>) {
-		let (sender, receiver) = channel::bounded(1);
-		return (EventEmitter {
+	pub fn new() -> EventEmitter {
+		return EventEmitter {
 			listeners: HashMap::new(),
-			shutdown_sender: sender,
-		}, receiver);
+			shutdown_listeners: Vec::new(),
+		};
 	}
 
 	/// Runs garbage collection for old receivers that are no longer active.
@@ -101,12 +99,22 @@ impl EventEmitter {
 	/// to get an MVP running.
 	fn gc(&mut self) {
 
+		// Clear out shutdown listeners
+		let mut i = 0;
+		while i < self.shutdown_listeners.len() {
+			if self.shutdown_listeners[i].receiver_count() == 0 {
+				self.shutdown_listeners.remove(i);
+			} else {
+				i += 1;
+			}
+		}
+
 		// Clear out listener Vecs
 		let mut to_remove = Vec::new();
 		for (event_id, listener_info) in self.listeners.iter_mut() {
-			let mut i = 0;
 
 			// PortableEvent Listeners
+			i = 0;
 			let listeners = &mut listener_info.listeners;
 			while i < listeners.len() {
 				if listeners[i].1.receiver_count() == 0 {
@@ -117,6 +125,7 @@ impl EventEmitter {
 			}
 
 			// JSON Listeners
+			i = 0;
 			let json_listeners = &mut listener_info.json_listeners;
 			while i < json_listeners.len() {
 				if json_listeners[i].1.receiver_count() == 0 {
@@ -127,6 +136,7 @@ impl EventEmitter {
 			}
 
 			// Bincode listeners
+			i = 0;
 			let bincode_listeners = &mut listener_info.bincode_listeners;
 			while i < bincode_listeners.len() {
 				if bincode_listeners[i].1.receiver_count() == 0 {
@@ -234,6 +244,14 @@ impl EventEmitter {
 		let (sender, receiver) = channel::unbounded();
 		listener_info.bincode_listeners.push((filter, sender));
 		return Ok(receiver);
+	}
+
+	pub fn on_shutdown(&mut self) -> Receiver<()> {
+		self.gc();
+
+		let (sender, receiver) = channel::unbounded();
+		self.shutdown_listeners.push(sender);
+		return receiver;
 	}
 
 	/// Sends an event on the bus. `T` gets cast to `Any`, boxed, wrapped in `Arc`,
@@ -364,7 +382,9 @@ impl EventEmitter {
 	pub async fn send_shutdown(&mut self) {
 		self.gc();
 
-		self.shutdown_sender.send(()).await.ok();
+		for shutdown_listener in self.shutdown_listeners.iter() {
+			shutdown_listener.send(()).await.ok();
+		}
 		for listener_group in self.listeners.values() {
 			send_shutdown(&listener_group.listeners).await;
 			send_shutdown(&listener_group.json_listeners).await;

@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::plugins::output_dmx::driver_types::DMXFrame;
 
-use super::dmxsource_controller::initialize_controller;
+use super::dmxsource_controller::ControllerCache;
 
 
 pub struct E131State {
@@ -15,9 +15,9 @@ pub struct E131State {
 	pub universes: HashMap<Uuid, E131Universe>,
 }
 impl E131State {
-	pub fn new() -> Self {
+	pub fn new(controller_cache: ControllerCache) -> Self {
 		return E131State {
-			controller: initialize_controller(),
+			controller: controller_cache,
 			universes: HashMap::new(),
 		}
 	}

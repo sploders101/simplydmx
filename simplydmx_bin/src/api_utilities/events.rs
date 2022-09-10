@@ -2,7 +2,6 @@ use std::collections::{HashMap, HashSet};
 use futures::{FutureExt, select_biased};
 
 use async_std::{
-	task,
 	channel::{
 		self,
 		Sender,
@@ -54,7 +53,7 @@ impl EventJuggler {
 
 			let reusable_criteria = criteria.clone();
 			let reusable_event_name = event_name.clone();
-			task::spawn(async move {
+			self.0.spawn_volatile("API Event forwarder", async move {
 				loop {
 					select_biased! {
 						event = event_receiver.recv().fuse() => {
@@ -85,7 +84,7 @@ impl EventJuggler {
 						},
 					};
 				}
-			});
+			}).await;
 
 			// If we don't have a filter, mark it in the hashmap to shut up the other receivers
 			if let FilterCriteria::None = criteria {

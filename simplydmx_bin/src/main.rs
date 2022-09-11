@@ -7,6 +7,8 @@ pub mod plugins;
 pub mod api_utilities;
 pub mod utilities;
 
+use std::time::Instant;
+
 use async_std::task;
 use simplydmx_plugin_framework::{
 	PluginManager,
@@ -14,23 +16,19 @@ use simplydmx_plugin_framework::{
 
 fn main() {
 
-	// Create plugin manager
-	let plugin_manager = PluginManager::new();
-
 	#[cfg(feature = "gui")]
-	{
-		// Call tauri and block main thread due to MacOS GUI limitation
-		task::block_on(plugins::gui::initialize(plugin_manager));
-	}
+	task::block_on(plugins::gui::initialize());
 
 }
 
 // Public so the GUI plugin can run it
 pub async fn async_main(plugin_manager: PluginManager) {
 
+	#[cfg(feature = "startup-benchmark")]
+	let start = Instant::now();
+
 	// Register core plugin
 	plugins::core::initialize(
-		plugin_manager.clone(),
 		plugin_manager.register_plugin(
 			"core",
 			"SimplyDMX Core",
@@ -69,5 +67,8 @@ pub async fn async_main(plugin_manager: PluginManager) {
 		).await.unwrap(),
 		dmx_interface.clone(),
 	).await;
+
+	#[cfg(feature = "startup-benchmark")]
+	println!("SimplyDMX plugins started up in {:?}", start.elapsed());
 
 }

@@ -82,7 +82,7 @@ pub async fn spawn_api_facet_controller(plugin_context: PluginContext, receiver:
 	// Receiver
 	let shutdown_receiver = plugin_context.on_shutdown().await;
 	plugin_context.clone().spawn_volatile("API Facet Controller", async move {
-		let juggler = EventJuggler::new(&plugin_context, sender.clone());
+		let juggler = EventJuggler::new(plugin_context.clone(), sender.clone());
 		loop {
 			select! {
 				command = receiver.recv().fuse() => {
@@ -162,6 +162,7 @@ async fn handle_command(plugin_context: PluginContext, command: JSONCommand, jug
 			JSONCommand::Unsubscribe { name, criteria } => {
 				juggler.remove_event_listener(name, criteria.unwrap_or(FilterCriteria::None)).await;
 			},
+
 		}
 	}).await;
 }

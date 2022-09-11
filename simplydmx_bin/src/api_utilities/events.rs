@@ -33,8 +33,8 @@ struct EventJugglerInfo {
 pub struct EventJuggler(PluginContext, Arc<RwLock<EventJugglerInfo>>);
 
 impl EventJuggler {
-	pub fn new(plugin_context: &PluginContext, sender: Sender<JSONResponse>) -> Self {
-		return EventJuggler(plugin_context.clone(), Arc::new(RwLock::new(EventJugglerInfo {
+	pub fn new(plugin_context: PluginContext, sender: Sender<JSONResponse>) -> Self {
+		return EventJuggler(plugin_context, Arc::new(RwLock::new(EventJugglerInfo {
 			sender,
 			has_criteria_none: HashSet::new(),
 			listeners: HashMap::new(),

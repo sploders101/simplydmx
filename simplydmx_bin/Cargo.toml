@@ -49,6 +49,8 @@ blender-benchmark = [
 	"blender",
 ]
 
+startup-benchmark = []
+
 api = []
 
 gui = [

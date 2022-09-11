@@ -1,0 +1,8 @@
+[app]
+name = "SimplyDMX"
+stylized-name = "SimplyDMX"
+domain = "shaunkeys.com"
+template-pack = "wry"
+
+[apple]
+development-team = "H25K78CVTM"

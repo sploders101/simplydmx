@@ -1,0 +1,13 @@
+# Rust
+target/
+**/*.rs.bk
+
+# cargo-mobile
+.cargo/
+/gen
+
+# macOS
+.DS_Store
+
+# Assets (should be built from UI during compilation
+/assets

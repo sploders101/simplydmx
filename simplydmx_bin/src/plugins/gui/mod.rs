@@ -17,7 +17,7 @@ use tauri::{
 };
 use crate::{
 	api_utilities::*,
-	async_main,
+	init::async_main,
 };
 use simplydmx_plugin_framework::*;
 

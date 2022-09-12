@@ -30,7 +30,7 @@ use crate::{
 		DeclareEventError,
 		PortableJSONEvent,
 		RegisterEncodedListenerError,
-		PortableBincodeEvent,
+		PortableCborEvent,
 		PortableMessageGenericDeserializer,
 	},
 	keep_alive::KeepAlive,
@@ -299,7 +299,7 @@ impl PluginContext {
 	/// Declares an event on the bus so it can be translated between data formats and included in self-documentation.
 	///
 	/// Events not declared here will not be handled by Rust, including translation between protocols. Pre-serialized
-	/// data (JSON and bincode, for example) will be repeated verbatim on the bus for any listeners of the same protocol.
+	/// data (JSON and CBOR, for example) will be repeated verbatim on the bus for any listeners of the same protocol.
 	///
 	/// The type parameter is used to construct a generic deserializer used for translation.
 	///
@@ -324,11 +324,11 @@ impl PluginContext {
 		self.0.evt_bus.write().await.emit_json(event_name, filter, message).await;
 	}
 
-	/// Emits a Bincode value to the bus, deserializing for listeners of other formats if
-	/// necessary/possible. It will always be repeated to Bincode listeners, but will silently
+	/// Emits a CBOR value to the bus, deserializing for listeners of other formats if
+	/// necessary/possible. It will always be repeated to CBOR listeners, but will silently
 	/// fail to repeat on listeners of other protocols if deserialization fails
-	pub async fn emit_bincode(&self, event_name: String, filter: FilterCriteria, message: Vec<u8>) {
-		self.0.evt_bus.write().await.emit_bincode(event_name, filter, message).await;
+	pub async fn emit_cbor(&self, event_name: String, filter: FilterCriteria, message: Vec<u8>) {
+		self.0.evt_bus.write().await.emit_cbor(event_name, filter, message).await;
 	}
 
 	/// Registers an event listener on the bus of the given type. Returns
@@ -344,9 +344,9 @@ impl PluginContext {
 		return self.0.evt_bus.write().await.on_json(event_name, filter);
 	}
 
-	/// Registers a listener on the bus that receives pre-encoded bincode events
-	pub async fn on_bincode(&self, event_name: String, filter: FilterCriteria) -> Result<Receiver<PortableBincodeEvent>, RegisterEncodedListenerError> {
-		return self.0.evt_bus.write().await.on_bincode(event_name, filter);
+	/// Registers a listener on the bus that receives pre-encoded CBOR events
+	pub async fn on_cbor(&self, event_name: String, filter: FilterCriteria) -> Result<Receiver<PortableCborEvent>, RegisterEncodedListenerError> {
+		return self.0.evt_bus.write().await.on_cbor(event_name, filter);
 	}
 
 	/// Spawn the specified task when the set of dependencies has finished.

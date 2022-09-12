@@ -12,7 +12,7 @@ use serde_json::{
 	self,
 	Value,
 };
-use bincode;
+use ciborium;
 
 /// Marker trait that enables a message to be sent on the event bus.
 ///
@@ -28,7 +28,7 @@ impl<T: PortableMessage + serde::de::DeserializeOwned> BidirectionalPortable for
 /// Common API for all events sent on the bus, regardless of type. Mainly
 pub trait PortableMessage: Any + Sync + Send {
 	fn serialize_json(&self) -> Result<Value, serde_json::Error>;
-	fn serialize_bincode(&self) -> Result<Vec<u8>, bincode::Error>;
+	fn serialize_cbor(&self) -> Result<Vec<u8>, String>;
 	fn clone_portable_message(&self) -> Box<dyn PortableMessage>;
 	fn fmt_portable_message(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result;
 }
@@ -38,8 +38,15 @@ impl<T: Serialize + Clone + fmt::Debug + Sync + Send + 'static> PortableMessage 
 	fn serialize_json(&self) -> Result<Value, serde_json::Error> {
 		return serde_json::to_value(&self);
 	}
-	fn serialize_bincode(&self) -> Result<Vec<u8>, bincode::Error> {
-		return bincode::serialize(&self);
+	fn serialize_cbor(&self) -> Result<Vec<u8>, String> {
+		let mut out = Vec::<u8>::new();
+		match ciborium::ser::into_writer(self, &mut out) {
+			Ok(()) => return Ok(out),
+			Err(error) => match error {
+				ciborium::ser::Error::Io(error) => return Err(format!("{:?}", error)),
+				ciborium::ser::Error::Value(error) => return Err(error),
+			},
+		}
 	}
 	fn clone_portable_message(&self) -> Box<dyn PortableMessage> {
 		return Box::new(Self::clone(self));
@@ -73,7 +80,7 @@ impl<T: BidirectionalPortable> PortableMessageDeserializer<T> {
 /// implemented with `PortableMessageDeserializer`
 pub trait PortableMessageGenericDeserializer: Sync + Send + 'static {
 	fn deserialize_json(&self, value: Value) -> Result<Box<dyn PortableMessage>, serde_json::Error>;
-	fn deserialize_bincode(&self, value: &[u8]) -> Result<Box<dyn PortableMessage>, bincode::Error>;
+	fn deserialize_cbor(&self, value: &[u8]) -> Result<Box<dyn PortableMessage>, String>;
 }
 
 // Blanket deserializer implementation for all PortableMessageDeserializer instances
@@ -84,10 +91,10 @@ impl<T: BidirectionalPortable> PortableMessageGenericDeserializer for PortableMe
 			Err(error) => { Err(error) },
 		};
 	}
-	fn deserialize_bincode(&self, value: &[u8]) -> Result<Box<dyn PortableMessage>, bincode::Error> {
-		return match bincode::deserialize::<T>(value) {
+	fn deserialize_cbor(&self, value: &[u8]) -> Result<Box<dyn PortableMessage>, String> {
+		return match ciborium::de::from_reader::<'_, T, &[u8]>(&value) {
 			Ok(decoded) => Ok(Box::new(decoded)),
-			Err(error) => Err(error),
+			Err(error) => Err(format!("{:?}", error)),
 		}
 	}
 }

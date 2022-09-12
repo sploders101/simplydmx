@@ -166,10 +166,12 @@ impl OutputDriver for DMXInterface {
 		}
 	}
 
-	async fn export_fixture_bincode(&self, id: &Uuid) -> Option<Vec<u8>> {
+	async fn export_fixture_cbor(&self, id: &Uuid) -> Option<Vec<u8>> {
 		let ctx = self.1.read().await;
 		if let Some(fixture) = ctx.library.get(&id) {
-			if let Ok(serialized) = bincode::serialize(fixture) {
+			let mut serialized = Vec::<u8>::new();
+
+			if let Ok(_) = ciborium::ser::into_writer(fixture, &mut serialized) {
 				return Some(serialized);
 			} else {
 				return None;

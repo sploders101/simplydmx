@@ -53,8 +53,8 @@ pub trait OutputDriver: Send + Sync + 'static {
 	/// Exports driver-specific information about the fixture for saving in a JSON format
 	async fn export_fixture_json(&self, id: &Uuid) -> Option<serde_json::Value>;
 
-	/// Exports driver-specific information about the fixture for saving in a Bincode format
-	async fn export_fixture_bincode(&self, id: &Uuid) -> Option<Vec<u8>>;
+	/// Exports driver-specific information about the fixture for saving in a CBOR format
+	async fn export_fixture_cbor(&self, id: &Uuid) -> Option<Vec<u8>>;
 
 	/// Gets a FormDescriptor to be sent to the UI for display to the user. The form descriptor should be
 	/// detailed enough to allow the UI to generate a struct sufficient for use within `create_fixture_instance`.

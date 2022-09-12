@@ -79,6 +79,6 @@ pub trait Service {
 	/// Call the service using JSON values
 	fn call_json<'a>(&'a self, arguments: Vec<Value>) -> Pin<Box<dyn Future<Output = Result<Value, CallServiceRPCError>> + Send + 'a>>;
 
-	// Call the service using Bincode values
-	fn call_bincode<'a>(&'a self, arguments: Vec<Vec<u8>>) -> Pin<Box<dyn Future<Output = Result<Vec<u8>, CallServiceRPCError>> + Send + 'a>>;
+	// Call the service using CBOR values
+	fn call_cbor<'a>(&'a self, arguments: Vec<Vec<u8>>) -> Pin<Box<dyn Future<Output = Result<Vec<u8>, CallServiceRPCError>> + Send + 'a>>;
 }

@@ -7,13 +7,13 @@ use simplydmx_plugin_framework::*;
 #[portable]
 #[serde(untagged)]
 pub enum SerializedData {
-	Bincode(Vec<u8>),
+	Cbor(Vec<u8>),
 	JSON(serde_json::Value),
 }
 impl SerializedData {
 	pub fn deserialize<T: DeserializeOwned>(self) -> Result<T, DeserializeError> {
 		let fixture_info: T = match self {
-			SerializedData::Bincode(data) => bincode::deserialize(&data)?,
+			SerializedData::Cbor(data) => ciborium::de::from_reader::<'_, T, &[u8]>(&data)?,
 			SerializedData::JSON(data) => serde_json::from_value(data)?,
 		};
 
@@ -25,8 +25,8 @@ impl SerializedData {
 ///
 /// Returned when there is an error deserializing `SerializedData`
 pub struct DeserializeError();
-impl From<bincode::Error> for DeserializeError {
-	fn from(_: bincode::Error) -> Self {
+impl<T> From<ciborium::de::Error<T>> for DeserializeError {
+	fn from(_: ciborium::de::Error<T>) -> Self {
 		return DeserializeError();
 	}
 }

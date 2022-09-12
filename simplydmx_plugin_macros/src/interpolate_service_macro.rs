@@ -179,7 +179,7 @@ fn interpolate_service_main(outer_type: Type, attr: TokenStream, body: ImplItemM
     // on from the generic `call` implementation
     let mut internal_arguments = Vec::<Box<dyn ToTokens>>::new();
     let mut internal_arguments_json = Vec::<Box<dyn ToTokens>>::new();
-    let mut internal_arguments_bincode = Vec::<Box<dyn ToTokens>>::new();
+    let mut internal_arguments_cbor = Vec::<Box<dyn ToTokens>>::new();
     let mut internal_argument_types = Vec::<Box<Type>>::new();
 
     // Number of arguments other than `self`
@@ -225,8 +225,8 @@ fn interpolate_service_main(outer_type: Type, attr: TokenStream, body: ImplItemM
                         Err(_) => return Err(simplydmx_plugin_framework::CallServiceRPCError::DeserializationFailed),
                     }
                 }));
-                internal_arguments_bincode.push(Box::new(quote! {
-                    match bincode::deserialize::<#ty>(&arguments[#index]) {
+                internal_arguments_cbor.push(Box::new(quote! {
+                    match ciborium::de::from_reader::<'_, #ty, &[u8]>(&arguments[#index]) {
                         Ok(arg) => arg,
                         Err(_) => return Err(simplydmx_plugin_framework::CallServiceRPCError::DeserializationFailed),
                     }
@@ -317,11 +317,12 @@ fn interpolate_service_main(outer_type: Type, attr: TokenStream, body: ImplItemM
             return #box_::pin(run(#outer_type::clone(&self), arguments));
         }
 
-        fn call_bincode<'a>(&'a self, arguments: Vec<Vec<u8>>) -> #pin<#box_<dyn #future<Output = Result<Vec<u8>, simplydmx_plugin_framework::CallServiceRPCError>> + Send + 'a>> {
+        fn call_cbor<'a>(&'a self, arguments: Vec<Vec<u8>>) -> #pin<#box_<dyn #future<Output = Result<Vec<u8>, simplydmx_plugin_framework::CallServiceRPCError>> + Send + 'a>> {
             async fn run(_self: #outer_type, arguments: Vec<Vec<u8>>) -> Result<Vec<u8>, simplydmx_plugin_framework::CallServiceRPCError> {
-                let ret_val = bincode::serialize(&#outer_type::#internal_call(_self, #(#internal_arguments_bincode),*)#inject_await);
-                return match ret_val {
-                    Ok(ret_val) => Ok(ret_val),
+                let mut ret_val = Vec::<u8>::new();
+                let ret_val_result = ciborium::ser::into_writer(&#outer_type::#internal_call(_self, #(#internal_arguments_cbor),*)#inject_await, &mut ret_val);
+                return match ret_val_result {
+                    Ok(_) => Ok(ret_val),
                     Err(_) => Err(simplydmx_plugin_framework::CallServiceRPCError::SerializationFailed),
                 }
             }

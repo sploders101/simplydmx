@@ -32,7 +32,7 @@ pub use event_emitter::{
 	ArcPortable,
 	Event,
 	PortableJSONEvent,
-	PortableBincodeEvent,
+	PortableCborEvent,
 	DeclareEventError,
 	RegisterEncodedListenerError,
 	RegisterListenerError,

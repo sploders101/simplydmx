@@ -33,7 +33,7 @@ pub use event_receiver::Event;
 
 type PortableEvent = PortableEventGeneric<Box<dyn PortableMessage>>;
 pub type PortableJSONEvent = PortableEventGeneric<serde_json::Value>;
-pub type PortableBincodeEvent = PortableEventGeneric<Vec<u8>>;
+pub type PortableCborEvent = PortableEventGeneric<Vec<u8>>;
 pub enum PortableEventGeneric<T: Sync + Send> {
 	Msg {
 		data: Arc<T>,
@@ -135,12 +135,12 @@ impl EventEmitter {
 				}
 			}
 
-			// Bincode listeners
+			// CBOR listeners
 			i = 0;
-			let bincode_listeners = &mut listener_info.bincode_listeners;
-			while i < bincode_listeners.len() {
-				if bincode_listeners[i].1.receiver_count() == 0 {
-					bincode_listeners.remove(i);
+			let cbor_listeners = &mut listener_info.cbor_listeners;
+			while i < cbor_listeners.len() {
+				if cbor_listeners[i].1.receiver_count() == 0 {
+					cbor_listeners.remove(i);
 				} else {
 					i += 1;
 				}
@@ -150,7 +150,7 @@ impl EventEmitter {
 			if !listener_info.persistent
 				&& listeners.len() == 0
 				&& json_listeners.len() == 0
-				&& bincode_listeners.len() == 0
+				&& cbor_listeners.len() == 0
 			{
 				to_remove.push(String::clone(event_id));
 			}
@@ -164,7 +164,7 @@ impl EventEmitter {
 	/// Declares an event on the bus so it can be translated between data formats and included in self-documentation.
 	///
 	/// Events not declared here will not be handled by Rust, including translation between protocols. Pre-serialized
-	/// data (JSON and bincode, for example) will be repeated verbatim on the bus for any listeners of the same protocol.
+	/// data (JSON and CBOR, for example) will be repeated verbatim on the bus for any listeners of the same protocol.
 	///
 	/// The type parameter is used to construct a generic deserializer used for translation.
 	pub fn declare_event<T: BidirectionalPortable>(&mut self, event_name: String) -> Result<(), DeclareEventError> {
@@ -231,8 +231,8 @@ impl EventEmitter {
 		return Ok(receiver);
 	}
 
-	/// Registers a listener on the bus that receives pre-encoded bincode events
-	pub fn on_bincode(&mut self, event_name: String, filter: FilterCriteria) -> Result<Receiver<PortableBincodeEvent>, RegisterEncodedListenerError> {
+	/// Registers a listener on the bus that receives pre-encoded CBOR events
+	pub fn on_cbor(&mut self, event_name: String, filter: FilterCriteria) -> Result<Receiver<PortableCborEvent>, RegisterEncodedListenerError> {
 		self.gc();
 
 		if !self.listeners.contains_key(&event_name) {
@@ -242,7 +242,7 @@ impl EventEmitter {
 		let listener_info = self.listeners.get_mut(&event_name).unwrap();
 
 		let (sender, receiver) = channel::unbounded();
-		listener_info.bincode_listeners.push((filter, sender));
+		listener_info.cbor_listeners.push((filter, sender));
 		return Ok(receiver);
 	}
 
@@ -269,10 +269,10 @@ impl EventEmitter {
 				}
 			}
 
-			// Re-broadcast bincode
-			if relevant_listener(&filter, &listeners.bincode_listeners) {
-				if let Ok(translated) = message.serialize_bincode() {
-					send_filtered(&filter, PortableBincodeEvent::Msg { data: Arc::new(translated), criteria: Arc::clone(&filter) }, &listeners.bincode_listeners);
+			// Re-broadcast CBOR
+			if relevant_listener(&filter, &listeners.cbor_listeners) {
+				if let Ok(translated) = message.serialize_cbor() {
+					send_filtered(&filter, PortableCborEvent::Msg { data: Arc::new(translated), criteria: Arc::clone(&filter) }, &listeners.cbor_listeners);
 				}
 			}
 
@@ -294,10 +294,10 @@ impl EventEmitter {
 				}
 			}
 
-			// Re-broadcast bincode
-			if relevant_listener(&filter, &listeners.bincode_listeners) {
-				if let Ok(translated) = message.serialize_bincode() {
-					send_filtered(&filter, PortableBincodeEvent::Msg { data: Arc::new(translated), criteria: Arc::clone(&filter) }, &listeners.bincode_listeners);
+			// Re-broadcast CBOR
+			if relevant_listener(&filter, &listeners.cbor_listeners) {
+				if let Ok(translated) = message.serialize_cbor() {
+					send_filtered(&filter, PortableCborEvent::Msg { data: Arc::new(translated), criteria: Arc::clone(&filter) }, &listeners.cbor_listeners);
 				}
 			}
 
@@ -320,7 +320,7 @@ impl EventEmitter {
 
 			let deserialized: Option<Box<dyn PortableMessage>> = if
 				relevant_listener(&filter, &listeners.listeners)
-				|| relevant_listener(&filter, &listeners.bincode_listeners)
+				|| relevant_listener(&filter, &listeners.cbor_listeners)
 			{ if let Some(ref evt_info) = listeners.evt_info { evt_info.deserializer.deserialize_json(message.clone()).ok() } else { None } }
 			else { None };
 
@@ -329,10 +329,10 @@ impl EventEmitter {
 				send_filtered(&filter, PortableJSONEvent::Msg { data: Arc::new(message), criteria: Arc::clone(&filter) }, &listeners.json_listeners);
 			}
 
-			// Re-broadcast bincode
-			if relevant_listener(&filter, &listeners.bincode_listeners) {
-				if let Ok(translated) = deserialized.as_ref().unwrap().serialize_bincode() {
-					send_filtered(&filter, PortableBincodeEvent::Msg { data: Arc::new(translated), criteria: Arc::clone(&filter) }, &listeners.bincode_listeners);
+			// Re-broadcast CBOR
+			if relevant_listener(&filter, &listeners.cbor_listeners) {
+				if let Ok(translated) = deserialized.as_ref().unwrap().serialize_cbor() {
+					send_filtered(&filter, PortableCborEvent::Msg { data: Arc::new(translated), criteria: Arc::clone(&filter) }, &listeners.cbor_listeners);
 				}
 			}
 
@@ -344,10 +344,10 @@ impl EventEmitter {
 		}
 	}
 
-	/// Emits a Bincode value to the bus, deserializing for listeners of other formats if
-	/// necessary/possible. It will always be repeated to Bincode listeners, but will silently
+	/// Emits a CBOR value to the bus, deserializing for listeners of other formats if
+	/// necessary/possible. It will always be repeated to CBOR listeners, but will silently
 	/// fail to repeat on listeners of other protocols if deserialization fails
-	pub async fn emit_bincode(&mut self, event_name: String, filter: FilterCriteria, message: Vec<u8>) {
+	pub async fn emit_cbor(&mut self, event_name: String, filter: FilterCriteria, message: Vec<u8>) {
 		self.gc();
 
 		if let Some(listeners) = self.listeners.get_mut(&event_name) {
@@ -356,7 +356,7 @@ impl EventEmitter {
 			let deserialized: Option<Box<dyn PortableMessage>> = if
 				relevant_listener(&filter, &listeners.listeners)
 				|| relevant_listener(&filter, &listeners.json_listeners)
-			{ if let Some(ref evt_info) = listeners.evt_info { evt_info.deserializer.deserialize_bincode(&message).ok() } else { None }}
+			{ if let Some(ref evt_info) = listeners.evt_info { evt_info.deserializer.deserialize_cbor(&message).ok() } else { None }}
 			else { None };
 
 			// Re-broadcast JSON
@@ -366,9 +366,9 @@ impl EventEmitter {
 				}
 			}
 
-			// Re-broadcast bincode
+			// Re-broadcast CBOR
 			if relevant_listener(&filter, &listeners.json_listeners) {
-				send_filtered(&filter, PortableBincodeEvent::Msg { data: Arc::new(message), criteria: Arc::clone(&filter) }, &listeners.bincode_listeners);
+				send_filtered(&filter, PortableCborEvent::Msg { data: Arc::new(message), criteria: Arc::clone(&filter) }, &listeners.cbor_listeners);
 			}
 
 			// Deserialized
@@ -388,7 +388,7 @@ impl EventEmitter {
 		for listener_group in self.listeners.values() {
 			send_shutdown(&listener_group.listeners).await;
 			send_shutdown(&listener_group.json_listeners).await;
-			send_shutdown(&listener_group.bincode_listeners).await;
+			send_shutdown(&listener_group.cbor_listeners).await;
 		}
 	}
 }
@@ -402,7 +402,7 @@ pub struct ListenerInfo {
 	pub persistent: bool,
 	pub listeners: Vec<(FilterCriteria, Sender<PortableEvent>)>,
 	pub json_listeners: Vec<(FilterCriteria, Sender<PortableJSONEvent>)>,
-	pub bincode_listeners: Vec<(FilterCriteria, Sender<PortableBincodeEvent>)>,
+	pub cbor_listeners: Vec<(FilterCriteria, Sender<PortableCborEvent>)>,
 }
 
 pub struct EventInfo {
@@ -417,7 +417,7 @@ impl ListenerInfo {
 			persistent: false,
 			listeners: Vec::new(),
 			json_listeners: Vec::new(),
-			bincode_listeners: Vec::new(),
+			cbor_listeners: Vec::new(),
 		};
 	}
 	pub fn new_declared<T: BidirectionalPortable>() -> Self {
@@ -429,7 +429,7 @@ impl ListenerInfo {
 			persistent: true,
 			listeners: Vec::new(),
 			json_listeners: Vec::new(),
-			bincode_listeners: Vec::new(),
+			cbor_listeners: Vec::new(),
 		}
 	}
 

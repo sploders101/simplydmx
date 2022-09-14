@@ -28,12 +28,12 @@ struct ApplicationState {
 	api_sender: channel::Sender<JSONCommand>,
 }
 impl ApplicationState {
-	async fn start_plugins(app: AppHandle) -> Self {
+	async fn start_plugins(app: AppHandle, file: Option<Vec<u8>>) -> Self {
 		let manager = PluginManager::new();
 		let plugin = manager.register_plugin("gui", "Tauri UI").await.unwrap();
 
 		// Boot up SimplyDMX
-		plugin.spawn("SimplyDMX Startup Routine", async_main(manager.clone())).await.unwrap();
+		async_main(manager.clone(), file).await;
 
 		// API Setup
 		let (request_sender, request_receiver) = channel::unbounded();
@@ -80,7 +80,7 @@ async fn sdmx(state: tauri::State<'_, Arc<RwLock<Option<ApplicationState>>>>, me
 }
 
 #[tauri::command]
-async fn load_file(app: tauri::AppHandle, state: tauri::State<'_, Arc<RwLock<Option<ApplicationState>>>>, file: Option<String>) -> Result<(), &'static str> {
+async fn load_file(app: tauri::AppHandle, state: tauri::State<'_, Arc<RwLock<Option<ApplicationState>>>>, file: Option<Vec<u8>>) -> Result<(), &'static str> {
 	let mut writable_state = state.write().await;
 
 	// Shut down existing instance
@@ -90,7 +90,7 @@ async fn load_file(app: tauri::AppHandle, state: tauri::State<'_, Arc<RwLock<Opt
 	}
 
 	// Reload
-	*writable_state = Some(ApplicationState::start_plugins(app).await);
+	*writable_state = Some(ApplicationState::start_plugins(app, file).await);
 
 	return Ok(());
 }
@@ -150,7 +150,7 @@ pub async fn initialize() {
 		.setup(move |app_ref| {
 			let app = app_ref.app_handle();
 			let mut application_state = block_on(application_state_setup.write());
-			*application_state = Some(block_on(ApplicationState::start_plugins(app)));
+			*application_state = Some(block_on(ApplicationState::start_plugins(app, None)));
 
 			return Ok(());
 		})

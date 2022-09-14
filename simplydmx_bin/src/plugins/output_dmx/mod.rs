@@ -8,10 +8,13 @@ use simplydmx_plugin_framework::*;
 
 use self::interface::DMXInterface;
 
-use super::patcher::PatcherInterface;
+use super::{
+	patcher::PatcherInterface,
+	saver::SaverInterface,
+};
 
 
-pub async fn initialize(plugin_context: PluginContext, patcher_interface: PatcherInterface) -> DMXInterface {
+pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface, patcher_interface: PatcherInterface) -> DMXInterface {
 
 	// Create plugin interface
 	let output_context = DMXInterface::new(plugin_context.clone());

@@ -21,7 +21,9 @@ use self::{
 	},
 };
 
-pub async fn initialize(plugin_context: PluginContext) -> PatcherInterface {
+use super::saver::SaverInterface;
+
+pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface) -> PatcherInterface {
 	let patcher_interface = PatcherInterface::new(plugin_context.clone(), Arc::new(RwLock::new(PatcherContext::new())));
 
 	plugin_context.declare_event::<()>(

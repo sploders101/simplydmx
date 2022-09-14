@@ -3,6 +3,7 @@ pub mod core;
 pub mod patcher;
 pub mod mixer;
 pub mod output_dmx;
+pub mod saver;
 
 #[cfg(feature = "gui")]
 pub mod gui;

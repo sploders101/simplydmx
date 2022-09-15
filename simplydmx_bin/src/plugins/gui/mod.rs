@@ -11,9 +11,8 @@ use futures::{
 };
 use tauri::{
 	Manager,
-	async_runtime,
-	WindowEvent,
 	AppHandle,
+	RunEvent,
 };
 use crate::{
 	api_utilities::*,
@@ -110,43 +109,11 @@ pub async fn initialize() {
 
 	let application_state: Arc<RwLock<Option<ApplicationState>>> = Arc::new(RwLock::new(None));
 	let application_state_setup = Arc::clone(&application_state);
-	let application_state_win_evt = Arc::clone(&application_state);
+	let application_state_exit = Arc::clone(&application_state);
 
 	tauri::Builder::default()
 		.manage(application_state)
 		.invoke_handler(tauri::generate_handler![sdmx, load_file])
-		.on_window_event(move |event| match event.event() {
-			WindowEvent::CloseRequested { api, .. } => {
-
-				// Prevent close until we determine it's safe.
-				api.prevent_close();
-
-				// Issue shutdown if necessary
-				let application_state_win_evt = Arc::clone(&application_state_win_evt);
-				let quitting = Arc::clone(&quitting);
-				let original_window = event.window().clone();
-				async_runtime::spawn(async move {
-					// If we're already quitting, ignore the event. Otherwise, mark that we are quitting
-					let mut quitting = quitting.write().await;
-					if *quitting {
-						return;
-					}
-					*quitting = true;
-					drop(quitting);
-
-					// If we have a plugin system, shut it down. Otherwise, go ahead and close the window
-					if let Some(ref state) = *application_state_win_evt.read().await {
-						state.plugin_manager.shutdown().await;
-						state.plugin_manager.finish_shutdown().await;
-						#[cfg(feature = "verbose-debugging")]
-						println!("Successfully shut down.");
-					}
-					original_window.close().unwrap();
-				});
-
-			},
-			_ => {},
-		})
 		.setup(move |app_ref| {
 			let app = app_ref.app_handle();
 			let mut application_state = block_on(application_state_setup.write());
@@ -154,8 +121,32 @@ pub async fn initialize() {
 
 			return Ok(());
 		})
-		.run(tauri::generate_context!())
-		.expect("error while running tauri application");
+		.build(tauri::generate_context!()).expect("error while running tauri application")
+		.run(move |app_handle, event| match event {
+			RunEvent::Exit => {
+				// Issue shutdown if necessary
+				let application_state = Arc::clone(&application_state_exit);
+				let quitting = Arc::clone(&quitting);
+				let app_handle = app_handle.clone();
+				// If we're already quitting, ignore the event. Otherwise, mark that we are quitting
+				let mut quitting = block_on(quitting.write());
+				if *quitting {
+					return;
+				}
+				*quitting = true;
+				drop(quitting);
+
+				// If we have a plugin system, shut it down. Otherwise, go ahead and close the window
+				if let Some(ref state) = *block_on(application_state.read()) {
+					block_on(state.plugin_manager.shutdown());
+					block_on(state.plugin_manager.finish_shutdown());
+					#[cfg(feature = "verbose-debugging")]
+					println!("Successfully shut down.");
+				}
+				app_handle.exit(0);
+			},
+			_ => {},
+		});
 
 	#[cfg(feature = "verbose-debugging")]
 	println!("Tauri call completed");

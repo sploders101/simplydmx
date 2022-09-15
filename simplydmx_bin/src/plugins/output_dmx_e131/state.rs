@@ -7,7 +7,10 @@ use uuid::Uuid;
 
 use crate::plugins::output_dmx::driver_types::DMXFrame;
 
-use super::dmxsource_controller::ControllerCache;
+use super::{
+	dmxsource_controller::ControllerCache,
+	interface::E131DMXShowSave,
+};
 
 
 pub struct E131State {
@@ -19,7 +22,13 @@ impl E131State {
 		return E131State {
 			controller: controller_cache,
 			universes: HashMap::new(),
-		}
+		};
+	}
+	pub fn from_file(controller_cache: ControllerCache, file: E131DMXShowSave) -> Self {
+		return E131State {
+			controller: controller_cache,
+			universes: file.universes,
+		};
 	}
 }
 

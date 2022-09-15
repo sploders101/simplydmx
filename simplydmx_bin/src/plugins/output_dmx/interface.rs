@@ -21,6 +21,7 @@ use crate::{
 			FullMixerOutput,
 			FixtureMixerOutput,
 		},
+		saver::Savable,
 	},
 	utilities::serialized_data::SerializedData,
 };
@@ -28,6 +29,7 @@ use super::{
 	state::{
 		DMXState,
 		UniverseInstance,
+		DMXFixtureInstance,
 	},
 	driver_types::{
 		DMXDriver,
@@ -43,6 +45,9 @@ pub struct DMXInterface(PluginContext, Arc::<RwLock::<DMXState>>);
 impl DMXInterface {
 	pub fn new(plugin_context: PluginContext) -> Self {
 		return DMXInterface(plugin_context, Arc::new(RwLock::new(DMXState::new())));
+	}
+	pub fn from_file(plugin_context: PluginContext, file: DMXShowSave) -> Self {
+		return DMXInterface(plugin_context, Arc::new(RwLock::new(DMXState::from_file(file))));
 	}
 
 	/// Registers an DMX driver for sending universe frames
@@ -125,6 +130,25 @@ impl DMXInterface {
 		}
 	}
 
+}
+
+#[portable]
+pub struct DMXShowSave {
+	pub library: HashMap<Uuid, DMXFixtureData>,
+	pub fixtures: HashMap<Uuid, DMXFixtureInstance>,
+	pub universes: HashMap<Uuid, UniverseInstance>,
+}
+
+#[async_trait]
+impl Savable for DMXInterface {
+	async fn save_data(&self) -> Result<Option<Vec<u8>>, String> {
+		let ctx = self.1.read().await;
+		return Ok(Some(DMXShowSave {
+			library: ctx.library.clone(), // TODO: Minify this first
+			fixtures: ctx.fixtures.clone(),
+			universes: ctx.universes.clone(),
+		}.serialize_cbor()?));
+	}
 }
 
 

@@ -23,8 +23,17 @@ use self::{
 
 use super::saver::SaverInterface;
 
-pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface) -> PatcherInterface {
-	let patcher_interface = PatcherInterface::new(plugin_context.clone(), Arc::new(RwLock::new(PatcherContext::new())));
+pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface) -> Result<PatcherInterface, PatcherInitializationError> {
+	// Create patcher context
+	let patcher_interface = if let Ok(data) = saver.load_data(&"patcher".into()).await {
+		if let Some(data) = data {
+			PatcherInterface::new(plugin_context.clone(), Arc::new(RwLock::new(PatcherContext::from_file(data))))
+		} else {
+			PatcherInterface::new(plugin_context.clone(), Arc::new(RwLock::new(PatcherContext::new())))
+		}
+	} else {
+		return Err(PatcherInitializationError::UnrecognizedData);
+	};
 
 	plugin_context.declare_event::<()>(
 		"patcher.patch_updated".to_owned(),
@@ -39,5 +48,12 @@ pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface) ->
 	plugin_context.register_service(true, ImportFixtureDefinition::new(patcher_interface.clone())).await.unwrap();
 	plugin_context.register_service(true, CreateFixture::new(patcher_interface.clone())).await.unwrap();
 
-	return patcher_interface;
+	saver.register_savable("patcher", patcher_interface.clone()).await.unwrap();
+
+	return Ok(patcher_interface);
+}
+
+#[portable]
+pub enum PatcherInitializationError {
+	UnrecognizedData,
 }

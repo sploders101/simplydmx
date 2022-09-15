@@ -21,6 +21,12 @@ impl PatcherContext {
 			},
 		}
 	}
+	pub fn from_file(file: SharablePatcherState) -> Self {
+		return PatcherContext {
+			output_drivers: HashMap::new(),
+			sharable: file,
+		};
+	}
 }
 
 

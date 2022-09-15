@@ -13,6 +13,7 @@ use crate::{
 	plugins::{
 		patcher::driver_plugin_api::*,
 		output_dmx::driver_types::*,
+		saver::Savable,
 	},
 	utilities::serialized_data::SerializedData,
 };
@@ -31,6 +32,9 @@ pub struct E131DMXDriver(PluginContext, Arc::<RwLock::<E131State>>);
 impl E131DMXDriver {
 	pub async fn new(plugin_context: PluginContext) -> Self {
 		return E131DMXDriver(plugin_context.clone(), Arc::new(RwLock::new(E131State::new(initialize_controller(plugin_context).await))));
+	}
+	pub async fn from_file(plugin_context: PluginContext, file: E131DMXShowSave) -> Self {
+		return E131DMXDriver(plugin_context.clone(), Arc::new(RwLock::new(E131State::from_file(initialize_controller(plugin_context).await, file))));
 	}
 
 	async fn create_universe(self, int_id: Uuid, data: E131Universe) -> Result<(), &'static str> {
@@ -86,6 +90,21 @@ impl E131DMXDriver {
 		}
 	}
 
+}
+
+#[portable]
+pub struct E131DMXShowSave {
+	pub universes: HashMap<Uuid, E131Universe>,
+}
+
+#[async_trait]
+impl Savable for E131DMXDriver {
+	async fn save_data(&self) -> Result<Option<Vec<u8>>, String> {
+		let ctx = self.1.read().await;
+		return Ok(Some(E131DMXShowSave {
+			universes: ctx.universes.clone(),
+		}.serialize_cbor()?));
+	}
 }
 
 #[async_trait]

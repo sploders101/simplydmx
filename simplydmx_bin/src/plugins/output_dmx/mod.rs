@@ -14,10 +14,18 @@ use super::{
 };
 
 
-pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface, patcher_interface: PatcherInterface) -> DMXInterface {
+pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface, patcher_interface: PatcherInterface) -> Result<DMXInterface, DMXInitializationError> {
 
 	// Create plugin interface
-	let output_context = DMXInterface::new(plugin_context.clone());
+	let output_context = if let Ok(data) = saver.load_data(&"output-dmx".into()).await {
+		if let Some(data) = data {
+			DMXInterface::from_file(plugin_context.clone(), data)
+		} else {
+			DMXInterface::new(plugin_context.clone())
+		}
+	} else {
+		return Err(DMXInitializationError::UnrecognizedData);
+	};
 
 	patcher_interface.register_output_driver(output_context.clone()).await;
 
@@ -36,6 +44,13 @@ pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface, pa
 	plugin_context.register_service(true, services::LinkUniverse::new(output_context.clone())).await.unwrap();
 	plugin_context.register_service(true, services::UnlinkUniverse::new(output_context.clone())).await.unwrap();
 
-	return output_context;
+	saver.register_savable("output-dmx", output_context.clone()).await.unwrap();
 
+	return Ok(output_context);
+
+}
+
+#[portable]
+pub enum DMXInitializationError {
+	UnrecognizedData,
 }

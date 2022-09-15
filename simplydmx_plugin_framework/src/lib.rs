@@ -36,6 +36,7 @@ pub use event_emitter::{
 	DeclareEventError,
 	RegisterEncodedListenerError,
 	RegisterListenerError,
+	BidirectionalPortable,
 	PortableMessage,
 	PortableMessageDeserializer,
 };

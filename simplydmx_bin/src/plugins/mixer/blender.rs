@@ -85,7 +85,9 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<Mutex<MixerCo
 
 	// Spawn the blender task when its dependencies have been satisfied.
 	let plugin_context_blender = plugin_context.clone();
-	plugin_context.spawn_volatile("Blender", async move {
+	plugin_context.spawn_when_volatile("Blender", vec![
+		Dependency::flag("saver", "finished"),
+	], async move {
 		let mut patcher_data = patcher_interface.get_base_layer().await;
 		let mut shutting_down = false;
 		loop {

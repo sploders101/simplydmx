@@ -3,6 +3,7 @@ use async_std::sync::{
 	Arc,
 	RwLock,
 };
+use async_trait::async_trait;
 use futures::{
 	FutureExt,
 	future::join_all,
@@ -11,11 +12,14 @@ use simplydmx_plugin_framework::*;
 use uuid::Uuid;
 
 use crate::{
-	plugins::mixer::exported_types::{
-		FullMixerOutput,
-		FullMixerBlendingData,
-		BlendingData,
-		SnapData,
+	plugins::{
+		mixer::exported_types::{
+			FullMixerOutput,
+			FullMixerBlendingData,
+			BlendingData,
+			SnapData,
+		},
+		saver::Savable,
 	},
 	utilities::serialized_data::SerializedData,
 };
@@ -185,6 +189,14 @@ impl PatcherInterface {
 		return SharableStateWrapper::new(ctx);
 	}
 
+}
+
+#[async_trait]
+impl Savable for PatcherInterface {
+	async fn save_data(&self) -> Result<Option<Vec<u8>>, String> {
+		let ctx = self.1.read().await;
+		return Ok(Some(ctx.sharable.serialize_cbor()?));
+	}
 }
 
 fn get_max_value(channel_size: &ChannelSize) -> u16 {

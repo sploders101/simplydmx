@@ -1,41 +1,20 @@
 use std::{collections::HashMap, sync::Arc};
 
 use async_std::sync::RwLock;
+use async_trait::async_trait;
 pub use simplydmx_plugin_framework::*;
 
 use self::types::ShowFile;
 
 mod types;
+mod services;
 
 /// The trait that plugins should implement in order to save show data
-pub trait Savable<T: BidirectionalPortable>: Send + Sync + 'static {
-	fn save_data(&self) -> Result<Option<T>, String>;
+#[async_trait]
+pub trait Savable: Send + Sync + 'static {
+	async fn save_data(&self) -> Result<Option<Vec<u8>>, String>;
 }
 
-/// Internal serialization trait that takes an object implementing `Savable<dyn PortableMessage>` and adds APIs
-/// to serialize the result
-pub trait SavableInternal: Send + Sync + 'static {
-	fn save_data_cbor(&self) -> Result<Option<Vec<u8>>, String>;
-}
-impl<T: BidirectionalPortable> SavableInternal for dyn Savable<T> {
-	fn save_data_cbor(&self) -> Result<Option<Vec<u8>>, String> {
-		match self.save_data() {
-			Ok(result) => {
-				if let Some(result) = result {
-					match PortableMessage::serialize_cbor(&result) {
-						Ok(result) => {
-							return Ok(Some(result));
-						},
-						Err(error) => return Err(format!("{:?}", error)),
-					}
-				} else {
-					return Ok(None);
-				}
-			},
-			Err(error) => return Err(error),
-		}
-	}
-}
 
 /// Initialize the saver plugin, returning its interface.
 ///
@@ -47,8 +26,7 @@ pub async fn initialize(plugin_context: PluginContext, loaded_data: Option<Vec<u
 	).await.unwrap();
 
 	let loaded_data = if let Some(loaded_data) = loaded_data {
-
-		match ciborium::de::from_reader::<'_, HashMap<String, Vec<u8>>, &[u8]>(&loaded_data) {
+		match ciborium::de::from_reader::<'_, ShowFile, &[u8]>(&loaded_data) {
 			Ok(result) => Some(result),
 			Err(err) => return Err(format!("{:?}", err)),
 		}
@@ -56,18 +34,22 @@ pub async fn initialize(plugin_context: PluginContext, loaded_data: Option<Vec<u
 		None
 	};
 
-	return Ok(SaverInterface(plugin_context, Arc::new(RwLock::new(SaverData {
+	let saver_interface = SaverInterface(plugin_context.clone(), Arc::new(RwLock::new(SaverData {
 		status: SaverInitializationStatus::Initializing,
 		loaded_data,
 		savers: HashMap::new(),
-	}))));
+	})));
+
+	plugin_context.register_service(true, services::SaveShow::new(saver_interface.clone())).await.unwrap();
+
+	return Ok(saver_interface);
 }
 
 /// Internal data held and maintained by the saver plugin
 pub struct SaverData {
 	status: SaverInitializationStatus,
-	loaded_data: Option<HashMap<String, Vec<u8>>>,
-	savers: HashMap<String, Box<dyn SavableInternal>>,
+	loaded_data: Option<ShowFile>,
+	savers: HashMap<String, Box<dyn Savable>>,
 }
 
 /// The saver plugin's interface, used by other plugins to save and load data
@@ -77,7 +59,8 @@ pub struct SaverInterface(PluginContext, Arc<RwLock<SaverData>>);
 impl SaverInterface {
 
 	/// Registers a `Savable<T>` interface
-	pub async fn register_savable(&self, id: String, interface: impl SavableInternal + 'static) -> Result<(), RegisterSavableError> {
+	pub async fn register_savable(&self, id: impl Into<String>, interface: impl Savable) -> Result<(), RegisterSavableError> {
+		let id = id.into();
 		let mut ctx = self.1.write().await;
 
 		if ctx.savers.contains_key(&id) {
@@ -96,7 +79,7 @@ impl SaverInterface {
 		};
 
 		for (id, interface) in ctx.savers.iter() {
-			match interface.save_data_cbor() {
+			match interface.save_data().await {
 				Ok(saved_data) => {
 					if let Some(saved_data) = saved_data {
 						show_file.plugin_data.insert(String::clone(id), saved_data);
@@ -115,7 +98,7 @@ impl SaverInterface {
 	pub async fn load_data<T: BidirectionalPortable>(&self, id: &String) -> Result<Option<T>, String> {
 		let mut ctx = self.1.write().await;
 		if let Some(ref mut loaded_data) = ctx.loaded_data {
-			if let Some(encoded_data) = loaded_data.remove(id) {
+			if let Some(encoded_data) = loaded_data.plugin_data.remove(id) {
 				return match ciborium::de::from_reader::<'_, T, &[u8]>(&encoded_data) {
 					Ok(result) => Ok(Some(result)),
 					Err(error) => Err(format!("{:?}", error)),
@@ -129,7 +112,7 @@ impl SaverInterface {
 		let mut ctx = self.1.write().await;
 
 		if let Some(ref loaded_data) = ctx.loaded_data {
-			if loaded_data.len() > 0 {
+			if loaded_data.plugin_data.len() > 0 {
 				ctx.status = SaverInitializationStatus::FinishedUnsafe;
 			} else {
 				ctx.status = SaverInitializationStatus::FinishedSafe;
@@ -139,6 +122,7 @@ impl SaverInterface {
 		}
 
 		self.0.emit("saver.load_status".into(), FilterCriteria::None, ctx.status.clone()).await;
+		self.0.set_init_flag("finished".into()).await;
 
 		return ctx.status.clone();
 	}

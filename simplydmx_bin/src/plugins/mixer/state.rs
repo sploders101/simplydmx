@@ -61,6 +61,10 @@ impl MixerContext {
 
 		return mixer_context;
 	}
+
+	pub fn from_file(mixer_context: MixerContext) -> MixerContext {
+		return mixer_context;
+	}
 }
 
 /// A set of data used to compose groups of layers.

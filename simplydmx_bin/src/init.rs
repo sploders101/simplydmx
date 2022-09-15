@@ -7,6 +7,9 @@ use simplydmx_plugin_framework::PluginManager;
 // Public so the GUI plugin can run it
 pub async fn async_main(plugin_manager: PluginManager, data: Option<Vec<u8>>) {
 
+	// TODO: Error handling during init. This wasn't originally intended to be necessary,
+	// but since file loading re-starts plugins with untrusted data, it needs to be done.
+
 	let saver = plugins::saver::initialize(
 		plugin_manager.register_plugin(
 			"saver",
@@ -29,7 +32,7 @@ pub async fn async_main(plugin_manager: PluginManager, data: Option<Vec<u8>>) {
 			"SimplyDMX Fixture Patcher",
 		).await.unwrap(),
 		saver.clone(),
-	).await;
+	).await.unwrap();
 
 	plugins::mixer::initialize_mixer(
 		plugin_manager.register_plugin(
@@ -38,7 +41,7 @@ pub async fn async_main(plugin_manager: PluginManager, data: Option<Vec<u8>>) {
 		).await.unwrap(),
 		saver.clone(),
 		patcher_interface.clone(),
-	).await;
+	).await.unwrap();
 
 	#[cfg(feature = "output-dmx")]
 	let dmx_interface = plugins::output_dmx::initialize(
@@ -48,7 +51,7 @@ pub async fn async_main(plugin_manager: PluginManager, data: Option<Vec<u8>>) {
 		).await.unwrap(),
 		saver.clone(),
 		patcher_interface.clone(),
-	).await;
+	).await.unwrap();
 
 	#[cfg(feature = "output-dmx-e131")]
 	plugins::output_dmx_e131::initialize(
@@ -58,7 +61,7 @@ pub async fn async_main(plugin_manager: PluginManager, data: Option<Vec<u8>>) {
 		).await.unwrap(),
 		saver.clone(),
 		dmx_interface.clone(),
-	).await;
+	).await.unwrap();
 
 	let init_status = saver.finish_initialization().await;
 	if let SaverInitializationStatus::FinishedUnsafe = init_status {

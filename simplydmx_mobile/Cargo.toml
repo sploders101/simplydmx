@@ -1,5 +1,5 @@
 [package]
-name = "simplydmx"
+name = "simplydmx_mobile"
 version = "0.1.0"
 authors = ["Shaun Keys <mariobuddy@gmail.com>"]
 edition = "2018"
@@ -36,7 +36,7 @@ wry = { git = "https://github.com/tauri-apps/wry" }
 #wry = "0.13.3"
 
 [dependencies.simplydmx]
-path = "../rust/simplydmx_bin"
+path = "../simplydmx_bin"
 default-features = false # Mobile features should be opt-in due to lower compatability
 features = [
     "output-dmx-e131",

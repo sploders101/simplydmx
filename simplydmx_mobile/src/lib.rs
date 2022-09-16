@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate log;
-
 use std::fs::{
     canonicalize,
     read,
@@ -95,7 +92,7 @@ fn start_simplydmx(event_loop_proxy: EventLoopProxy<String>) -> Sender<String> {
     let manager = PluginManager::new();
     let plugin = block_on(manager.register_plugin("gui", "iPad Wry UI")).unwrap();
 
-    block_on(async_main(manager.clone()));
+    block_on(async_main(manager.clone(), None));
 
     let (request_sender, request_receiver) = channel::unbounded::<JSONCommand>();
     let (response_sender, response_receiver) = channel::unbounded::<JSONResponse>();

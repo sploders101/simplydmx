@@ -1,20 +1,9 @@
-use std::{
-	sync::Arc,
-	collections::HashMap,
-};
-use async_std::{
-	channel::Sender,
-	sync::Mutex,
-};
-
 use simplydmx_plugin_framework::*;
+use super::MixerInterface;
 use super::state::{
-	MixerContext,
 	Submaster,
-	LayerBin,
 	SubmasterDelta,
 };
-use super::blender::UpdateList;
 
 use uuid::Uuid;
 
@@ -29,40 +18,14 @@ use uuid::Uuid;
 	"Copies the default layer bin to a new one with 0 opacity, setting it as the new default.",
 )]
 impl EnterBlindMode {
-	#![inner_raw(PluginContext, Arc::<Mutex::<MixerContext>>)]
-
-	pub fn new(plugin_context: PluginContext, mixer_context: Arc::<Mutex::<MixerContext>>) -> Self {
-		return Self(plugin_context, mixer_context);
-	}
+	#![inner_raw(MixerInterface)]
+	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
 
 	#[service_main(
 		("Layer Bin ID", "The UUID for the old layer bin. Returns None/null if blind mode is already active.", "mixer::layer_bin_id"),
 	)]
 	async fn main(self) -> Option<Uuid> {
-
-		// Get resources
-		let mut ctx = self.1.lock().await;
-
-		if let Some(_) = ctx.transitional_layer_bin {
-			return None;
-		}
-
-		let new_uuid = Uuid::new_v4();
-
-		// Clone default bin and insert
-		let cloned_bin = LayerBin::clone(ctx.layer_bins.get(&ctx.default_layer_bin).unwrap());
-		ctx.layer_bins.insert(new_uuid, cloned_bin);
-		ctx.layer_bin_opacities.insert(new_uuid, 0);
-		ctx.layer_bin_order.push(new_uuid);
-
-		// Set new bin as default
-		let old_layer_bin = ctx.default_layer_bin;
-		ctx.default_layer_bin = new_uuid;
-		ctx.transitional_layer_bin = Some(old_layer_bin.clone());
-
-		// No blending needed as the opacity of all new data is zero.
-
-		return Some(old_layer_bin);
+		return self.0.enter_blind_mode().await;
 	}
 }
 
@@ -72,23 +35,14 @@ impl EnterBlindMode {
 	"Sets the opacity of the blind layer",
 )]
 impl SetBlindOpacity {
-	#![inner_raw(PluginContext, Arc::<Mutex::<MixerContext>>, Sender::<UpdateList>)]
-
-	pub fn new(plugin_context: PluginContext, mixer_context: Arc::<Mutex::<MixerContext>>, update_sender: Sender<UpdateList>) -> Self {
-		return Self(plugin_context, mixer_context, update_sender);
-	}
+	#![inner_raw(MixerInterface)]
+	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
 
 	#[service_main(
 		("Opacity", "The desired opacity of the layer bin"),
 	)]
 	async fn main(self, opacity: u16) {
-		let mut ctx = self.1.lock().await;
-		if ctx.transitional_layer_bin.is_some() {
-			let uuid = ctx.default_layer_bin;
-			ctx.layer_bin_opacities.insert(uuid, opacity);
-			// Sender can only fail if we are shutting down, in which case we don't care if this fails
-			self.2.send(UpdateList::LayerBin).await.ok();
-		}
+		return self.0.set_blind_opacity(opacity).await;
 	}
 }
 
@@ -98,26 +52,14 @@ impl SetBlindOpacity {
 	"Gets the opacity of the blind layer",
 )]
 impl GetBlindOpacity {
-	#![inner_raw(PluginContext, Arc::<Mutex::<MixerContext>>)]
-
-	pub fn new(plugin_context: PluginContext, mixer_context: Arc::<Mutex::<MixerContext>>) -> Self {
-		return Self(plugin_context, mixer_context);
-	}
+	#![inner_raw(MixerInterface)]
+	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
 
 	#[service_main(
 		("Blind Opacity", "The opacity of the blind layer bin. This will be None or null if blind mode is inactive"),
 	)]
 	async fn main(self) -> Option<u16> {
-		let ctx = self.1.lock().await;
-		if ctx.transitional_layer_bin.is_some() {
-			if let Some(opacity) = ctx.layer_bin_opacities.get(&ctx.default_layer_bin) {
-				return Some(u16::clone(opacity));
-			} else {
-				return None;
-			}
-		} else {
-			return None;
-		}
+		return self.0.get_blind_opacity().await;
 	}
 }
 
@@ -127,27 +69,12 @@ impl GetBlindOpacity {
 	"Reverts all changes made in blind mode. Changes are made instantly. Use `set_blind_opacity` to fade.",
 )]
 impl RevertBlind {
-	#![inner_raw(PluginContext, Arc::<Mutex::<MixerContext>>, Sender::<UpdateList>)]
-
-	pub fn new(plugin_context: PluginContext, mixer_context: Arc::<Mutex::<MixerContext>>, update_sender: Sender<UpdateList>) -> Self {
-		return Self(plugin_context, mixer_context, update_sender);
-	}
+	#![inner_raw(MixerInterface)]
+	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
 
 	#[service_main()]
 	async fn main(self) {
-		// Get resources
-		let mut ctx = self.1.lock().await;
-
-		// Delete layer bin and set transitional as default
-		if let Some(old_bin) = ctx.transitional_layer_bin {
-			let blind_bin = ctx.default_layer_bin;
-			ctx.layer_bins.remove(&blind_bin);
-			ctx.layer_bin_order.retain(|&x| x != blind_bin);
-			ctx.default_layer_bin = old_bin;
-			ctx.transitional_layer_bin = None;
-			ctx.layer_bin_opacities.insert(old_bin, u16::MAX);
-			self.2.send(UpdateList::LayerBin).await.ok();
-		}
+		return self.0.revert_blind().await;
 	}
 }
 
@@ -158,26 +85,12 @@ impl RevertBlind {
 	"Commits all changes made in blind mode, deleting the previous look. Changes are made instantly. Use `set_blind_opacity` to fade.",
 )]
 impl CommitBlind {
-	#![inner_raw(PluginContext, Arc::<Mutex::<MixerContext>>, Sender::<UpdateList>)]
-
-	pub fn new(plugin_context: PluginContext, mixer_context: Arc::<Mutex::<MixerContext>>, update_sender: Sender<UpdateList>) -> Self {
-		return Self(plugin_context, mixer_context, update_sender);
-	}
+	#![inner_raw(MixerInterface)]
+	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
 
 	#[service_main()]
 	async fn main(self) {
-		// Get resources
-		let mut ctx = self.1.lock().await;
-
-		// Delete transitional layer bin
-		if let Some(old_bin) = ctx.transitional_layer_bin {
-			let blind_bin = ctx.default_layer_bin;
-			ctx.layer_bins.remove(&old_bin);
-			ctx.layer_bin_order.retain(|&x| x != old_bin);
-			ctx.transitional_layer_bin = None;
-			ctx.layer_bin_opacities.insert(blind_bin, u16::MAX);
-			self.2.send(UpdateList::LayerBin).await.ok();
-		}
+		return self.0.commit_blind().await;
 	}
 }
 
@@ -192,29 +105,14 @@ impl CommitBlind {
 	"Creates a new submaster that can be used for blending",
 )]
 impl CreateLayer {
-
-	#![inner_raw(PluginContext, Arc::<Mutex::<MixerContext>>)]
-
-	pub fn new(plugin_context: PluginContext, mixer_context: Arc::<Mutex::<MixerContext>>) -> Self {
-		return Self(plugin_context, mixer_context);
-	}
+	#![inner_raw(MixerInterface)]
+	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
 
 	#[service_main(
 		("Submaster ID", "UUID value that should be used from this point forward to identify the submaster", "mixer::layer_id"),
 	)]
 	async fn main(self) -> Uuid {
-		let uuid = Uuid::new_v4();
-		#[cfg(feature = "verbose-debugging")]
-		println!("Aquiring lock in create_layer");
-		let mut context = self.1.lock().await;
-
-		context.submasters.insert(uuid, Submaster {
-			data: HashMap::new(),
-		});
-
-		#[cfg(feature = "verbose-debugging")]
-		println!("Dropping lock in create_layer");
-		return uuid;
+		return self.0.create_layer().await;
 	}
 }
 
@@ -224,57 +122,16 @@ impl CreateLayer {
 	"Adds or removes content in a layer",
 )]
 impl SetLayerContents {
-	#![inner_raw(PluginContext, Arc::<Mutex::<MixerContext>>, Sender::<UpdateList>)]
-
-	pub fn new(plugin_context: PluginContext, mixer_context: Arc::<Mutex::<MixerContext>>, update_sender: Sender<UpdateList>) -> Self {
-		return Self(plugin_context, mixer_context, update_sender);
-	}
+	#![inner_raw(MixerInterface)]
+	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
 
 	#[service_main(
 		("Submaster ID", "UUID value to identify the submaster", "mixer::layer_id"),
 		("Submaster Delta", "Collection of values to merge with the existing submaster data"),
 		("Success", "Boolean indicating whether or not the set was successful"),
 	)]
-	async fn main(self, uuid: Uuid, submaster_delta: SubmasterDelta) -> bool {
-		#[cfg(feature = "verbose-debugging")]
-		println!("Aquiring lock in set_layer_contents");
-		let mut ctx = self.1.lock().await;
-
-		// Check if the specified submaster exists
-		if let Some(submaster) = ctx.submasters.get_mut(&uuid) {
-			// Loop through fixtures in the delta
-			for (fixture_id, fixture_data) in submaster_delta.iter() {
-
-				// If fixture doesn't exist in the submaster, create it, then get the mutable data
-				if !submaster.data.contains_key(fixture_id) {
-					submaster.data.insert(fixture_id.clone(), HashMap::new());
-				}
-				let current_fixture_data = submaster.data.get_mut(fixture_id).unwrap();
-
-				// Loop through attributes in the delta
-				for (attribute_id, attribute_value) in fixture_data.iter() {
-
-					if let Some(attribute_value) = attribute_value {
-						current_fixture_data.insert(attribute_id.clone(), attribute_value.clone());
-					} else {
-						current_fixture_data.remove(attribute_id);
-					}
-
-				}
-
-				// TODO: ST: Emit `mixer.submaster_content`
-				// TODO: LT: Remove unused fixture maps so we don't loop through them unnecessarily
-
-			}
-			self.2.send(UpdateList::Submaster(uuid)).await.ok();
-			#[cfg(feature = "verbose-debugging")]
-			println!("Dropping lock in set_layer_contents");
-			return true;
-		} else {
-			#[cfg(feature = "verbose-debugging")]
-			println!("Dropping lock in set_layer_contents");
-			return false;
-		}
+	async fn main(self, submaster_id: Uuid, submaster_delta: SubmasterDelta) -> bool {
+		return self.0.set_layer_contents(submaster_id, submaster_delta).await;
 	}
 }
 
@@ -284,23 +141,15 @@ impl SetLayerContents {
 	"Retrieves the contents of a layer",
 )]
 impl GetLayerContents {
-	#![inner_raw(PluginContext, Arc::<Mutex::<MixerContext>>)]
-
-	pub fn new(plugin_context: PluginContext, mixer_context: Arc::<Mutex::<MixerContext>>) -> Self {
-		return Self(plugin_context, mixer_context);
-	}
+	#![inner_raw(MixerInterface)]
+	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
 
 	#[service_main(
 		("Submaster ID", "The UUID that identifies the submaster in question", "mixer::layer_id"),
 		("Submaster Data", "The submaster's visible contents"),
 	)]
-	async fn main(self, uuid: Uuid) -> Option::<Submaster> {
-		let ctx = self.1.lock().await;
-		// TODO: ST: Maybe use Arc instead of cloning?
-		return match ctx.submasters.get(&uuid) {
-			Some(submaster) => Some(submaster.clone()),
-			None => None,
-		}
+	async fn main(self, submaster_id: Uuid) -> Option::<Submaster> {
+		return self.0.get_layer_contents(submaster_id).await;
 	}
 }
 
@@ -310,11 +159,8 @@ impl GetLayerContents {
 	"Sets the opacity of a layer (Optionally within a specific bin)",
 )]
 impl SetLayerOpacity {
-	#![inner_raw(PluginContext, Arc::<Mutex::<MixerContext>>, Sender::<UpdateList>)]
-
-	pub fn new(plugin_context: PluginContext, mixer_context: Arc::<Mutex::<MixerContext>>, update_sender: Sender<UpdateList>) -> Self {
-		return Self(plugin_context, mixer_context, update_sender);
-	}
+	#![inner_raw(MixerInterface)]
+	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
 
 	#[service_main(
 		("Submaster ID", "The UUID that identifies the submaster to be changed", "mixer::layer_id"),
@@ -323,33 +169,8 @@ impl SetLayerOpacity {
 		("Layer Bin", "ID of the desired layer bin to make the change on. Default is used if not provided."),
 		("Success", "A boolean indicating if the opacity setting was successfully applied."),
 	)]
-	async fn main(self, uuid: Uuid, opacity: u16, auto_insert: bool, layer_bin_id: Option::<Uuid>) -> bool {
-		#[cfg(feature = "verbose-debugging")]
-		println!("Aquiring lock in set_layer_opacity");
-		let mut ctx = self.1.lock().await;
-		let default_layer_bin = ctx.default_layer_bin;
-		if let Some(layer_bin) = ctx.layer_bins.get_mut(&layer_bin_id.unwrap_or(default_layer_bin)) {
-			if auto_insert {
-				if opacity > 0 && !layer_bin.layer_order.contains(&uuid) {
-					layer_bin.layer_order.push(uuid.clone());
-				} else if opacity == 0 && layer_bin.layer_order.contains(&uuid) {
-					layer_bin.layer_order.retain(|x| *x != uuid);
-				}
-			}
-			layer_bin.layer_opacities.insert(uuid, opacity);
-			if opacity == 0 && auto_insert {
-				self.2.send(UpdateList::All).await.ok();
-			} else {
-				self.2.send(UpdateList::Submaster(uuid)).await.ok();
-			}
-			#[cfg(feature = "verbose-debugging")]
-			println!("Dopping lock in set_layer_opacity");
-			return true;
-		} else {
-			#[cfg(feature = "verbose-debugging")]
-			println!("Dopping lock in set_layer_opacity");
-			return false;
-		}
+	async fn main(self, submaster_id: Uuid, opacity: u16, auto_insert: bool, layer_bin_id: Option::<Uuid>) -> bool {
+		return self.0.set_layer_opacity(submaster_id, opacity, auto_insert, layer_bin_id).await;
 	}
 }
 
@@ -359,32 +180,16 @@ impl SetLayerOpacity {
 	"Gets the opacity of a layer (Optionally within a specific bin)",
 )]
 impl GetLayerOpacity {
-	#![inner_raw(PluginContext, Arc::<Mutex::<MixerContext>>)]
-
-	pub fn new(plugin_context: PluginContext, mixer_context: Arc::<Mutex::<MixerContext>>) -> Self {
-		return Self(plugin_context, mixer_context);
-	}
+	#![inner_raw(MixerInterface)]
+	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
 
 	#[service_main(
 		("Submaster ID", "The UUID that identifies the submaster to be changed", "mixer::layer_id"),
 		("Layer Bin ID", "The UUID of the layer bin you would like to query. If None/null, the default bin will be used."),
 		("Layer Opacity", "The opacity if the layer from 0 to 65535. None or null if the submaster is not currently in the stack. (effective 0)"),
 	)]
-	async fn main(self, uuid: Uuid, layer_bin_id: Option::<Uuid>) -> Option::<u16> {
-		let ctx = self.1.lock().await;
-		if let Some(layer_bin) = ctx.layer_bins.get(&layer_bin_id.unwrap_or(ctx.default_layer_bin)) {
-			if layer_bin.layer_order.contains(&uuid) {
-				if let Some(opacity) = layer_bin.layer_opacities.get(&uuid) {
-					return Some(opacity.clone());
-				} else {
-					return None;
-				}
-			} else {
-				return None;
-			}
-		} else {
-			return None;
-		}
+	async fn main(self, submaster_id: Uuid, layer_bin_id: Option::<Uuid>) -> Option::<u16> {
+		return self.0.get_layer_opacity(submaster_id, layer_bin_id).await;
 	}
 }
 
@@ -394,30 +199,14 @@ impl GetLayerOpacity {
 	"Deletes a layer from the registry",
 )]
 impl DeleteLayer {
-	#![inner_raw(PluginContext, Arc::<Mutex::<MixerContext>>, Sender::<UpdateList>)]
-
-	pub fn new(plugin_context: PluginContext, mixer_context: Arc::<Mutex::<MixerContext>>, update_sender: Sender<UpdateList>) -> Self {
-		return Self(plugin_context, mixer_context, update_sender);
-	}
+	#![inner_raw(MixerInterface)]
+	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
 
 	#[service_main(
 		("Submaster ID", "The ID of the submaster you would like to delete", "mixer::layer_id"),
 		("Existed", "Whether or not the layer existed"),
 	)]
-	async fn main(self, uuid: Uuid) -> bool {
-		let mut ctx = self.1.lock().await;
-
-		// Remove submaster
-		let was_removed = ctx.submasters.remove(&uuid).is_some();
-
-		// Remove references
-		for layer_bin in ctx.layer_bins.values_mut() {
-			layer_bin.layer_order.retain(|x| x != &uuid);
-			layer_bin.layer_opacities.remove(&uuid);
-		}
-
-		// Signal to update everything and return
-		self.2.send(UpdateList::All).await.ok();
-		return was_removed;
+	async fn main(self, submaster_id: Uuid) -> bool {
+		return self.0.delete_layer(submaster_id).await;
 	}
 }

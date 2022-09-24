@@ -39,6 +39,14 @@ default = [
 	"tauri/custom-protocol",
 ]
 
+dev = [
+	"stdout-logging",
+	"output-dmx-e131",
+	"blender",
+	"blender-benchmark",
+	"gui"
+]
+
 verbose-debugging = [
 	"simplydmx_plugin_framework/shutdown-debug",
 ]

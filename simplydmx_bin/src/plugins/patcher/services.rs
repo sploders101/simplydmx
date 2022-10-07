@@ -4,7 +4,14 @@ use crate::utilities::serialized_data::SerializedData;
 
 use super::{
 	PatcherInterface,
-	driver_plugin_api::FixtureBundle, interface::{ImportFixtureError, CreateFixtureError},
+	driver_plugin_api::{
+		FixtureBundle,
+		SharablePatcherState,
+	},
+	interface::{
+		ImportFixtureError,
+		CreateFixtureError,
+	},
 };
 
 #[interpolate_service(
@@ -50,6 +57,27 @@ impl CreateFixture {
 	)]
 	async fn main(self, fixture_type: Uuid, personality: String, name: Option::<String>, comments: Option::<String>, form_data: SerializedData) -> Result<Uuid, CreateFixtureError> {
 		return self.0.create_fixture(fixture_type, personality, name, comments, form_data).await;
+	}
+
+}
+
+#[interpolate_service(
+	"get_patcher_state",
+	"Get Patcher State",
+	"Retrieves the current state of the patcher, with libraries, registered fixtures, etc.",
+)]
+impl GetPatcherState {
+
+	#![inner_raw(PatcherInterface)]
+
+	pub fn new(patcher_interface: PatcherInterface) -> Self { Self(patcher_interface) }
+
+	#[service_main(
+		("Patcher State", "The sharable state of the patcher"),
+	)]
+	async fn main(self) -> SharablePatcherState {
+		let state = self.0.get_sharable_state().await;
+		return SharablePatcherState::clone(&state);
 	}
 
 }

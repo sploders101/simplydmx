@@ -35,7 +35,8 @@ use super::{
 		self,
 		OutputDriver,
 		SharableStateWrapper,
-		FixtureBundle, FixtureInstance,
+		FixtureBundle,
+		FixtureInstance,
 	},
 };
 

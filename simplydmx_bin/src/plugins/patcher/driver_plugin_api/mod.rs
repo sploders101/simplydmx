@@ -5,7 +5,7 @@ pub use uuid::Uuid;
 use crate::{
 	impl_deserialize_err,
 	utilities::serialized_data::SerializedData,
-	plugins::mixer::exported_types::FullMixerOutput,
+	mixer_utils::state::FullMixerOutput,
 };
 pub use crate::utilities::forms::FormDescriptor;
 

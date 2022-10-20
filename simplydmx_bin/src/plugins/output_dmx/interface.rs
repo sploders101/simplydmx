@@ -17,11 +17,11 @@ use simplydmx_plugin_framework::*;
 use crate::{
 	plugins::{
 		patcher::driver_plugin_api::*,
-		mixer::exported_types::{
-			FullMixerOutput,
-			FixtureMixerOutput,
-		},
 		saver::Savable,
+	},
+	mixer_utils::state::{
+		FullMixerOutput,
+		FixtureMixerOutput,
 	},
 	utilities::serialized_data::SerializedData,
 };

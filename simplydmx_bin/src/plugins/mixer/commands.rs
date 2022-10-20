@@ -1,8 +1,8 @@
 use simplydmx_plugin_framework::*;
 use super::MixerInterface;
-use super::state::{
-	Submaster,
-	SubmasterDelta,
+use crate::mixer_utils::{
+	state::SubmasterData,
+	static_layer::StaticLayer,
 };
 
 use uuid::Uuid;
@@ -22,9 +22,8 @@ impl EnterBlindMode {
 	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
 
 	#[service_main(
-		("Layer Bin ID", "The UUID for the old layer bin. Returns None/null if blind mode is already active.", "mixer::layer_bin_id"),
 	)]
-	async fn main(self) -> Option<Uuid> {
+	async fn main(self) -> () {
 		return self.0.enter_blind_mode().await;
 	}
 }
@@ -127,10 +126,10 @@ impl SetLayerContents {
 
 	#[service_main(
 		("Submaster ID", "UUID value to identify the submaster", "mixer::layer_id"),
-		("Submaster Delta", "Collection of values to merge with the existing submaster data"),
+		("Submaster Data", "Collection of values to merge with the existing submaster data"),
 		("Success", "Boolean indicating whether or not the set was successful"),
 	)]
-	async fn main(self, submaster_id: Uuid, submaster_delta: SubmasterDelta) -> bool {
+	async fn main(self, submaster_id: Uuid, submaster_delta: SubmasterData) -> bool {
 		return self.0.set_layer_contents(submaster_id, submaster_delta).await;
 	}
 }
@@ -148,7 +147,7 @@ impl GetLayerContents {
 		("Submaster ID", "The UUID that identifies the submaster in question", "mixer::layer_id"),
 		("Submaster Data", "The submaster's visible contents"),
 	)]
-	async fn main(self, submaster_id: Uuid) -> Option::<Submaster> {
+	async fn main(self, submaster_id: Uuid) -> Option::<StaticLayer> {
 		return self.0.get_layer_contents(submaster_id).await;
 	}
 }
@@ -166,11 +165,10 @@ impl SetLayerOpacity {
 		("Submaster ID", "The UUID that identifies the submaster to be changed", "mixer::layer_id"),
 		("Opacity", "The desired opacity, from 0 to 65535"),
 		("Automatic insertion", "Automatically insert if necessary when opacity > 0, and remove when opacity == 0"),
-		("Layer Bin", "ID of the desired layer bin to make the change on. Default is used if not provided."),
 		("Success", "A boolean indicating if the opacity setting was successfully applied."),
 	)]
-	async fn main(self, submaster_id: Uuid, opacity: u16, auto_insert: bool, layer_bin_id: Option::<Uuid>) -> bool {
-		return self.0.set_layer_opacity(submaster_id, opacity, auto_insert, layer_bin_id).await;
+	async fn main(self, submaster_id: Uuid, opacity: u16, auto_insert: bool) -> bool {
+		return self.0.set_layer_opacity(submaster_id, opacity, auto_insert).await;
 	}
 }
 
@@ -185,11 +183,10 @@ impl GetLayerOpacity {
 
 	#[service_main(
 		("Submaster ID", "The UUID that identifies the submaster to be changed", "mixer::layer_id"),
-		("Layer Bin ID", "The UUID of the layer bin you would like to query. If None/null, the default bin will be used."),
 		("Layer Opacity", "The opacity if the layer from 0 to 65535. None or null if the submaster is not currently in the stack. (effective 0)"),
 	)]
-	async fn main(self, submaster_id: Uuid, layer_bin_id: Option::<Uuid>) -> Option::<u16> {
-		return self.0.get_layer_opacity(submaster_id, layer_bin_id).await;
+	async fn main(self, submaster_id: Uuid) -> Option::<u16> {
+		return self.0.get_layer_opacity(submaster_id).await;
 	}
 }
 

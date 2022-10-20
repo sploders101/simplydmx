@@ -5,6 +5,7 @@
 
 pub mod plugins;
 pub mod api_utilities;
+pub mod mixer_utils;
 pub mod utilities;
 pub mod init;
 

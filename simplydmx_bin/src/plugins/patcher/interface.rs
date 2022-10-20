@@ -12,13 +12,13 @@ use simplydmx_plugin_framework::*;
 use uuid::Uuid;
 
 use crate::{
+	mixer_utils::state::{
+		FullMixerOutput,
+		FullMixerBlendingData,
+		BlendingData,
+		SnapData,
+	},
 	plugins::{
-		mixer::exported_types::{
-			FullMixerOutput,
-			FullMixerBlendingData,
-			BlendingData,
-			SnapData,
-		},
 		saver::Savable,
 	},
 	utilities::serialized_data::SerializedData,

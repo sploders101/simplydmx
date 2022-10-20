@@ -1,12 +1,12 @@
 use simplydmx_plugin_framework::*;
 use uuid::Uuid;
 use crate::{
-	plugins::mixer::exported_types::SnapData,
+	mixer_utils::state::SnapData,
 	utilities::serialized_data::SerializedData,
 };
 use std::collections::HashMap;
 
-use crate::plugins::mixer::exported_types::BlendingScheme;
+use crate::mixer_utils::state::BlendingScheme;
 
 #[portable]
 pub struct FixtureBundle {

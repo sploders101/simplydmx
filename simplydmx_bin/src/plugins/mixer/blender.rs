@@ -56,7 +56,7 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<RwLock<MixerC
 					let start = Instant::now();
 
 					// Indicates that a layer in the stack is an animation and should hold the blender active
-					let animated = false;
+					let mut animated = false;
 
 					// Unlock context
 					let ctx = ctx.read().await;
@@ -70,12 +70,18 @@ pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<RwLock<MixerC
 						if let Some(opacity) = ctx.default_context.layer_opacities.get(layer_id) {
 							if *opacity == 0 { continue } // Skip if opacity is 0
 							if let Some(layer) = ctx.default_context.user_submasters.get(layer_id) {
+								if layer.animated() {
+									animated = true;
+								}
 								layer.blend(&mut cumulative_layer, &locked_data_sources, *opacity).await;
 							}
 						}
 					}
 					#[cfg(feature = "blender-benchmark")]
 					println!("Blender took {:?}", start_bench.elapsed());
+
+					let result = Arc::new(cumulative_layer);
+					patcher_interface.write_values(Arc::clone(&result)).await;
 
 					drop(ctx);
 

@@ -10,7 +10,7 @@ use super::{
 	data_sources::LayerDataSourcesLocked,
 };
 
-pub async fn blend_layer(cumulative_layer: &mut FullMixerOutput, data_sources: &LayerDataSourcesLocked, opacity: u16, submaster: &SubmasterData) {
+pub fn blend_layer(cumulative_layer: &mut FullMixerOutput, data_sources: &LayerDataSourcesLocked, opacity: u16, submaster: &SubmasterData) {
 	let blending_data = data_sources.blending_data();
 
 	// For each light within the submaster

@@ -31,6 +31,6 @@ impl Default for StaticLayer {
 impl MixerLayer for StaticLayer {
 	fn animated(&self) -> bool { false }
 	async fn blend(&self, cumulative_layer: &mut FullMixerOutput, data_sources: &LayerDataSourcesLocked, opacity: u16) {
-		blend_layer(cumulative_layer, data_sources, opacity, &self.values).await;
+		blend_layer(cumulative_layer, data_sources, opacity, &self.values);
 	}
 }

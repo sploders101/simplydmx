@@ -65,16 +65,16 @@ impl ApplicationState {
 
 
 #[tauri::command]
-async fn sdmx(state: tauri::State<'_, Arc<RwLock<Option<ApplicationState>>>>, message: JSONCommand) -> Result<(), &'static str> {
+async fn sdmx(state: tauri::State<'_, Arc<RwLock<Option<ApplicationState>>>>, message: String) -> Result<(), String> {
 	if let Some(ref app_state) = *state.read().await {
-		match app_state.api_sender.send(message).await {
+		match app_state.api_sender.send(serde_json::from_str(&message).map_err(|err| err.to_string())?).await {
 			Ok(_) => { return Ok(()); },
 			Err(_) => {
-				return Err("Could not communicate with SimplyDMX API.");
+				return Err("Could not communicate with SimplyDMX API.".into());
 			},
 		};
 	} else {
-		return Err("SimplyDMX not finished initializing");
+		return Err("SimplyDMX not finished initializing".into());
 	}
 }
 

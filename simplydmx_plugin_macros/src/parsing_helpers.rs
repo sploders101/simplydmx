@@ -3,18 +3,18 @@ use quote::{
 	quote,
 };
 use syn::{
-    punctuated::Punctuated,
-    Expr,
-    Token,
-    Lit,
-    LitStr,
+	punctuated::Punctuated,
+	Expr,
+	Token,
+	Lit,
+	LitStr,
 	Type,
 };
 
 pub fn get_comma_delimited_strings(input: &Punctuated<Expr, Token![,]>, error_msg: &str) -> Vec<LitStr> {
-    let mut strings = Vec::new();
+	let mut strings = Vec::new();
 
-    for string in input.iter() {
+	for string in input.iter() {
 		if let Expr::Lit(string) = string {
 			if let Lit::Str(ref string) = string.lit {
 				strings.push(LitStr::clone(string));
@@ -26,7 +26,7 @@ pub fn get_comma_delimited_strings(input: &Punctuated<Expr, Token![,]>, error_ms
 		}
 	}
 
-    return strings;
+	return strings;
 }
 
 pub fn get_typedoc(in_type: Type) -> Box<dyn ToTokens> {

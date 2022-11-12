@@ -16,8 +16,7 @@ pub use services::{
 		CallServiceError,
 		CallServiceRPCError,
 		ServiceArgument,
-		ServiceArgumentModifiers,
-		ServiceDataTypes,
+		ServiceArgumentOwned,
 	},
 	type_specifiers::{
 		TypeSpecifier,

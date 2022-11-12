@@ -17,7 +17,7 @@ use super::{
 pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface, patcher_interface: PatcherInterface) -> Result<DMXInterface, DMXInitializationError> {
 
 	// Create plugin interface
-	let output_context = if let Ok(data) = saver.load_data(&"output-dmx".into()).await {
+	let output_context = if let Ok(data) = saver.load_data(&"output_dmx".into()).await {
 		if let Some(data) = data {
 			DMXInterface::from_file(plugin_context.clone(), data)
 		} else {
@@ -44,7 +44,7 @@ pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface, pa
 	plugin_context.register_service(true, services::LinkUniverse::new(output_context.clone())).await.unwrap();
 	plugin_context.register_service(true, services::UnlinkUniverse::new(output_context.clone())).await.unwrap();
 
-	saver.register_savable("output-dmx", output_context.clone()).await.unwrap();
+	saver.register_savable("output_dmx", output_context.clone()).await.unwrap();
 
 	return Ok(output_context);
 

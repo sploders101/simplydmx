@@ -1,24 +1,65 @@
 use proc_macro::TokenStream;
 use quote::{
-	ToTokens,
+	ToTokens, quote,
 };
 use std::collections::HashSet;
-use proc_macro2::{Delimiter, TokenTree};
+use proc_macro2::{Delimiter, TokenTree, Ident, Span};
 use syn::{
 	punctuated::Punctuated,
 	parse::Parser,
 };
 
+
 pub fn portable_object(_attr: TokenStream, body: TokenStream) -> TokenStream {
-	if let Ok(mut input) = syn::parse::<syn::ItemStruct>(body.clone()) {
+	let (modified_body, ident): (proc_macro2::TokenStream, Ident) = if let Ok(mut input) = syn::parse::<syn::ItemStruct>(body.clone()) {
 		if let Some(error) = edit_attributes(&mut input.attrs) { return error; }
-		return input.into_token_stream().into();
+		let ident = input.ident.clone();
+		(input.into_token_stream().into(), ident)
 	} else if let Ok(mut input) = syn::parse::<syn::ItemEnum>(body.clone()) {
 		if let Some(error) = edit_attributes(&mut input.attrs) { return error; }
-		return input.into_token_stream().into();
+		let ident = input.ident.clone();
+		(input.into_token_stream().into(), ident)
+	} else if let Ok(input) = syn::parse::<syn::ItemType>(body.clone()) {
+		// These items cannot implement traits since they are just aliases, so create a transparent struct to implement on
+		let ident = input.ident.clone();
+		let ident_str = ident.to_string();
+		let generics = input.generics.clone();
+		let alias_value = input.ty.clone();
+		let body = input.into_token_stream();
+		let portable_ident = Ident::new(&format!("PORTABLETYPE__{}", &ident_str), Span::call_site());
+		let portable_ident_hidden = Ident::new(&format!("PORTABLETYPE__WRAPPER__{}", &ident_str), Span::call_site());
+
+		return quote! {
+			#body
+
+			// Add the value of the alias here
+			#[cfg(feature = "export-services")]
+			#[allow(nonstandard_style)]
+			#[derive(tsify::Tsify)]
+			#[serde(transparent)]
+			#[serde(rename = #ident_str)]
+			struct #portable_ident_hidden #generics (#alias_value);
+
+			#[cfg(feature = "export-services")]
+			#[allow(nonstandard_style)]
+			#[linkme::distributed_slice(crate::init::exporter::PORTABLETYPE)]
+			static #portable_ident: (&'static str, &'static str) = (#ident_str, <#portable_ident_hidden as tsify::Tsify>::DECL);
+		}.into();
 	} else {
 		panic!("Data type not recognized");
-	}
+	};
+
+	let ident_str = ident.to_string();
+	let portable_ident = Ident::new(&format!("PORTABLETYPE__{}", &ident_str), Span::call_site());
+
+	return quote! {
+		#modified_body
+
+		#[cfg(feature = "export-services")]
+		#[allow(nonstandard_style)]
+		#[linkme::distributed_slice(crate::init::exporter::PORTABLETYPE)]
+		static #portable_ident: (&'static str, &'static str) = (#ident_str, <#ident as tsify::Tsify>::DECL);
+	}.into();
 }
 
 fn edit_attributes(attrs: &mut Vec<syn::Attribute>) -> Option<TokenStream> {
@@ -53,6 +94,8 @@ fn edit_attributes(attrs: &mut Vec<syn::Attribute>) -> Option<TokenStream> {
 	}
 
 	all_derived_traits.extend([
+		#[cfg(feature = "tsify")]
+		syn::parse_quote!(tsify::Tsify),
 		syn::parse_quote!(Debug),
 		syn::parse_quote!(Clone),
 		syn::parse_quote!(serde::Serialize),
@@ -63,6 +106,9 @@ fn edit_attributes(attrs: &mut Vec<syn::Attribute>) -> Option<TokenStream> {
 	attrs.insert(0, syn::parse_quote! {
 		#[derive( #(#all_derived_traits),* )]
 	});
+
+	#[cfg(feature = "tsify-wasm-abi")]
+	attrs.insert(1, syn::parse_quote!{#[tsify(into_wasm_abi, from_wasm_abi)]});
 
 	return None;
 }

@@ -13,7 +13,7 @@ pub struct ServiceArgument<'a> {
 	pub id: &'a str,
 	pub name: &'a str,
 	pub description: &'a str,
-	pub val_type: ServiceArgumentModifiers<'a>,
+	pub val_type: &'a str,
 
 	/// Type ID identifying more specific information about the value. For example, the following could be
 	/// used to identify that a string uuid representing a fixture should be provided.
@@ -21,29 +21,28 @@ pub struct ServiceArgument<'a> {
 	/// `Some(String::from("fixture-uid"))`
 	///
 	/// This can be used to provide auto-completion and inference in UI-driven configuration tools.
-	pub val_type_id: Option<&'a str>,
+	pub val_type_hint: Option<&'a str>,
 }
 
 #[portable]
-#[serde(tag = "modifier", content = "value")]
-pub enum ServiceArgumentModifiers<'a> {
-	Required(ServiceDataTypes),
-	Optional(ServiceDataTypes),
-	Vector(ServiceDataTypes),
-	Custom(&'a str),
+#[derive(Hash)]
+pub struct ServiceArgumentOwned {
+	pub id: String,
+	pub name: String,
+	pub description: String,
+	pub val_type: String,
+	pub val_type_hint: Option<String>,
 }
-
-#[portable]
-#[serde(tag = "type")]
-/// Describes a data type used by a service.
-pub enum ServiceDataTypes {
-	U8,
-	U16,
-	U32,
-	I8,
-	I16,
-	I32,
-	String,
+impl From<ServiceArgument<'_>> for ServiceArgumentOwned {
+	fn from(arg: ServiceArgument<'_>) -> Self {
+		ServiceArgumentOwned {
+			id: String::from(arg.id),
+			name: String::from(arg.name),
+			description: String::from(arg.description),
+			val_type: String::from(arg.val_type),
+			val_type_hint: if let Some(hint) = arg.val_type_hint { Some(String::from(hint)) } else { None },
+		}
+	}
 }
 
 #[portable]

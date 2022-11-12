@@ -14,7 +14,7 @@ use simplydmx_plugin_framework::*;
 
 pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface, dmx_interface: DMXInterface) -> Result<E131DMXDriver, E131InitializationError> {
 	// Create E131 context
-	let interface = if let Ok(data) = saver.load_data(&"output-dmx-e131".into()).await {
+	let interface = if let Ok(data) = saver.load_data(&"output_dmx_e131".into()).await {
 		if let Some(data) = data {
 			E131DMXDriver::from_file(plugin_context, data).await
 		} else {
@@ -26,7 +26,7 @@ pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface, dm
 
 	dmx_interface.register_dmx_driver(interface.clone()).await;
 
-	saver.register_savable("output-dmx-e131", interface.clone()).await.unwrap();
+	saver.register_savable("output_dmx_e131", interface.clone()).await.unwrap();
 
 	return Ok(interface);
 }

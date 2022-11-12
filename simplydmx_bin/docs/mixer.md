@@ -7,10 +7,8 @@ into coherent looks that can be output to the lights.
 
 ## Architecture
 
-The architecture of the mixer is made of three main parts: submasters, layers, and layer bins.
-Submasters provide the values for each fragment of the show. Layers specify which submasters are
-used at which opacity, and layer bins are complete, flattened looks made up of layers that get
-blended together to allow transitions to occur for things like blind mode.
+The architecture of the mixer is made of three main parts: submasters, layers, and mixing contexts.
+A mixing context can be used recursively within a layer, but the mixer only handles the master context.
 
 
 ## Submasters

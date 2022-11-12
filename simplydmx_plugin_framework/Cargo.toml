@@ -16,7 +16,12 @@ serde_json = "1.0.72"
 ciborium = "0.2.0"
 uuid = { version = "1.1.2", features = ["v4", "serde"] }
 simplydmx_plugin_macros = { path = "../simplydmx_plugin_macros" }
+tsify = { version = "0.4.2", default-features = false, optional = true }
 
 [features]
 
 shutdown-debug = []
+tsify = [
+	"dep:tsify",
+	"simplydmx_plugin_macros/tsify",
+]

@@ -32,7 +32,7 @@ impl ApplicationState {
 		let plugin = manager.register_plugin("gui", "Tauri UI").await.unwrap();
 
 		// Boot up SimplyDMX
-		async_main(manager.clone(), file).await;
+		async_main(&manager, file).await;
 
 		// API Setup
 		let (request_sender, request_receiver) = channel::unbounded();

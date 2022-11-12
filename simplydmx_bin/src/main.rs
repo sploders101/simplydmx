@@ -13,7 +13,16 @@ use async_std::task;
 
 fn main() {
 
+	#[cfg(all(feature = "export-services", feature = "gui"))]
+	compile_error!("export-services cannot be used with an application runtime. Please remove the runtime feature (eg. `gui`) or use `--no-default-features`");
+
+	#[cfg(all(feature = "export-services", not(debug_assertions)))]
+	compile_error!("export-services cannot be used in release mode. The lack of a runtime means that not all types are included in release mode since they don't get used.");
+
 	#[cfg(feature = "gui")]
 	task::block_on(plugins::gui::initialize());
+
+	#[cfg(feature = "export-services")]
+	init::exporter::rpc_coverage();
 
 }

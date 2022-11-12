@@ -37,6 +37,7 @@ use crate::{
 	services::{
 		internals::{
 			Service,
+			ServiceArgumentOwned,
 		},
 		type_specifiers::{
 			TypeSpecifier,
@@ -101,6 +102,20 @@ impl PluginManager {
 		S: Into<String>
 	{
 		return PluginContext::new(&self.0, id.into(), name.into()).await;
+	}
+
+	/// List Services (TODO: Remove duplicate code)
+	pub async fn list_services(&self) -> Vec<ServiceDescription> {
+		let mut service_list = Vec::new();
+
+		let discoverable_services = self.0.discoverable_services.read().await;
+		for plugin in discoverable_services.values() {
+			for service in plugin.values() {
+				service_list.push(service.clone());
+			}
+		}
+
+		return service_list;
 	}
 
 	pub async fn shutdown(&self) {
@@ -206,6 +221,9 @@ impl PluginContext {
 		let id = String::from(service.get_id());
 		let name = String::from(service.get_name());
 		let description = String::from(service.get_description());
+		let signature = service.get_signature();
+		let arguments = signature.0.iter().map(|arg| ServiceArgumentOwned::from(arg.clone())).collect();
+		let returns = if let Some(ret) = signature.1 { Some(ServiceArgumentOwned::from(ret.clone())) } else { None };
 
 		// Register service
 		let mut self_services = self.1.services.write().await;
@@ -224,6 +242,8 @@ impl PluginContext {
 					id: String::clone(&id),
 					name,
 					description,
+					arguments,
+					returns,
 				});
 		}
 
@@ -578,6 +598,8 @@ pub struct ServiceDescription {
 	pub id: String,
 	pub name: String,
 	pub description: String,
+	pub arguments: Vec<ServiceArgumentOwned>,
+	pub returns: Option<ServiceArgumentOwned>,
 }
 
 #[portable]

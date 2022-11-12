@@ -19,10 +19,7 @@ use syn::{
 	ImplItemMethod,
 };
 
-use super::parsing_helpers::{
-	get_comma_delimited_strings,
-	get_typedoc,
-};
+use super::parsing_helpers::get_comma_delimited_strings;
 
 static ARGERR: &str = "interpolate_service expects comma-separated list of description strings or (\"name\", \"description\", \"type-id\") tuples.";
 
@@ -267,7 +264,9 @@ fn interpolate_service_main(outer_type: Type, attr: TokenStream, body: ImplItemM
 				let desc_elements = get_comma_delimited_strings(&description.elems, ARGERR);
 				let name = desc_elements.get(0).expect("Couldn't find human-readable name");
 				let description = desc_elements.get(1).expect("Couldn't find the description");
-				let val_type = get_typedoc(Type::clone(internal_argument_types.get(i).as_ref().expect("Couldn't find the internal argument type")));
+				// let val_type = Type::clone(internal_argument_types.get(i).as_ref().expect("Couldn't find the internal argument type")).into_token_stream().to_string();
+				let val_type = Type::clone(internal_argument_types.get(i).as_ref().expect("Couldn't find the internal argument type"));
+				let val_type_str = val_type.to_token_stream().to_string();
 				let type_id: Box<dyn ToTokens> = if let Some(type_id) = desc_elements.get(2) { Box::new(quote!{Some(#type_id)}) } else { Box::new(quote!{None}) };
 				// let type_id: Box<dyn ToTokens> = Box::new(desc_elements.get(2).unwrap_or(quote!{None}));
 				input_tokens.push(Box::new(quote! {
@@ -275,8 +274,20 @@ fn interpolate_service_main(outer_type: Type, attr: TokenStream, body: ImplItemM
 						id: #id,
 						name: #name,
 						description: #description,
-						val_type: #val_type,
-						val_type_id: #type_id,
+						#[cfg(feature = "export-services")]
+						val_type: {
+							// Add the value of the alias here
+							#[allow(nonstandard_style)]
+							#[derive(tsify::Tsify)]
+							#[serde(transparent)]
+							struct FunctionArgument (#val_type);
+							// This is not ideal. We want to use DECL[31..], but the compiler doesn't realize it's a static value
+							// and throws an error. For some reason Box::leak doesn't work either.
+							<FunctionArgument as tsify::Tsify>::DECL
+						},
+						#[cfg(not(feature = "export-services"))]
+						val_type: #val_type_str,
+						val_type_hint: #type_id,
 					}
 				}));
 			} else {

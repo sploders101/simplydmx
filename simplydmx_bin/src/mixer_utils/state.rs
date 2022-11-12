@@ -3,10 +3,12 @@ use simplydmx_plugin_framework::*;
 use uuid::Uuid;
 
 /// Represents the data within a submaster used for blending
+#[portable]
 pub type SubmasterData = HashMap<Uuid, AbstractLayerLight>;
 
 /// Represents the abstract data for a single light in a layer.
 /// A value's binary may be masked if the output is u8 (integer overflow cast)
+#[portable]
 pub type AbstractLayerLight = HashMap<String, BlenderValue>;
 
 /// Value to be used in a submaster with instructions for mixing it into the result

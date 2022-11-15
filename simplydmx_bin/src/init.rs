@@ -147,8 +147,13 @@ pub mod exporter {
 
 		let mut rpc_modules = String::new();
 
-		for (plugin_id, services) in plugin_services {
+		let mut sorted_plugin_ids = plugin_services.keys().cloned().collect::<Vec<String>>();
+		sorted_plugin_ids.sort();
+		for plugin_id in sorted_plugin_ids {
+			let mut services = plugin_services.remove(&plugin_id).unwrap();
 			rpc_modules += &format!("\nexport const {} = {{\n", &plugin_id);
+
+			services.sort_by(|a, b| a.id.cmp(&b.id));
 			for service in services {
 				let mut service_args_with_types = Vec::<String>::new();
 				let mut service_args_no_types = Vec::<String>::new();

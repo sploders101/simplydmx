@@ -179,7 +179,7 @@ pub mod exporter {
 		}
 
 		let mut rpc_ts = File::create("./frontend/src/scripts/api/ipc/rpc.ts").unwrap();
-		rpc_ts.write_all(format!("import {{ callService }} from \"./agnostic_abstractions\";\n\n\n// {} types registered\n\n{}\n\n{}\n", types.len(), &types.into_iter().map(|ty| format!("// {}\n{}", ty.0, ty.1)).collect::<Vec<String>>().join("\n\n"), &rpc_modules).as_bytes()).unwrap();
+		rpc_ts.write_all(format!("import {{ callService }} from \"./agnostic_abstractions\";\n\n\n{}\n\n{}\n", &types.into_iter().map(|ty| format!("// {}\n{}", ty.0, ty.1)).collect::<Vec<String>>().join("\n\n"), &rpc_modules).as_bytes()).unwrap();
 		println!("Types have been exported");
 
 	}

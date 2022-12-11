@@ -26,6 +26,12 @@ pub enum JSONCommand {
 		message_id: u32,
 	},
 
+	// Options provider
+	GetOptions {
+		message_id: u32,
+		provider_id: String,
+	},
+
 	// Events
 	SendEvent {
 		name: String,
@@ -55,6 +61,11 @@ pub enum JSONResponse {
 	ServiceList {
 		message_id: u32,
 		list: Vec<ServiceDescription>,
+	},
+
+	OptionsList {
+		message_id: u32,
+		list: Result<Vec<DropdownOptionJSON>, TypeSpecifierRetrievalError>,
 	},
 
 	CallServiceError {
@@ -153,6 +164,14 @@ async fn handle_command(plugin_context: PluginContext, command: JSONCommand, jug
 					list: plugin_context.list_services().await,
 				}).await.ok();
 			},
+
+			JSONCommand::GetOptions { message_id, provider_id } => {
+				sender.send(JSONResponse::OptionsList {
+					message_id,
+					list: plugin_context.get_service_type_options_json(&provider_id).await,
+				}).await.ok();
+			},
+
 			JSONCommand::SendEvent { name, criteria, data } => {
 				plugin_context.emit_json(name, criteria.unwrap_or(FilterCriteria::None), data).await;
 			},

@@ -540,10 +540,10 @@ impl PluginContext {
 	/// `exclusive`: Whether or not the user should be allowed to type in their own values
 	///
 	/// `options`: The options themselves
-	pub async fn get_service_type_options(&self, type_id: &str) -> Result<(bool, Vec<DropdownOptionNative>), TypeSpecifierRetrievalError> {
+	pub async fn get_service_type_options(&self, type_id: &str) -> Result<Vec<DropdownOptionNative>, TypeSpecifierRetrievalError> {
 		let type_specifiers = self.0.type_specifiers.read().await;
 		if let Some(specifier) = type_specifiers.get(type_id) {
-			return Ok((specifier.is_exclusive(), specifier.get_options()));
+			return Ok(specifier.get_options());
 		} else {
 			return Err(TypeSpecifierRetrievalError::SpecifierNotFound);
 		}
@@ -558,10 +558,10 @@ impl PluginContext {
 	/// `exclusive`: Whether or not the user should be allowed to type in their own values
 	///
 	/// `options`: The options themselves
-	pub async fn get_service_type_options_json(&self, type_id: &str) -> Result<(bool, Vec<DropdownOptionJSON>), TypeSpecifierRetrievalError> {
+	pub async fn get_service_type_options_json(&self, type_id: &str) -> Result<Vec<DropdownOptionJSON>, TypeSpecifierRetrievalError> {
 		let type_specifiers = self.0.type_specifiers.read().await;
 		if let Some(specifier) = type_specifiers.get(type_id) {
-			return Ok((specifier.is_exclusive(), specifier.get_options_json()));
+			return Ok(specifier.get_options_json());
 		} else {
 			return Err(TypeSpecifierRetrievalError::SpecifierNotFound);
 		}

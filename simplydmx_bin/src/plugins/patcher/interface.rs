@@ -147,6 +147,7 @@ impl PatcherInterface {
 					return Err(CreateFixtureError::ErrorFromController(controller_error));
 				} else {
 					// Controller successfully loaded protocol-specific details
+					ctx.sharable.fixture_order.push(instance_uuid.clone());
 					ctx.sharable.fixtures.insert(instance_uuid.clone(), FixtureInstance {
 						id: instance_uuid.clone(),
 						fixture_id: fixture_type,

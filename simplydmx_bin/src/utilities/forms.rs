@@ -14,11 +14,25 @@ impl FormDescriptor {
 		return self;
 	}
 
-	/// Creates a dropdown
-	///
-	/// Options can be sourced from either statically-inserted values or a TypeSpec source
-	pub fn dropdown(mut self, label: impl Into<String>, id: impl Into<String>, options: FormItemOptionSource) -> Self {
-		self.0.push(FormItem::Dropdown(FormDropdown { label: label.into(), id: id.into(), item_source: options }));
+	/// Creates a number input
+	pub fn number(mut self, label: impl Into<String>, id: impl Into<String>) -> Self {
+		self.0.push(FormItem::Number(FormNumber { label: label.into(), id: id.into() }));
+		return self;
+	}
+
+	/// Creates a dropdown with static options
+	pub fn dropdown_static(mut self, label: impl Into<String>, id: impl Into<String>, options: impl Fn(OptionsBuilder) -> OptionsBuilder) -> Self {
+		self.0.push(FormItem::Dropdown(FormDropdown { label: label.into(), id: id.into(), item_source: options(OptionsBuilder(Vec::new())).into() }));
+		return self;
+	}
+
+	/// Creates a dropdown with options sourced from a provider registered in the plugin framework
+	pub fn dropdown_dynamic(mut self, label: impl Into<String>, id: impl Into<String>, typespec_id: impl Into<String>) -> Self {
+		self.0.push(FormItem::Dropdown(FormDropdown {
+			label: label.into(),
+			id: id.into(),
+			item_source: FormItemOptionSource::TypeSpec { typespec_id: typespec_id.into() },
+		}));
 		return self;
 	}
 
@@ -77,6 +91,7 @@ impl FormDescriptor {
 #[portable]
 pub enum FormItem {
 	Textbox(FormTextbox),
+	Number(FormNumber),
 	Dropdown(FormDropdown),
 	Section(FormSection),
 	VerticalStack(Vec<FormItem>),
@@ -91,6 +106,12 @@ pub struct FormSection {
 
 #[portable]
 pub struct FormTextbox {
+	label: String,
+	id: String,
+}
+
+#[portable]
+pub struct FormNumber {
 	label: String,
 	id: String,
 }
@@ -119,4 +140,22 @@ pub enum FormItemOptionSource {
 		typespec_id: String
 	},
 
+}
+
+pub struct OptionsBuilder(Vec<DropdownOptionJSON>);
+impl OptionsBuilder {
+	pub fn add_item(mut self, name: impl Into<String>, value: impl Into<String>) {
+		self.0.push(DropdownOptionJSON {
+			name: name.into(),
+			description: None,
+			value: value.into().serialize_json().unwrap(),
+		});
+	}
+}
+impl Into<FormItemOptionSource> for OptionsBuilder {
+	fn into(self) -> FormItemOptionSource {
+		return FormItemOptionSource::Static {
+			values: self.0,
+		};
+	}
 }

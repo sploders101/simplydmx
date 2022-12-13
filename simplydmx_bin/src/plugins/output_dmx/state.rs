@@ -52,5 +52,6 @@ pub struct DMXFixtureInstance {
 #[portable]
 pub struct UniverseInstance {
 	pub id: Uuid,
+	pub name: String,
 	pub controller: Option<String>,
 }

@@ -4,6 +4,7 @@ pub mod fixture_types;
 pub mod state;
 pub mod services;
 
+use async_trait::async_trait;
 use simplydmx_plugin_framework::*;
 
 use self::interface::DMXInterface;
@@ -44,6 +45,8 @@ pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface, pa
 	plugin_context.register_service(true, services::LinkUniverse::new(output_context.clone())).await.unwrap();
 	plugin_context.register_service(true, services::UnlinkUniverse::new(output_context.clone())).await.unwrap();
 
+	plugin_context.register_service_type_specifier("universes".into(), UniverseTypeSpecifier::new(output_context.clone())).await.unwrap();
+
 	saver.register_savable("output_dmx", output_context.clone()).await.unwrap();
 
 	return Ok(output_context);
@@ -53,4 +56,26 @@ pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface, pa
 #[portable]
 pub enum DMXInitializationError {
 	UnrecognizedData,
+}
+
+pub struct UniverseTypeSpecifier(DMXInterface);
+impl UniverseTypeSpecifier {
+	fn new(interface: DMXInterface) -> Self { return Self(interface); }
+}
+#[async_trait]
+impl TypeSpecifier for UniverseTypeSpecifier {
+	async fn get_options(&self) -> Vec<DropdownOptionNative> {
+		return self.0.list_universes().await.into_iter().map(|(id, name)| DropdownOptionNative {
+			name,
+			description: None,
+			value: Box::new(id),
+		}).collect();
+	}
+	async fn get_options_json(&self) -> Vec<DropdownOptionJSON> {
+		return self.0.list_universes().await.into_iter().map(|(id, name)| DropdownOptionJSON {
+			name,
+			description: None,
+			value: id.serialize_json().unwrap(),
+		}).collect();
+	}
 }

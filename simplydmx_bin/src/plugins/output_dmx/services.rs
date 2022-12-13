@@ -15,10 +15,11 @@ impl CreateUniverse {
 	pub fn new(interface: DMXInterface) -> Self { Self(interface) }
 
 	#[service_main(
+		("Name", "An arbitrary name to give the new universe"),
 		("New universe ID", "Returns the UUID of the new universe", "DMX::universe-id"),
 	)]
-	async fn main(self) -> Uuid {
-		return self.0.create_universe().await;
+	async fn main(self, name: String) -> Uuid {
+		return self.0.create_universe(name).await;
 	}
 }
 

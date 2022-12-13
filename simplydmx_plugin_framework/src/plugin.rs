@@ -543,7 +543,7 @@ impl PluginContext {
 	pub async fn get_service_type_options(&self, type_id: &str) -> Result<Vec<DropdownOptionNative>, TypeSpecifierRetrievalError> {
 		let type_specifiers = self.0.type_specifiers.read().await;
 		if let Some(specifier) = type_specifiers.get(type_id) {
-			return Ok(specifier.get_options());
+			return Ok(specifier.get_options().await);
 		} else {
 			return Err(TypeSpecifierRetrievalError::SpecifierNotFound);
 		}
@@ -561,7 +561,7 @@ impl PluginContext {
 	pub async fn get_service_type_options_json(&self, type_id: &str) -> Result<Vec<DropdownOptionJSON>, TypeSpecifierRetrievalError> {
 		let type_specifiers = self.0.type_specifiers.read().await;
 		if let Some(specifier) = type_specifiers.get(type_id) {
-			return Ok(specifier.get_options_json());
+			return Ok(specifier.get_options_json().await);
 		} else {
 			return Err(TypeSpecifierRetrievalError::SpecifierNotFound);
 		}

@@ -68,7 +68,7 @@ pub trait OutputDriver: Send + Sync + 'static {
 	async fn remove_fixture_instance(&self, id: &Uuid);
 
 	/// Gets a copy of the edit form for the plugin in its current state
-	async fn get_edit_form(&self) -> FormDescriptor;
+	async fn get_edit_form(&self, instance_id: &Uuid) -> FormDescriptor;
 
 	/// Edits an instance of a fixture based on data from the form returned in `get_edit_form`
 	async fn edit_fixture_instance(&self, id: &Uuid, form: SerializedData) -> Result<(), EditError>;

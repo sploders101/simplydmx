@@ -57,11 +57,12 @@ impl DMXInterface {
 	}
 
 	/// Creates a new universe
-	pub async fn create_universe(&self) -> Uuid {
+	pub async fn create_universe(&self, name: String) -> Uuid {
 		let mut ctx = self.1.write().await;
 		let new_id = Uuid::new_v4();
 		ctx.universes.insert(new_id.clone(), UniverseInstance {
 			id: new_id.clone(),
+			name,
 			controller: None,
 		});
 		return new_id;
@@ -130,6 +131,11 @@ impl DMXInterface {
 		}
 	}
 
+	pub async fn list_universes(&self) -> Vec<(Uuid, String)> {
+		let ctx = self.1.write().await;
+		return ctx.universes.values().map(|universe| (universe.id.clone(), universe.name.clone())).collect();
+	}
+
 }
 
 #[portable]
@@ -171,6 +177,7 @@ impl OutputDriver for DMXInterface {
 
 	// Fixture library imports/exports
 
+	/// Takes a `Uuid` and a `DMXFixtureData` instance serialized as `SerializedData`
 	async fn import_fixture(&self, id: &Uuid, data: SerializedData) -> Result<(), ImportError> {
 		let mut ctx = self.1.write().await;
 		ctx.library.insert(id.clone(), data.deserialize()?);
@@ -209,8 +216,9 @@ impl OutputDriver for DMXInterface {
 	// Fixture creation/removal
 
 	async fn get_creation_form(&self) -> FormDescriptor {
-		// TODO
-		return FormDescriptor::new();
+		return FormDescriptor::new()
+			.dropdown_dynamic("Universe", "universe", "universes")
+			.number("DMX Offset", "offset");
 	}
 
 	async fn create_fixture_instance(&self, id: &Uuid, form: SerializedData) -> Result<(), CreateInstanceError> {
@@ -226,8 +234,7 @@ impl OutputDriver for DMXInterface {
 
 
 	// Fixture editing
-
-	async fn get_edit_form(&self) -> FormDescriptor {
+	async fn get_edit_form(&self, instance_id: &Uuid) -> FormDescriptor {
 		// TODO
 		return FormDescriptor::new();
 	}

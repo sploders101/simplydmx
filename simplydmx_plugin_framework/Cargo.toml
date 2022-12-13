@@ -17,6 +17,7 @@ ciborium = "0.2.0"
 uuid = { version = "1.1.2", features = ["v4", "serde"] }
 simplydmx_plugin_macros = { path = "../simplydmx_plugin_macros" }
 tsify = { version = "0.4.2", default-features = false, optional = true }
+async-trait = "0.1.59"
 
 [features]
 

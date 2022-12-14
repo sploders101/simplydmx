@@ -79,6 +79,8 @@ pub mod exporter {
 		ServiceDescription,
 		FilterCriteria,
 		ServiceArgumentOwned,
+		DropdownOptionJSON,
+		TypeSpecifierRetrievalError,
 	};
 	use tsify::Tsify;
 	use std::{
@@ -90,7 +92,7 @@ pub mod exporter {
 	use linkme::distributed_slice;
 
 	#[distributed_slice]
-	pub static PORTABLETYPE: [(&'static str, &'static str)] = [..];
+	pub static PORTABLETYPE: [(&'static str, &'static str, &'static Option<&'static str>)] = [..];
 
 
 	pub fn rpc_coverage() {
@@ -102,14 +104,16 @@ pub mod exporter {
 		block_on(super::async_main(&plugin_manager, None));
 
 		// Sort types to enable deterministic exports for git tracking
-		let mut types: Vec<(&'static str, &'static str)> = vec![
-			("Uuid", "export type Uuid = string;"),
-			("Value", "export type Value = any;"),
-			("FilterCriteria", FilterCriteria::DECL),
-			("ServiceDescription", ServiceDescription::DECL),
-			("ServiceArgumentOwned", ServiceArgumentOwned::DECL),
+		let mut types: Vec<(&'static str, &'static str, &'static Option<&'static str>)> = vec![
+			("Uuid", "export type Uuid = string;", &Some(r#"/** Unique identifier used in various parts of the API. In TS, UUID does not have its own data type, so this just re-exports string. */"#)),
+			("Value", "export type Value = any;", &Some(r#"/** Represents Rust's `serde_json::Value` type. This is used for dynamic typing, like when using backend-defined forms. */"#)),
+			("FilterCriteria", FilterCriteria::DECL, &Some(r#"/** Represents criteria used to filter an event. For example, a submaster UUID could be used to filter submaster updates by that specific submaster */"#)),
+			("ServiceDescription", ServiceDescription::DECL, &Some(r#"/** Describes a service that can be called from an external API */"#)),
+			("ServiceArgumentOwned", ServiceArgumentOwned::DECL, &Some(r#"/** Describes an argument that must be passed to a service call */"#)),
+			("DropdownOptionJSON", DropdownOptionJSON::DECL, &Some(r#"/** Describes a value to be shown in a dropdown list */"#)),
+			("TypeSpecifierRetrievalError", TypeSpecifierRetrievalError::DECL, &Some(r#"/** Describes an error that occurred while retrieving items for a dropdown list */"#)),
 		];
-		types.append(&mut PORTABLETYPE.into_iter().cloned().collect::<Vec::<(&'static str, &'static str)>>());
+		types.append(&mut PORTABLETYPE.into_iter().cloned().collect::<Vec::<(&'static str, &'static str, &'static Option<&'static str>)>>());
 		types.sort_by(|a, b| {
 			if a.0 > b.0 {
 				return Ordering::Greater;
@@ -179,7 +183,13 @@ pub mod exporter {
 		}
 
 		let mut rpc_ts = File::create("./frontend/src/scripts/api/ipc/rpc.ts").unwrap();
-		rpc_ts.write_all(format!("import {{ callService }} from \"./agnostic_abstractions\";\n\n\n{}\n\n{}\n", &types.into_iter().map(|ty| format!("// {}\n{}", ty.0, ty.1)).collect::<Vec<String>>().join("\n\n"), &rpc_modules).as_bytes()).unwrap();
+		rpc_ts.write_all(format!("import {{ callService }} from \"./agnostic_abstractions\";\n\n\n{}\n\n{}\n", &types.into_iter().map(|ty| {
+			if let Some(docs) = ty.2 {
+				format!("{}\n{}", docs, ty.1)
+			} else {
+				format!("/** This type is currently undocumented. I will be working to resolve this for all types in the near future. */\n{}", ty.1)
+			}
+		}).collect::<Vec<String>>().join("\n\n"), &rpc_modules).as_bytes()).unwrap();
 		println!("Types have been exported");
 
 	}

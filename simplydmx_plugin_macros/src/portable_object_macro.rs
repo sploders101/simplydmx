@@ -7,24 +7,58 @@ use proc_macro2::{Delimiter, TokenTree, Ident, Span};
 use syn::{
 	punctuated::Punctuated,
 	parse::Parser,
+	Attribute,
+	Meta,
+	Lit,
 };
 
 
+fn get_ts_docs(attributes: &Vec<Attribute>) -> proc_macro2::TokenStream {
+	let doc_lines: Vec<String> = attributes.iter().filter_map(|attr| {
+		if attr.path.segments[0].ident == "doc" {
+			let meta = attr.parse_meta();
+			return match meta {
+				Ok(meta) => match meta {
+					Meta::NameValue(meta) => match meta.lit {
+						Lit::Str(meta) => Some(String::from(" * ") + meta.value().trim()),
+						_ => Some(String::from(" *")),
+					},
+					_ => Some(String::from(" *")),
+				},
+				Err(_) => Some(String::from(" *")),
+			};
+		} else {
+			return None;
+		}
+	}).collect();
+
+	if doc_lines.len() == 0 {
+		return quote!{&None};
+	} else {
+		let formatted_body = String::from("/**\n") + &doc_lines.join("\n") + "\n */";
+		return quote! {&Some(#formatted_body)};
+	}
+}
+
+
 pub fn portable_object(_attr: TokenStream, body: TokenStream) -> TokenStream {
-	let (modified_body, ident): (proc_macro2::TokenStream, Ident) = if let Ok(mut input) = syn::parse::<syn::ItemStruct>(body.clone()) {
+	let (modified_body, ident, docs): (proc_macro2::TokenStream, Ident, proc_macro2::TokenStream) = if let Ok(mut input) = syn::parse::<syn::ItemStruct>(body.clone()) {
 		if let Some(error) = edit_attributes(&mut input.attrs) { return error; }
 		let ident = input.ident.clone();
-		(input.into_token_stream().into(), ident)
+		let docs = get_ts_docs(&input.attrs);
+		(input.into_token_stream().into(), ident, docs)
 	} else if let Ok(mut input) = syn::parse::<syn::ItemEnum>(body.clone()) {
 		if let Some(error) = edit_attributes(&mut input.attrs) { return error; }
 		let ident = input.ident.clone();
-		(input.into_token_stream().into(), ident)
+		let docs = get_ts_docs(&input.attrs);
+		(input.into_token_stream().into(), ident, docs)
 	} else if let Ok(input) = syn::parse::<syn::ItemType>(body.clone()) {
 		// These items cannot implement traits since they are just aliases, so create a transparent struct to implement on
 		let ident = input.ident.clone();
 		let ident_str = ident.to_string();
 		let generics = input.generics.clone();
 		let alias_value = input.ty.clone();
+		let docs = get_ts_docs(&input.attrs);
 		let body = input.into_token_stream();
 		let portable_ident = Ident::new(&format!("PORTABLETYPE__{}", &ident_str), Span::call_site());
 		let portable_ident_hidden = Ident::new(&format!("PORTABLETYPE__WRAPPER__{}", &ident_str), Span::call_site());
@@ -43,7 +77,7 @@ pub fn portable_object(_attr: TokenStream, body: TokenStream) -> TokenStream {
 			#[cfg(feature = "export-services")]
 			#[allow(nonstandard_style)]
 			#[linkme::distributed_slice(crate::init::exporter::PORTABLETYPE)]
-			static #portable_ident: (&'static str, &'static str) = (#ident_str, <#portable_ident_hidden as tsify::Tsify>::DECL);
+			static #portable_ident: (&'static str, &'static str, &'static Option<&'static str>) = (#ident_str, <#portable_ident_hidden as tsify::Tsify>::DECL, #docs);
 		}.into();
 	} else {
 		panic!("Data type not recognized");
@@ -58,7 +92,7 @@ pub fn portable_object(_attr: TokenStream, body: TokenStream) -> TokenStream {
 		#[cfg(feature = "export-services")]
 		#[allow(nonstandard_style)]
 		#[linkme::distributed_slice(crate::init::exporter::PORTABLETYPE)]
-		static #portable_ident: (&'static str, &'static str) = (#ident_str, <#ident as tsify::Tsify>::DECL);
+		static #portable_ident: (&'static str, &'static str, &'static Option<&'static str>) = (#ident_str, <#ident as tsify::Tsify>::DECL, #docs);
 	}.into();
 }
 

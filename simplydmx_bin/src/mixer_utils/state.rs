@@ -60,6 +60,9 @@ pub enum BlendingScheme {
 
 #[portable]
 #[serde(tag = "type", content = "data")]
+/// This indicates if a value should snap to a new value. This is useful for things like gobos, where
+/// intermediate values don't blend, and can instead cause distraction by rapidly switching between noticably
+/// discrete states.
 pub enum SnapData {
 
 	/// Do not snap values. Output without transforming
@@ -71,6 +74,9 @@ pub enum SnapData {
 }
 
 #[portable]
+/// This contains data that indicates how a channel should be blended.
+///
+/// It is provided by the fixture description to tweak the properties of a layer's blending function.
 pub struct BlendingData {
 
 	/// Indicates how the value should be blended

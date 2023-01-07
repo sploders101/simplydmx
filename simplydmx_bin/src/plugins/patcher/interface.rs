@@ -239,12 +239,14 @@ fn get_min_value_segments(segments: &[Segment]) -> u16 {
 }
 
 #[portable]
+/// An error that could occur when importing a fixture definition
 pub enum ImportFixtureError {
 	UnknownController,
 	ErrorFromController(driver_plugin_api::ImportError),
 }
 
 #[portable]
+/// An error that could occur when creating a fixture
 pub enum CreateFixtureError {
 	FixtureTypeMissing,
 	ControllerMissing,

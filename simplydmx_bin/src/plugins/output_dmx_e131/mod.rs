@@ -32,6 +32,7 @@ pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface, dm
 }
 
 #[portable]
+/// An error that could occur while initializing the E131 plugin
 pub enum E131InitializationError {
 	UnrecognizedData,
 }

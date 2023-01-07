@@ -305,6 +305,7 @@ impl Savable for MixerInterface {
 
 #[portable]
 #[derive(Debug)]
+/// An error that could occur while initializing the mixer plugin
 pub enum MixerInitializationError {
 	UnrecognizedData,
 }

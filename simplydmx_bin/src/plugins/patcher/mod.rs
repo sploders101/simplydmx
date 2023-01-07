@@ -56,6 +56,7 @@ pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface) ->
 }
 
 #[portable]
+/// An error that could occur while initializing the patcher plugin
 pub enum PatcherInitializationError {
 	UnrecognizedData,
 }

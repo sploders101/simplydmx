@@ -90,6 +90,7 @@ pub trait OutputDriver: Send + Sync + 'static {
 
 #[portable]
 #[serde(tag = "type")]
+/// A generic error originating from an OutputDriver interface when importing a fixture definition
 pub enum ImportError {
 	InvalidData,
 	Other(String),
@@ -99,6 +100,7 @@ impl_deserialize_err!(ImportError, Self::InvalidData);
 
 #[portable]
 #[serde(tag = "type")]
+/// A generic error originating from an OutputDriver interface when creating a fixture instance
 pub enum CreateInstanceError {
 	InvalidData,
 	Other(String),
@@ -108,6 +110,7 @@ impl_deserialize_err!(CreateInstanceError, Self::InvalidData);
 
 #[portable]
 #[serde(tag = "type")]
+/// A generic error originating from an OutputDriver interface when editing an existing fixture instance
 pub enum EditError {
 	InvalidData,
 	Other(String),

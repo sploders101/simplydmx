@@ -44,12 +44,14 @@ impl DMXState {
 }
 
 #[portable]
+/// This holds DMX-specific information about a fixture instance
 pub struct DMXFixtureInstance {
 	pub universe: Option<Uuid>,
 	pub offset: Option<u16>,
 }
 
 #[portable]
+/// This represents a DMX universe instance
 pub struct UniverseInstance {
 	pub id: Uuid,
 	pub name: String,

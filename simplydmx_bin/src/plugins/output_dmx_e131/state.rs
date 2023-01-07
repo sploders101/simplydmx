@@ -33,6 +33,7 @@ impl E131State {
 }
 
 #[portable]
+/// E131-specific DMX universe data
 pub struct E131Universe {
 	pub external_universe: u16,
 }

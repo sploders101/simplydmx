@@ -2,6 +2,7 @@ use simplydmx_plugin_framework::*;
 
 #[portable]
 #[serde(transparent)]
+/// Describes a form-style UI using a frontend-agnostic generic data structure
 pub struct FormDescriptor(Vec<FormItem>);
 impl FormDescriptor {
 	pub fn new() -> FormDescriptor {
@@ -89,6 +90,7 @@ impl FormDescriptor {
 }
 
 #[portable]
+/// Describes a form element
 pub enum FormItem {
 	Textbox(FormTextbox),
 	Number(FormNumber),
@@ -99,24 +101,28 @@ pub enum FormItem {
 }
 
 #[portable]
+/// Describes a visual container for form elements
 pub struct FormSection {
 	label: String,
 	form_items: Vec<FormItem>,
 }
 
 #[portable]
+/// Describes a textbox as part of a form
 pub struct FormTextbox {
 	label: String,
 	id: String,
 }
 
 #[portable]
+/// Describes a number input as part of a form
 pub struct FormNumber {
 	label: String,
 	id: String,
 }
 
 #[portable]
+/// Describes a dropdown component as part of a form
 pub struct FormDropdown {
 	/// The label to be displayed on the Dropdown
 	label: String,
@@ -127,6 +133,7 @@ pub struct FormDropdown {
 }
 
 #[portable]
+/// Describes a source for dropdown/autocomplete options
 pub enum FormItemOptionSource {
 
 	/// Use a static set of values as the dropdown options

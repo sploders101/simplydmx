@@ -93,6 +93,7 @@ impl E131DMXDriver {
 }
 
 #[portable]
+/// The E131 portion of the show file
 pub struct E131DMXShowSave {
 	pub universes: HashMap<Uuid, E131Universe>,
 }

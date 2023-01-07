@@ -13,6 +13,7 @@ use simplydmx_plugin_framework::*;
 
 #[portable]
 #[serde(tag = "type")]
+/// Describes a command to be sent via a JSON or equivalent API
 pub enum JSONCommand {
 
 	// Services
@@ -51,6 +52,7 @@ pub enum JSONCommand {
 
 #[portable]
 #[serde(tag = "type")]
+/// Describes an event to be sent to a client via a JSON or equivalent API
 pub enum JSONResponse {
 
 	CallServiceResponse {
@@ -83,6 +85,7 @@ pub enum JSONResponse {
 
 #[portable]
 #[serde(tag = "type")]
+/// An error that could occur while attempting to call a JSON service
 pub enum JSONCallServiceError {
 	ServiceNotFound,
 	ArgDeserializationFailed,

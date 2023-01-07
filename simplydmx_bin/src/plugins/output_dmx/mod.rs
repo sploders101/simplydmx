@@ -54,6 +54,7 @@ pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface, pa
 }
 
 #[portable]
+/// An error that could occur while initializing the DMX plugin
 pub enum DMXInitializationError {
 	UnrecognizedData,
 }

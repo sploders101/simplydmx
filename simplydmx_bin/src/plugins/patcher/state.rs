@@ -31,6 +31,8 @@ impl PatcherContext {
 
 
 #[portable]
+/// Sharable (and serializable) component of the patcher state containing
+/// information about registered fixtures
 pub struct SharablePatcherState {
 	pub library: HashMap<Uuid, FixtureInfo>,
 	pub fixture_order: Vec<Uuid>,

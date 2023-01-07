@@ -139,6 +139,7 @@ impl DMXInterface {
 }
 
 #[portable]
+/// The DMX portion of the show file
 pub struct DMXShowSave {
 	pub library: HashMap<Uuid, DMXFixtureData>,
 	pub fixtures: HashMap<Uuid, DMXFixtureInstance>,
@@ -381,6 +382,7 @@ fn insert_fixture_data(
 
 #[portable]
 #[serde(tag = "type", content = "data")]
+/// An error that could occur while linking a DMX universe to a universe controller
 pub enum LinkUniverseError {
 	ErrorFromController(RegisterUniverseError),
 	UniverseNotFound,

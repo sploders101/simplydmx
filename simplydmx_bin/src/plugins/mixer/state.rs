@@ -6,7 +6,7 @@ use crate::mixer_utils::static_layer::StaticLayer;
 // Use this for upgrades: https://serde.rs/attr-default.html
 
 #[portable]
-// #[derive(Default)]
+/// Data used by the mixer to blend submasters and produce a final result
 pub struct MixerContext {
 
 	/// The default context, where changes are made
@@ -40,6 +40,9 @@ impl MixerContext {
 }
 
 #[portable]
+/// Describes a single mixer instance, with its own internal state for driving layers and effects
+///
+/// Multiple instances are used for creating a blind mode
 pub struct MixingContext {
 	pub layer_order: Vec<Uuid>,
 	pub layer_opacities: HashMap<Uuid, u16>,

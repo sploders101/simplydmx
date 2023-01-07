@@ -15,6 +15,7 @@ use super::{
 };
 
 #[portable]
+/// Defines a static submaster
 pub struct StaticLayer {
 	pub values: SubmasterData,
 }

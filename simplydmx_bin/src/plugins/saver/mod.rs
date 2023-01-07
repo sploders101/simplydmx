@@ -161,6 +161,7 @@ impl<T: std::fmt::Debug> From<ciborium::ser::Error<T>> for SaveError {
 
 #[portable]
 #[serde(tag = "type")]
+/// Describes the state of the show controller backend during initialization
 pub enum SaverInitializationStatus {
 	FinishedSafe,
 	FinishedUnsafe,

@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use crate::mixer_utils::state::BlendingScheme;
 
 #[portable]
+/// Importable fixture descriptor bundle that includes output driver-specific information
 pub struct FixtureBundle {
 
 	/// Contains information about the fixture used for blending, identification, and capability detection

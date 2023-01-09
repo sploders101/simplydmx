@@ -19,6 +19,7 @@ use crate::{
 	init::async_main,
 };
 use simplydmx_plugin_framework::*;
+use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
 
 
 /// Holds the state of the application in a data structure that can be swapped out when the system is reloaded
@@ -118,6 +119,13 @@ pub async fn initialize() {
 			let app = app_ref.app_handle();
 			let mut application_state = block_on(application_state_setup.write());
 			*application_state = Some(block_on(ApplicationState::start_plugins(app, None)));
+
+			#[cfg(target_os = "macos")]
+			{
+				let window = app_ref.get_window("main").unwrap();
+				apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, None, None)
+					.expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS")
+			}
 
 			return Ok(());
 		})

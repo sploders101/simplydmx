@@ -4,15 +4,7 @@
 		"beforeBuildCommand": "yarn build",
 		"devPath": "http://localhost:1420",
 		"distDir": "./frontend/dist",
-		"withGlobalTauri": true,
-
-		"features": [
-			"stdout-logging",
-			"output-dmx-e131",
-			"blender",
-			"blender-benchmark",
-			"gui"
-		]
+		"withGlobalTauri": false
 	},
 	"package": {
 		"productName": "simplydmx",
@@ -37,7 +29,7 @@
 				"icons/icon.icns",
 				"icons/icon.ico"
 			],
-			"identifier": "com.simplydmx.reference",
+			"identifier": "com.simplydmx.tauri-ui",
 			"longDescription": "",
 			"macOS": {
 				"entitlements": null,
@@ -67,8 +59,10 @@
 				"height": 600,
 				"resizable": true,
 				"title": "SimplyDMX",
+				"transparent": true,
 				"width": 800
 			}
-		]
+		],
+		"macOSPrivateApi": true
 	}
 }

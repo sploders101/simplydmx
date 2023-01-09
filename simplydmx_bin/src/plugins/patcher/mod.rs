@@ -19,6 +19,7 @@ use self::{
 		ImportFixtureDefinition,
 		CreateFixture,
 		GetPatcherState,
+		GetCreationForm,
 	},
 };
 
@@ -48,6 +49,7 @@ pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface) ->
 
 	plugin_context.register_service(true, ImportFixtureDefinition::new(patcher_interface.clone())).await.unwrap();
 	plugin_context.register_service(true, CreateFixture::new(patcher_interface.clone())).await.unwrap();
+	plugin_context.register_service(true, GetCreationForm::new(patcher_interface.clone())).await.unwrap();
 	plugin_context.register_service(true, GetPatcherState::new(patcher_interface.clone())).await.unwrap();
 
 	saver.register_savable("patcher", patcher_interface.clone()).await.unwrap();

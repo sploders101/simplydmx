@@ -18,10 +18,11 @@ use crate::{
 		BlendingData,
 		SnapData,
 	},
-	plugins::{
-		saver::Savable,
+	plugins::saver::Savable,
+	utilities::{
+		serialized_data::SerializedData,
+		forms::FormDescriptor,
 	},
-	utilities::serialized_data::SerializedData,
 };
 
 use super::{
@@ -130,6 +131,18 @@ impl PatcherInterface {
 			}
 		} else {
 			return Err(ImportFixtureError::UnknownController);
+		}
+	}
+
+	/// Gets the form to display for creating a new fixture
+	pub async fn get_creation_form(&self, fixture_type: Uuid) -> Result<FormDescriptor, GetCreationFormError> {
+		let ctx = self.1.read().await;
+		if let Some(fixture_info) = ctx.sharable.library.get(&fixture_type) {
+			let output_driver = ctx.output_drivers.get(&fixture_info.output_driver)
+				.expect("Found reference to non-existant driver in fixture library");
+			return Ok(output_driver.get_creation_form(&fixture_info).await);
+		} else {
+			return Err(GetCreationFormError::FixtureTypeMissing);
 		}
 	}
 
@@ -251,4 +264,10 @@ pub enum CreateFixtureError {
 	FixtureTypeMissing,
 	ControllerMissing,
 	ErrorFromController(driver_plugin_api::CreateInstanceError),
+}
+
+#[portable]
+/// An error that could occur while retrieving a fixture creation form
+pub enum GetCreationFormError {
+	FixtureTypeMissing,
 }

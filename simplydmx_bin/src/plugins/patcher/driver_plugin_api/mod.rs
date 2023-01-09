@@ -58,7 +58,7 @@ pub trait OutputDriver: Send + Sync + 'static {
 
 	/// Gets a FormDescriptor to be sent to the UI for display to the user. The form descriptor should be
 	/// detailed enough to allow the UI to generate a struct sufficient for use within `create_fixture_instance`.
-	async fn get_creation_form(&self) -> FormDescriptor;
+	async fn get_creation_form(&self, fixture_info: &FixtureInfo) -> FormDescriptor;
 
 	/// Creates an instance of a fixture, based on data provided by the UI, which should have been derived from
 	/// the form returned in `get_creation_form`.

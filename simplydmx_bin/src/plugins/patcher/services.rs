@@ -1,6 +1,9 @@
 use simplydmx_plugin_framework::*;
 use uuid::Uuid;
-use crate::utilities::serialized_data::SerializedData;
+use crate::utilities::{
+	serialized_data::SerializedData,
+	forms::FormDescriptor,
+};
 
 use super::{
 	PatcherInterface,
@@ -11,6 +14,7 @@ use super::{
 	interface::{
 		ImportFixtureError,
 		CreateFixtureError,
+		GetCreationFormError,
 	},
 };
 
@@ -80,4 +84,24 @@ impl GetPatcherState {
 		return SharablePatcherState::clone(&state);
 	}
 
+}
+
+#[interpolate_service(
+	"get_creation_form",
+	"Get Creation Form",
+	"Queries the given fixture's driver for a fixture creation form to display",
+)]
+impl GetCreationForm {
+
+	#![inner_raw(PatcherInterface)]
+
+	pub fn new(patcher_interface: PatcherInterface) -> Self { Self(patcher_interface) }
+
+	#[service_main(
+		("Fixture Type", "The UUID of the fixture within the fixture library that you would like to create an instance of", "fixture-type-uuid"),
+		("Form Descriptor", "A dynamic form descriptor that can be used to build visual elements for the user to input the required data"),
+	)]
+	async fn main(self, fixture_type: Uuid) -> Result<FormDescriptor, GetCreationFormError> {
+		return self.0.get_creation_form(fixture_type).await;
+	}
 }

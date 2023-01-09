@@ -216,7 +216,7 @@ impl OutputDriver for DMXInterface {
 
 	// Fixture creation/removal
 
-	async fn get_creation_form(&self) -> FormDescriptor {
+	async fn get_creation_form(&self, _fixture_info: &FixtureInfo) -> FormDescriptor {
 		return FormDescriptor::new()
 			.dropdown_dynamic("Universe", "universe", "universes")
 			.number("DMX Offset", "offset");

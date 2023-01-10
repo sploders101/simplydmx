@@ -524,9 +524,9 @@ impl PluginContext {
 	pub async fn register_service_type_specifier<T: TypeSpecifier + Sync + Send + 'static>(&self, type_id: String, type_specifier: T) -> Result<(), TypeSpecifierRegistrationError> {
 		let mut type_specifiers = self.0.type_specifiers.write().await;
 		if type_specifiers.contains_key(&type_id) {
-			type_specifiers.insert(type_id, Box::new(type_specifier));
 			return Err(TypeSpecifierRegistrationError::NameConflict);
 		} else {
+			type_specifiers.insert(type_id, Box::new(type_specifier));
 			return Ok(());
 		}
 	}

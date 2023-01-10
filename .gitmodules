@@ -1,3 +1,3 @@
 [submodule "simplydmx_bin/frontend"]
 	path = simplydmx_bin/frontend
-	url = gitea@git.shaunkeys.com:sploders101/simplydmx-ui.git
+	url = git@github.com:sploders101/simplydmx-ui.git

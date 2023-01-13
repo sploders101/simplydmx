@@ -219,7 +219,8 @@ impl OutputDriver for DMXInterface {
 	async fn get_creation_form(&self, _fixture_info: &FixtureInfo) -> FormDescriptor {
 		return FormDescriptor::new()
 			.dropdown_dynamic("Universe", "universe", "universes")
-			.number("DMX Offset", "offset");
+			.number("DMX Offset", "offset")
+			.build();
 	}
 
 	async fn create_fixture_instance(&self, id: &Uuid, form: SerializedData) -> Result<(), CreateInstanceError> {

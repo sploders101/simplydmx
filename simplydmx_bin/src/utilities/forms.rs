@@ -1,3 +1,5 @@
+mod validation;
+
 use simplydmx_plugin_framework::*;
 
 #[portable]
@@ -41,6 +43,8 @@ impl FormDescriptor {
 	///
 	/// `builder` can be used to easily construct the contents of the section.
 	///
+	/// If more than one item is given in the builder, a VerticalStack is created automatically.
+	///
 	/// Example:
 	/// ```rust
 	/// FormDescriptor::new()
@@ -50,7 +54,18 @@ impl FormDescriptor {
 	///     )
 	/// ```
 	pub fn section(mut self, label: impl Into<String>, builder: impl FnOnce(FormDescriptor) -> FormDescriptor) -> Self {
-		self.0.push(FormItem::Section(FormSection { label: label.into(), form_items: builder(FormDescriptor::new()).0 }));
+		// Build item
+		let mut item = builder(FormDescriptor::new()).0;
+		let item = if item.len() == 0 {
+			return self;
+		} else if item.len() == 1 {
+			item.pop().unwrap()
+		} else {
+			FormItem::VerticalStack(item)
+		};
+
+		// Add section to FormDescriptor
+		self.0.push(FormItem::Section(FormSection { label: label.into(), form_item: Box::new(item) }));
 		return self;
 	}
 
@@ -87,6 +102,13 @@ impl FormDescriptor {
 		self.0.push(FormItem::HorizontalStack(builder(FormDescriptor::new()).0));
 		return self;
 	}
+
+	/// Builds the form data into its final representation
+	///
+	/// Currently a no-op, but will be changed later to flatten into a single `FormItem` instance
+	pub fn build(self) -> Self {
+		return self;
+	}
 }
 
 #[portable]
@@ -104,7 +126,7 @@ pub enum FormItem {
 /// Describes a visual container for form elements
 pub struct FormSection {
 	label: String,
-	form_items: Vec<FormItem>,
+	form_item: Box<FormItem>,
 }
 
 #[portable]

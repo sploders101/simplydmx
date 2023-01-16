@@ -1,6 +1,13 @@
 mod validation;
+mod interactivity;
 
 use simplydmx_plugin_framework::*;
+
+pub use self::interactivity::InteractiveDescription;
+pub use self::validation::{
+	NumberValidation,
+	ImplicitNumberValidation,
+};
 
 #[portable]
 #[serde(transparent)]
@@ -11,6 +18,16 @@ impl FormDescriptor {
 		return FormDescriptor(Vec::new());
 	}
 
+	/// Creates a hide-able collection of form items
+	pub fn dynamic(
+		mut self,
+		conditions: InteractiveDescription,
+		builder: impl FnOnce(FormDescriptor) -> FormDescriptor,
+	) -> Self {
+		self.0.push(FormItem::Dynamic(conditions, builder(FormDescriptor::new()).0));
+		return self;
+	}
+
 	/// Creates a textbox
 	pub fn textbox(mut self, label: impl Into<String>, id: impl Into<String>) -> Self {
 		self.0.push(FormItem::Textbox(FormTextbox { label: label.into(), id: id.into() }));
@@ -18,19 +35,37 @@ impl FormDescriptor {
 	}
 
 	/// Creates a number input
-	pub fn number(mut self, label: impl Into<String>, id: impl Into<String>) -> Self {
-		self.0.push(FormItem::Number(FormNumber { label: label.into(), id: id.into() }));
+	pub fn number(mut self, label: impl Into<String>, id: impl Into<String>, validation: NumberValidation) -> Self {
+		self.0.push(FormItem::Number(FormNumber {
+			label: label.into(),
+			id: id.into(),
+			validation,
+		}));
 		return self;
 	}
 
 	/// Creates a dropdown with static options
-	pub fn dropdown_static(mut self, label: impl Into<String>, id: impl Into<String>, options: impl Fn(OptionsBuilder) -> OptionsBuilder) -> Self {
-		self.0.push(FormItem::Dropdown(FormDropdown { label: label.into(), id: id.into(), item_source: options(OptionsBuilder(Vec::new())).into() }));
+	pub fn dropdown_static(
+		mut self,
+		label: impl Into<String>,
+		id: impl Into<String>,
+		options: impl FnOnce(OptionsBuilder) -> OptionsBuilder,
+	) -> Self {
+		self.0.push(FormItem::Dropdown(FormDropdown {
+			label: label.into(),
+			id: id.into(),
+			item_source: options(OptionsBuilder(Vec::new())).into(),
+		}));
 		return self;
 	}
 
 	/// Creates a dropdown with options sourced from a provider registered in the plugin framework
-	pub fn dropdown_dynamic(mut self, label: impl Into<String>, id: impl Into<String>, typespec_id: impl Into<String>) -> Self {
+	pub fn dropdown_dynamic(
+		mut self,
+		label: impl Into<String>,
+		id: impl Into<String>,
+		typespec_id: impl Into<String>,
+	) -> Self {
 		self.0.push(FormItem::Dropdown(FormDropdown {
 			label: label.into(),
 			id: id.into(),
@@ -53,7 +88,11 @@ impl FormDescriptor {
 	///         .textbox("Another textbox", "anotherTextbox")
 	///     )
 	/// ```
-	pub fn section(mut self, label: impl Into<String>, builder: impl FnOnce(FormDescriptor) -> FormDescriptor) -> Self {
+	pub fn section(
+		mut self,
+		label: impl Into<String>,
+		builder: impl FnOnce(FormDescriptor) -> FormDescriptor,
+	) -> Self {
 		// Build item
 		let mut item = builder(FormDescriptor::new()).0;
 		let item = if item.len() == 0 {
@@ -114,6 +153,7 @@ impl FormDescriptor {
 #[portable]
 /// Describes a form element
 pub enum FormItem {
+	Dynamic(InteractiveDescription, Vec<FormItem>),
 	Textbox(FormTextbox),
 	Number(FormNumber),
 	Dropdown(FormDropdown),
@@ -141,6 +181,7 @@ pub struct FormTextbox {
 pub struct FormNumber {
 	label: String,
 	id: String,
+	validation: NumberValidation,
 }
 
 #[portable]

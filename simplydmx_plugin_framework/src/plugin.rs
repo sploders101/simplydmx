@@ -561,7 +561,12 @@ impl PluginContext {
 	pub async fn get_service_type_options_json(&self, type_id: &str) -> Result<Vec<DropdownOptionJSON>, TypeSpecifierRetrievalError> {
 		let type_specifiers = self.0.type_specifiers.read().await;
 		if let Some(specifier) = type_specifiers.get(type_id) {
-			return Ok(specifier.get_options_json().await);
+			let native_options = specifier.get_options().await;
+			let mut json_options = Vec::<DropdownOptionJSON>::with_capacity(native_options.len());
+			for option in native_options {
+				json_options.push(option.try_into().map_err(|_| TypeSpecifierRetrievalError::SerializationError)?);
+			}
+			return Ok(json_options);
 		} else {
 			return Err(TypeSpecifierRetrievalError::SpecifierNotFound);
 		}
@@ -590,6 +595,7 @@ pub enum TypeSpecifierRegistrationError {
 #[portable]
 pub enum TypeSpecifierRetrievalError {
 	SpecifierNotFound,
+	SerializationError,
 }
 
 #[portable]

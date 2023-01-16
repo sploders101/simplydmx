@@ -45,7 +45,8 @@ pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface, pa
 	plugin_context.register_service(true, services::LinkUniverse::new(output_context.clone())).await.unwrap();
 	plugin_context.register_service(true, services::UnlinkUniverse::new(output_context.clone())).await.unwrap();
 
-	plugin_context.register_service_type_specifier("universes".into(), UniverseTypeSpecifier::new(output_context.clone())).await.unwrap();
+	plugin_context.register_service_type_specifier("universes".into(), UniverseTypeSpecifier(output_context.clone())).await.unwrap();
+	plugin_context.register_service_type_specifier("universes_optional".into(), OptionalUniverseTypeSpecifier(output_context.clone())).await.unwrap();
 
 	saver.register_savable("output_dmx", output_context.clone()).await.unwrap();
 
@@ -60,9 +61,6 @@ pub enum DMXInitializationError {
 }
 
 pub struct UniverseTypeSpecifier(DMXInterface);
-impl UniverseTypeSpecifier {
-	fn new(interface: DMXInterface) -> Self { return Self(interface); }
-}
 #[async_trait]
 impl TypeSpecifier for UniverseTypeSpecifier {
 	async fn get_options(&self) -> Vec<DropdownOptionNative> {
@@ -72,11 +70,22 @@ impl TypeSpecifier for UniverseTypeSpecifier {
 			value: Box::new(id),
 		}).collect();
 	}
-	async fn get_options_json(&self) -> Vec<DropdownOptionJSON> {
-		return self.0.list_universes().await.into_iter().map(|(id, name)| DropdownOptionJSON {
+}
+
+pub struct OptionalUniverseTypeSpecifier(DMXInterface);
+#[async_trait]
+impl TypeSpecifier for OptionalUniverseTypeSpecifier {
+	async fn get_options(&self) -> Vec<DropdownOptionNative> {
+		let mut options = vec![DropdownOptionNative {
+			name: String::from("Unassigned"),
+			description: None,
+			value: Box::new(Option::<uuid::Uuid>::None),
+		}];
+		options.extend(self.0.list_universes().await.into_iter().map(|(id, name)| DropdownOptionNative {
 			name,
 			description: None,
-			value: id.serialize_json().unwrap(),
-		}).collect();
+			value: Box::new(Some(id)),
+		}));
+		return options;
 	}
 }

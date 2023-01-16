@@ -23,7 +23,14 @@ use crate::{
 		FullMixerOutput,
 		FixtureMixerOutput,
 	},
-	utilities::serialized_data::SerializedData,
+	utilities::{
+		serialized_data::SerializedData,
+		forms::{
+			InteractiveDescription,
+			NumberValidation,
+			ImplicitNumberValidation,
+		},
+	},
 };
 use super::{
 	state::{
@@ -218,8 +225,14 @@ impl OutputDriver for DMXInterface {
 
 	async fn get_creation_form(&self, _fixture_info: &FixtureInfo) -> FormDescriptor {
 		return FormDescriptor::new()
-			.dropdown_dynamic("Universe", "universe", "universes")
-			.number("DMX Offset", "offset")
+			.dropdown_dynamic("Universe", "universe", "universes_optional")
+			.dynamic(
+				InteractiveDescription::not(InteractiveDescription::Equal {
+					field_name: "universe".into(),
+					value: serde_json::Value::Null,
+				}),
+				|form| form.number("DMX Offset", "offset", u16::with_validation(NumberValidation::Between(1.0, 512.0)))
+			)
 			.build();
 	}
 

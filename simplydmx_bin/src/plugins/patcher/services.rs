@@ -15,6 +15,7 @@ use super::{
 		ImportFixtureError,
 		CreateFixtureError,
 		GetCreationFormError,
+		GetEditFormError,
 	},
 };
 
@@ -102,6 +103,26 @@ impl GetCreationForm {
 		("Form Descriptor", "A dynamic form descriptor that can be used to build visual elements for the user to input the required data"),
 	)]
 	async fn main(self, fixture_type: Uuid) -> Result<FormDescriptor, GetCreationFormError> {
-		return self.0.get_creation_form(fixture_type).await;
+		return self.0.get_creation_form(&fixture_type).await;
+	}
+}
+
+#[interpolate_service(
+	"get_edit_form",
+	"Get Edit Form",
+	"Queries the given fixture's driver for a fixture edit form to display",
+)]
+impl GetEditForm {
+
+	#![inner_raw(PatcherInterface)]
+
+	pub fn new(patcher_interface: PatcherInterface) -> Self { Self(patcher_interface) }
+
+	#[service_main(
+		("Fixture ID", "The UUID of the particular fixture instance you would like to edit"),
+		("Form Descriptor", "A result containing either a FormDescriptor object or an error"),
+	)]
+	async fn main(self, fixture_id: Uuid) -> Result<FormDescriptor, GetEditFormError> {
+		return self.0.get_edit_form(&fixture_id).await;
 	}
 }

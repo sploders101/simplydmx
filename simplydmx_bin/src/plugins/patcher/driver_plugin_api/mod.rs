@@ -62,13 +62,20 @@ pub trait OutputDriver: Send + Sync + 'static {
 
 	/// Creates an instance of a fixture, based on data provided by the UI, which should have been derived from
 	/// the form returned in `get_creation_form`.
-	async fn create_fixture_instance(&self, id: &Uuid, form: SerializedData) -> Result<(), CreateInstanceError>;
+	async fn create_fixture_instance(
+		&self,
+		patcher_state: &SharablePatcherState,
+		id: &Uuid,
+		fixture_type_info: &FixtureInfo,
+		personality_id: &str,
+		form: SerializedData,
+	) -> Result<(), CreateInstanceError>;
 
 	/// Removes an instance of a fixture.
 	async fn remove_fixture_instance(&self, id: &Uuid);
 
 	/// Gets a copy of the edit form for the plugin in its current state
-	async fn get_edit_form(&self, instance_id: &Uuid) -> FormDescriptor;
+	async fn get_edit_form(&self, instance_id: &Uuid) -> anyhow::Result<FormDescriptor>;
 
 	/// Edits an instance of a fixture based on data from the form returned in `get_edit_form`
 	async fn edit_fixture_instance(&self, id: &Uuid, form: SerializedData) -> Result<(), EditError>;
@@ -88,8 +95,17 @@ pub trait OutputDriver: Send + Sync + 'static {
 
 }
 
+macro_rules! impl_anyhow {
+	($type:ident, $variant:expr) => {
+		impl From<anyhow::Error> for $type {
+			fn from(value: anyhow::Error) -> Self {
+				return $variant(value.to_string());
+			}
+		}
+	}
+}
+
 #[portable]
-#[serde(tag = "type")]
 /// A generic error originating from an OutputDriver interface when importing a fixture definition
 pub enum ImportError {
 	InvalidData,
@@ -97,9 +113,9 @@ pub enum ImportError {
 	Unknown,
 }
 impl_deserialize_err!(ImportError, Self::InvalidData);
+impl_anyhow!(ImportError, Self::Other);
 
 #[portable]
-#[serde(tag = "type")]
 /// A generic error originating from an OutputDriver interface when creating a fixture instance
 pub enum CreateInstanceError {
 	InvalidData,
@@ -107,9 +123,9 @@ pub enum CreateInstanceError {
 	Unknown,
 }
 impl_deserialize_err!(CreateInstanceError, Self::InvalidData);
+impl_anyhow!(CreateInstanceError, Self::Other);
 
 #[portable]
-#[serde(tag = "type")]
 /// A generic error originating from an OutputDriver interface when editing an existing fixture instance
 pub enum EditError {
 	InvalidData,
@@ -117,3 +133,4 @@ pub enum EditError {
 	Unknown,
 }
 impl_deserialize_err!(EditError, Self::InvalidData);
+impl_anyhow!(EditError, Self::Other);

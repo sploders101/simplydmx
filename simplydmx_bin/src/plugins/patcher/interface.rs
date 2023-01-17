@@ -135,7 +135,7 @@ impl PatcherInterface {
 	}
 
 	/// Gets the form to display for creating a new fixture
-	pub async fn get_creation_form(&self, fixture_type: Uuid) -> Result<FormDescriptor, GetCreationFormError> {
+	pub async fn get_creation_form(&self, fixture_type: &Uuid) -> Result<FormDescriptor, GetCreationFormError> {
 		let ctx = self.1.read().await;
 		if let Some(fixture_info) = ctx.sharable.library.get(&fixture_type) {
 			let output_driver = ctx.output_drivers.get(&fixture_info.output_driver)
@@ -143,6 +143,22 @@ impl PatcherInterface {
 			return Ok(output_driver.get_creation_form(&fixture_info).await);
 		} else {
 			return Err(GetCreationFormError::FixtureTypeMissing);
+		}
+	}
+
+	/// Gets the form to display for creating a new fixture
+	pub async fn get_edit_form(&self, fixture_id: &Uuid) -> Result<FormDescriptor, GetEditFormError> {
+		let ctx = self.1.read().await;
+		if let Some(instance_info) = ctx.sharable.fixtures.get(&fixture_id) {
+			if let Some(fixture_info) = ctx.sharable.library.get(&instance_info.fixture_id) {
+				let output_driver = ctx.output_drivers.get(&fixture_info.output_driver)
+					.expect("Found reference to non-existant driver in fixture library");
+				return Ok(output_driver.get_edit_form(&fixture_id).await?);
+			} else {
+				return Err(GetEditFormError::FixtureDefinitionMissing);
+			}
+		} else {
+			return Err(GetEditFormError::FixtureMissing);
 		}
 	}
 
@@ -156,7 +172,7 @@ impl PatcherInterface {
 		if let Some(fixture_type_info) = ctx.sharable.library.get(&fixture_type) {
 			if let Some(controller) = ctx.output_drivers.get(&fixture_type_info.output_driver) {
 				let instance_uuid = Uuid::new_v4();
-				if let Err(controller_error) = controller.create_fixture_instance(&instance_uuid, form_data).await {
+				if let Err(controller_error) = controller.create_fixture_instance(&ctx.sharable, &instance_uuid, fixture_type_info, &personality, form_data).await {
 					return Err(CreateFixtureError::ErrorFromController(controller_error));
 				} else {
 					// Controller successfully loaded protocol-specific details
@@ -270,4 +286,18 @@ pub enum CreateFixtureError {
 /// An error that could occur while retrieving a fixture creation form
 pub enum GetCreationFormError {
 	FixtureTypeMissing,
+}
+
+#[portable]
+/// An error that could occur while retrieving a fixture edit form
+pub enum GetEditFormError {
+	FixtureMissing,
+	FixtureDefinitionMissing,
+	ControllerMissing,
+	ControllerError(String),
+}
+impl From<anyhow::Error> for GetEditFormError {
+	fn from(value: anyhow::Error) -> Self {
+		return Self::ControllerError(value.to_string());
+	}
 }

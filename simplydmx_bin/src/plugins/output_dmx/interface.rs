@@ -1,18 +1,15 @@
 use std::collections::HashMap;
-
 use async_std::sync::{
 	Arc,
 	RwLock,
 };
-
 use futures::{
 	future::join_all,
 	FutureExt,
 };
-
 use uuid::Uuid;
 use async_trait::async_trait;
-
+use anyhow::{anyhow, Context};
 use simplydmx_plugin_framework::*;
 use crate::{
 	plugins::{
@@ -28,7 +25,6 @@ use crate::{
 		forms::{
 			InteractiveDescription,
 			NumberValidation,
-			ImplicitNumberValidation,
 		},
 	},
 };
@@ -105,7 +101,12 @@ impl DMXInterface {
 	}
 
 	/// Links an existing universe to a driver
-	pub async fn link_universe(&self, universe_id: &Uuid, driver: String, form_data: SerializedData) -> Result<(), LinkUniverseError> {
+	pub async fn link_universe(
+		&self,
+		universe_id: &Uuid,
+		driver: String,
+		form_data: SerializedData,
+	) -> Result<(), LinkUniverseError> {
 		let mut ctx = self.1.write().await;
 		if ctx.universes.contains_key(universe_id) {
 			if let Some(controller) = ctx.drivers.get(&driver) {
@@ -142,7 +143,6 @@ impl DMXInterface {
 		let ctx = self.1.write().await;
 		return ctx.universes.values().map(|universe| (universe.id.clone(), universe.name.clone())).collect();
 	}
-
 }
 
 #[portable]
@@ -231,14 +231,25 @@ impl OutputDriver for DMXInterface {
 					field_name: "universe".into(),
 					value: serde_json::Value::Null,
 				}),
-				|form| form.number("DMX Offset", "offset", u16::with_validation(NumberValidation::Between(1.0, 512.0)))
+				|form| form.number_prefilled("DMX Offset", "offset", NumberValidation::And(vec![
+					NumberValidation::Between(1.0, 512.0),
+					NumberValidation::DivisibleBy(1.0),
+				]), 1.0),
 			)
 			.build();
 	}
 
-	async fn create_fixture_instance(&self, id: &Uuid, form: SerializedData) -> Result<(), CreateInstanceError> {
+	async fn create_fixture_instance(
+		&self,
+		patcher: &SharablePatcherState,
+		id: &Uuid,
+		fixture_type_info: &FixtureInfo,
+		personality_id: &str,
+		form: SerializedData,
+	) -> Result<(), CreateInstanceError> {
 		let mut ctx = self.1.write().await;
-		ctx.fixtures.insert(id.clone(), form.deserialize()?);
+		let normalized_fixture = ctx.normalize_fixture(patcher, fixture_type_info, personality_id, form.deserialize()?).await?;
+		ctx.fixtures.insert(id.clone(), normalized_fixture);
 		return Ok(());
 	}
 
@@ -249,9 +260,23 @@ impl OutputDriver for DMXInterface {
 
 
 	// Fixture editing
-	async fn get_edit_form(&self, instance_id: &Uuid) -> FormDescriptor {
-		// TODO
-		return FormDescriptor::new();
+	async fn get_edit_form(&self, instance_id: &Uuid) -> anyhow::Result<FormDescriptor> {
+		let ctx = self.1.read().await;
+		let fixture_info = ctx.fixtures.get(instance_id)
+			.map_or_else(|| Err(anyhow!("Couldn't get fixture instance")), |instance| Ok(instance))?;
+		return Ok(FormDescriptor::new()
+			.dropdown_dynamic_prefilled("Universe", "universe", "universes_optional", fixture_info.universe.serialize_json()?)
+			.dynamic(
+				InteractiveDescription::not(InteractiveDescription::Equal {
+					field_name: "universe".into(),
+					value: serde_json::Value::Null,
+				}),
+				|form| form.number_prefilled("DMX Offset", "offset", NumberValidation::And(vec![
+					NumberValidation::Between(1.0, 512.0),
+					NumberValidation::DivisibleBy(1.0),
+				]), fixture_info.offset.map_or(1.0, |offset| offset as f64)),
+			)
+			.build());
 	}
 
 	async fn edit_fixture_instance(&self, id: &Uuid, form: SerializedData) -> Result<(), EditError> {
@@ -379,13 +404,13 @@ fn insert_fixture_data(
 			) {
 				match channel_info.size {
 					ChannelSize::U8 => {
-						universe_frame[offset as usize] = *channel_value as u8;
+						universe_frame[(offset - 1) as usize] = *channel_value as u8;
 						offset += 1;
 					},
 					ChannelSize::U16 => {
 						let current_value_bytes = channel_value.to_be_bytes();
-						universe_frame[offset as usize] = current_value_bytes[0];
-						universe_frame[(offset + 1) as usize] = current_value_bytes[1];
+						universe_frame[(offset - 1) as usize] = current_value_bytes[0];
+						universe_frame[offset as usize] = current_value_bytes[1];
 						offset += 2;
 					},
 				}

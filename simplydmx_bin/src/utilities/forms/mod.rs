@@ -30,16 +30,58 @@ impl FormDescriptor {
 
 	/// Creates a textbox
 	pub fn textbox(mut self, label: impl Into<String>, id: impl Into<String>) -> Self {
-		self.0.push(FormItem::Textbox(FormTextbox { label: label.into(), id: id.into() }));
+		self.0.push(FormItem::Textbox(FormTextbox {
+			label: label.into(),
+			id: id.into(),
+			value: None,
+		}));
+		return self;
+	}
+
+	/// Creates a textbox with a pre-filled value
+	pub fn textbox_prefilled(
+		mut self,
+		label: impl Into<String>,
+		id: impl Into<String>,
+		value: impl Into<String>,
+	) -> Self {
+		self.0.push(FormItem::Textbox(FormTextbox {
+			label: label.into(),
+			id: id.into(),
+			value: Some(value.into()),
+		}));
 		return self;
 	}
 
 	/// Creates a number input
-	pub fn number(mut self, label: impl Into<String>, id: impl Into<String>, validation: NumberValidation) -> Self {
+	pub fn number(
+		mut self,
+		label: impl Into<String>,
+		id: impl Into<String>,
+		validation: NumberValidation,
+	) -> Self {
 		self.0.push(FormItem::Number(FormNumber {
 			label: label.into(),
 			id: id.into(),
 			validation,
+			value: None,
+		}));
+		return self;
+	}
+
+	/// Creates a number input with a pre-filled value
+	pub fn number_prefilled(
+		mut self,
+		label: impl Into<String>,
+		id: impl Into<String>,
+		validation: NumberValidation,
+		value: f64,
+	) -> Self {
+		self.0.push(FormItem::Number(FormNumber {
+			label: label.into(),
+			id: id.into(),
+			validation,
+			value: Some(value),
 		}));
 		return self;
 	}
@@ -55,6 +97,24 @@ impl FormDescriptor {
 			label: label.into(),
 			id: id.into(),
 			item_source: options(OptionsBuilder(Vec::new())).into(),
+			value: serde_json::Value::Null,
+		}));
+		return self;
+	}
+
+	/// Creates a pre-filled dropdown with static options
+	pub fn dropdown_static_prefilled(
+		mut self,
+		label: impl Into<String>,
+		id: impl Into<String>,
+		options: impl FnOnce(OptionsBuilder) -> OptionsBuilder,
+		value: serde_json::Value,
+	) -> Self {
+		self.0.push(FormItem::Dropdown(FormDropdown {
+			label: label.into(),
+			id: id.into(),
+			item_source: options(OptionsBuilder(Vec::new())).into(),
+			value,
 		}));
 		return self;
 	}
@@ -70,6 +130,24 @@ impl FormDescriptor {
 			label: label.into(),
 			id: id.into(),
 			item_source: FormItemOptionSource::TypeSpec { typespec_id: typespec_id.into() },
+			value: serde_json::Value::Null,
+		}));
+		return self;
+	}
+
+	/// Creates a pre-filled dropdown with options sourced from a provider registered in the plugin framework
+	pub fn dropdown_dynamic_prefilled(
+		mut self,
+		label: impl Into<String>,
+		id: impl Into<String>,
+		typespec_id: impl Into<String>,
+		value: serde_json::Value,
+	) -> Self {
+		self.0.push(FormItem::Dropdown(FormDropdown {
+			label: label.into(),
+			id: id.into(),
+			item_source: FormItemOptionSource::TypeSpec { typespec_id: typespec_id.into() },
+			value,
 		}));
 		return self;
 	}
@@ -165,23 +243,34 @@ pub enum FormItem {
 #[portable]
 /// Describes a visual container for form elements
 pub struct FormSection {
+	/// The label to give this section of the form
 	label: String,
+	/// The item that should be rendered within the form section
 	form_item: Box<FormItem>,
 }
 
 #[portable]
 /// Describes a textbox as part of a form
 pub struct FormTextbox {
+	/// The label to give this textbox
 	label: String,
+	/// The ID to give the field (ex: `formData[FormNumber::id] = FormNumber::value`)
 	id: String,
+	/// The value to give this textbox upon initial creation of the form
+	value: Option<String>,
 }
 
 #[portable]
 /// Describes a number input as part of a form
 pub struct FormNumber {
+	/// The label to give this field
 	label: String,
+	/// The ID to give the field (ex: `formData[FormNumber::id] = FormNumber::value`)
 	id: String,
+	/// The validation criteria for this number field
 	validation: NumberValidation,
+	/// The value to give this number field upon initial creation of the form
+	value: Option<f64>,
 }
 
 #[portable]
@@ -193,6 +282,8 @@ pub struct FormDropdown {
 	id: String,
 	/// The method by which this dropdown should source its items
 	item_source: FormItemOptionSource,
+	/// The value to give this dropdown upon initial creation of the form
+	value: serde_json::Value,
 }
 
 #[portable]

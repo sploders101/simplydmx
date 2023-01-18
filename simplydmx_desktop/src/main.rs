@@ -1,3 +1,8 @@
+#![cfg_attr(
+	all(not(debug_assertions), target_os = "windows"),
+	windows_subsystem = "windows"
+)]
+
 use std::sync::Arc;
 
 use async_std::{
@@ -14,11 +19,11 @@ use tauri::{
 	AppHandle,
 	RunEvent,
 };
-use crate::{
+use simplydmx::{
+	*,
 	api_utilities::*,
 	init::async_main,
 };
-use simplydmx_plugin_framework::*;
 use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial};
 
 
@@ -159,4 +164,8 @@ pub async fn initialize() {
 	#[cfg(feature = "verbose-debugging")]
 	println!("Tauri call completed");
 
+}
+
+fn main() {
+	block_on(initialize());
 }

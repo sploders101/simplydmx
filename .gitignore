@@ -3,3 +3,5 @@
 *.code-workspace
 .Trashes
 .TemporaryItems
+/about.html
+/target

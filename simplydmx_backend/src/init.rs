@@ -182,7 +182,10 @@ pub mod exporter {
 			rpc_modules += "};\n";
 		}
 
-		let mut rpc_ts = File::create("./frontend/src/scripts/api/ipc/rpc.ts").unwrap();
+		let manifest_directory = std::env::var("CARGO_MANIFEST_DIR").expect("Could not get project directory");
+		let mut rpc_path = std::path::PathBuf::from(manifest_directory);
+		println!("Manifest directory: {}", manifest_directory);
+		let mut rpc_ts = File::create(format!("{}/../simplydmx_frontend/src/scripts/api/ipc/rpc.ts", manifest_directory)).unwrap();
 		rpc_ts.write_all(format!("import {{ callService }} from \"./agnostic_abstractions\";\n\n\n{}\n\n{}\n", &types.into_iter().map(|ty| {
 			if let Some(docs) = ty.2 {
 				format!("{}\n{}", docs, ty.1)

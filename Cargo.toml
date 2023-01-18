@@ -1,0 +1,8 @@
+[workspace]
+members = [
+	"simplydmx_backend",
+	"simplydmx_desktop",
+	"simplydmx_mobile",
+	"simplydmx_plugin_framework",
+	"simplydmx_plugin_macros",
+]

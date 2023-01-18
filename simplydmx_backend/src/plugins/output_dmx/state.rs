@@ -30,7 +30,6 @@ fn get_size(personality: &DMXPersonalityData, fixture_type_info: &FixtureInfo) -
 			ChannelSize::U16 => 2,
 		};
 	}
-	println!("Returning size {size}");
 	return Ok(size);
 }
 

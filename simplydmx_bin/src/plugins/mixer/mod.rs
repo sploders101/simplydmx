@@ -2,36 +2,21 @@ mod commands;
 mod state;
 mod blender;
 
-use std::{
-	sync::Arc,
-	collections::HashMap,
-};
-use async_std::{
-	sync::RwLock,
-	channel::Sender,
-};
-use async_trait::async_trait;
-use simplydmx_plugin_framework::*;
-
-use state::MixerContext;
-use uuid::Uuid;
-
-use crate::mixer_utils::{
-	state::{
-		FullMixerOutput,
-		SubmasterData,
-		BlenderValue,
-	},
-	static_layer::StaticLayer,
-};
-
 use super::{
 	patcher::PatcherInterface,
-	saver::{
-		SaverInterface,
-		Savable,
-	},
+	saver::{Savable, SaverInterface},
 };
+use crate::mixer_utils::{
+	state::{BlenderValue, FullMixerOutput, SubmasterData},
+	static_layer::StaticLayer,
+};
+use async_std::{channel::Sender, sync::RwLock};
+use async_trait::async_trait;
+use simplydmx_plugin_framework::*;
+use state::MixerContext;
+use std::{collections::HashMap, sync::Arc};
+use thiserror::Error;
+use uuid::Uuid;
 
 pub async fn initialize_mixer(plugin_context: PluginContext, saver: SaverInterface, patcher: PatcherInterface) -> Result<MixerInterface, MixerInitializationError> {
 
@@ -304,8 +289,9 @@ impl Savable for MixerInterface {
 }
 
 #[portable]
-#[derive(Debug)]
+#[derive(Debug, Error)]
 /// An error that could occur while initializing the mixer plugin
 pub enum MixerInitializationError {
+	#[error("An error occurred while importing mixer data.")]
 	UnrecognizedData,
 }

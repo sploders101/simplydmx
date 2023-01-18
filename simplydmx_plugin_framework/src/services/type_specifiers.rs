@@ -1,4 +1,3 @@
-use std::any::Any;
 use serde_json::Value;
 use async_trait::async_trait;
 use simplydmx_plugin_macros::portable;

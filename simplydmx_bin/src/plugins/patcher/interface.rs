@@ -4,6 +4,7 @@ use async_std::sync::{
 	RwLock,
 };
 use async_trait::async_trait;
+use thiserror::Error;
 use futures::{
 	FutureExt,
 	future::join_all,
@@ -22,7 +23,7 @@ use crate::{
 	utilities::{
 		serialized_data::SerializedData,
 		forms::FormDescriptor,
-	},
+	}, impl_anyhow,
 };
 
 use super::{
@@ -140,7 +141,7 @@ impl PatcherInterface {
 		if let Some(fixture_info) = ctx.sharable.library.get(&fixture_type) {
 			let output_driver = ctx.output_drivers.get(&fixture_info.output_driver)
 				.expect("Found reference to non-existant driver in fixture library");
-			return Ok(output_driver.get_creation_form(&fixture_info).await);
+			return Ok(output_driver.get_creation_form(&fixture_info).await?);
 		} else {
 			return Err(GetCreationFormError::FixtureTypeMissing);
 		}
@@ -203,10 +204,10 @@ impl PatcherInterface {
 		#[cfg(feature = "verbose-debugging")]
 		println!("Pushing values");
 		for driver in ctx.output_drivers.values().cloned() {
-			let patcher_interface = PatcherInterface::clone(self);
+			let state = self.get_sharable_state().await;
 			let data = Arc::clone(&data);
 			futures.push(async move {
-				driver.send_updates(patcher_interface, data).fuse().await;
+				driver.send_updates(&state, data).fuse().await;
 			});
 		}
 		drop(ctx);
@@ -268,32 +269,49 @@ fn get_min_value_segments(segments: &[Segment]) -> u16 {
 }
 
 #[portable]
+#[derive(Error)]
 /// An error that could occur when importing a fixture definition
 pub enum ImportFixtureError {
+	#[error("Could not find the controller referenced by the fixture definition")]
 	UnknownController,
+	#[error("An error occured while importing controller-specific details:\n{0:?}")]
 	ErrorFromController(driver_plugin_api::ImportError),
 }
 
 #[portable]
+#[derive(Error)]
 /// An error that could occur when creating a fixture
 pub enum CreateFixtureError {
+	#[error("The requested fixture type does not exist in the library")]
 	FixtureTypeMissing,
+	#[error("The controller responsible for this fixture is missing")]
 	ControllerMissing,
+	#[error("The controller reported an error while creating an instance of the fixture:\n{0:?}")]
 	ErrorFromController(driver_plugin_api::CreateInstanceError),
 }
 
 #[portable]
+#[derive(Error)]
 /// An error that could occur while retrieving a fixture creation form
 pub enum GetCreationFormError {
+	#[error("The requested fixture type does not exist in the library")]
 	FixtureTypeMissing,
+	#[error("The controller reported an error while getting the creation form:\n{0}")]
+	Other(String),
 }
+impl_anyhow!(GetCreationFormError, GetCreationFormError::Other);
 
 #[portable]
+#[derive(Error)]
 /// An error that could occur while retrieving a fixture edit form
 pub enum GetEditFormError {
+	#[error("The requested fixture instance does not exist in the library.")]
 	FixtureMissing,
+	#[error("The definition for the requested fixture is missing.")]
 	FixtureDefinitionMissing,
+	#[error("The controller associated with this fixture is missing.")]
 	ControllerMissing,
+	#[error("The controller reported an error while getting the edit form:\n{0}")]
 	ControllerError(String),
 }
 impl From<anyhow::Error> for GetEditFormError {

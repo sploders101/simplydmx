@@ -1,16 +1,12 @@
-use std::collections::HashMap;
-
-use simplydmx_plugin_framework::*;
-use uuid::Uuid;
-use async_trait::async_trait;
-
 use crate::{
-	utilities::{
-		forms::FormDescriptor,
-		serialized_data::SerializedData,
-	},
 	impl_deserialize_err,
+	utilities::{forms::FormDescriptor, serialized_data::SerializedData},
 };
+use async_trait::async_trait;
+use simplydmx_plugin_framework::*;
+use std::collections::HashMap;
+use thiserror::Error;
+use uuid::Uuid;
 
 
 /// Trait indicating parameters for communicating with a DMX driver
@@ -53,9 +49,11 @@ pub type DMXFrame = [u8; 512];
 
 /// An error that occurs while registering a universe
 #[portable]
+#[derive(Error)]
 pub enum RegisterUniverseError {
-	InvalidData,
+	#[error("Could not parse form data when registering universe:\n{0}")]
+	InvalidData(String),
+	#[error("An error occurred in the transport driver while registering the universe:\n{0}")]
 	Other(String),
-	Unknown,
 }
 impl_deserialize_err!(RegisterUniverseError, Self::InvalidData);

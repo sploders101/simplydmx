@@ -2,15 +2,11 @@ pub mod interface;
 pub mod dmxsource_controller;
 pub mod state;
 
-use simplydmx_plugin_framework::PluginContext;
+use super::{output_dmx::interface::DMXInterface, saver::SaverInterface};
 use interface::E131DMXDriver;
-
-use super::{
-	output_dmx::interface::DMXInterface,
-	saver::SaverInterface,
-};
-
+use simplydmx_plugin_framework::PluginContext;
 use simplydmx_plugin_framework::*;
+use thiserror::Error;
 
 pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface, dmx_interface: DMXInterface) -> Result<E131DMXDriver, E131InitializationError> {
 	// Create E131 context
@@ -32,7 +28,9 @@ pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface, dm
 }
 
 #[portable]
+#[derive(Error)]
 /// An error that could occur while initializing the E131 plugin
 pub enum E131InitializationError {
+	#[error("The show file could not be parsed.")]
 	UnrecognizedData,
 }

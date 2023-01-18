@@ -24,15 +24,19 @@ impl SerializedData {
 /// Struct used to support `?` syntax for casting to `Err(...)`.
 ///
 /// Returned when there is an error deserializing `SerializedData`
-pub struct DeserializeError();
+pub struct DeserializeError(pub String);
 impl<T> From<ciborium::de::Error<T>> for DeserializeError {
-	fn from(_: ciborium::de::Error<T>) -> Self {
-		return DeserializeError();
+	fn from(err: ciborium::de::Error<T>) -> Self {
+		return DeserializeError(match err {
+			ciborium::de::Error::Syntax(_) => String::from("Syntax error"),
+			ciborium::de::Error::Semantic(_, err) => err,
+			_ => String::from("An unknown error occurred while deserializing"),
+		});
 	}
 }
 impl From<serde_json::Error> for DeserializeError {
-	fn from(_: serde_json::Error) -> Self {
-		return DeserializeError();
+	fn from(err: serde_json::Error) -> Self {
+		return DeserializeError(err.to_string());
 	}
 }
 
@@ -40,8 +44,8 @@ impl From<serde_json::Error> for DeserializeError {
 macro_rules! impl_deserialize_err {
 	($type:ty, $output:expr) => {
 		impl From<crate::utilities::serialized_data::DeserializeError> for $type {
-			fn from(_: crate::utilities::serialized_data::DeserializeError) -> Self {
-				return $output;
+			fn from(err: crate::utilities::serialized_data::DeserializeError) -> Self {
+				return $output(err.0);
 			}
 		}
 	};

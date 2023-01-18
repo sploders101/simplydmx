@@ -192,39 +192,28 @@ impl OutputDriver for DMXInterface {
 		return Ok(());
 	}
 
-	async fn export_fixture_json(&self, id: &Uuid) -> Option<serde_json::Value> {
+	async fn export_fixture_json(&self, id: &Uuid) -> anyhow::Result<serde_json::Value> {
 		let ctx = self.1.read().await;
-		if let Some(fixture) = ctx.library.get(&id) {
-			if let Ok(serialized) = serde_json::to_value(fixture) {
-				return Some(serialized);
-			} else {
-				return None;
-			}
-		} else {
-			return None;
-		}
+		let fixture = ctx.library.get(&id).with_context(|| format!("Could not find fixture {id}"))?;
+		let serialized = serde_json::to_value(fixture)
+			.with_context(|| format!("An error occurred while serializing fixture {id}"))?;
+		return Ok(serialized);
 	}
 
-	async fn export_fixture_cbor(&self, id: &Uuid) -> Option<Vec<u8>> {
+	async fn export_fixture_cbor(&self, id: &Uuid) -> anyhow::Result<Vec<u8>> {
 		let ctx = self.1.read().await;
-		if let Some(fixture) = ctx.library.get(&id) {
-			let mut serialized = Vec::<u8>::new();
-
-			if let Ok(_) = ciborium::ser::into_writer(fixture, &mut serialized) {
-				return Some(serialized);
-			} else {
-				return None;
-			}
-		} else {
-			return None;
-		}
+		let fixture = ctx.library.get(&id).with_context(|| format!("Could not find fixture {id}"))?;
+		let mut serialized = Vec::<u8>::new();
+		ciborium::ser::into_writer(fixture, &mut serialized)
+			.with_context(|| format!("An error occurred while serializing fixture {id}."))?;
+		return Ok(serialized);
 	}
 
 
 	// Fixture creation/removal
 
-	async fn get_creation_form(&self, _fixture_info: &FixtureInfo) -> FormDescriptor {
-		return FormDescriptor::new()
+	async fn get_creation_form(&self, _fixture_info: &FixtureInfo) -> anyhow::Result<FormDescriptor> {
+		return Ok(FormDescriptor::new()
 			.dropdown_dynamic("Universe", "universe", "universes_optional")
 			.dynamic(
 				InteractiveDescription::not(InteractiveDescription::Equal {
@@ -236,7 +225,7 @@ impl OutputDriver for DMXInterface {
 					NumberValidation::DivisibleBy(1.0),
 				]), 1.0),
 			)
-			.build();
+			.build());
 	}
 
 	async fn create_fixture_instance(
@@ -253,9 +242,10 @@ impl OutputDriver for DMXInterface {
 		return Ok(());
 	}
 
-	async fn remove_fixture_instance(&self, id: &Uuid) {
+	async fn remove_fixture_instance(&self, id: &Uuid) -> anyhow::Result<()> {
 		let mut ctx = self.1.write().await;
 		ctx.fixtures.remove(id);
+		return Ok(());
 	}
 
 
@@ -288,10 +278,9 @@ impl OutputDriver for DMXInterface {
 
 	// Updates
 
-	async fn send_updates(&self, patcher_interface: PatcherInterface, data: Arc<FullMixerOutput>) {
+	async fn send_updates<'a>(&self, patcher_data: &'a SharableStateWrapper<'a>, data: Arc<FullMixerOutput>) {
 		#[cfg(feature = "verbose-debugging")]
 		println!("Getting sharable state");
-		let patcher_data = patcher_interface.get_sharable_state().await;
 		#[cfg(feature = "verbose-debugging")]
 		println!("Got sharable state. Getting DMX context");
 		let ctx = self.1.read().await;

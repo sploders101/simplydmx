@@ -24,6 +24,7 @@ tsify = { version = "0.4.2", default-features = false }
 linkme = { version = "0.3.5", optional = true }
 window-vibrancy = "0.3.2"
 anyhow = "1.0.68"
+thiserror = "1.0.38"
 
 [lib]
 # name = "simplydmx_embedded"
@@ -34,64 +35,31 @@ name = "simplydmx"
 path = "src/main.rs"
 
 [features]
-default = [
-	"gui",
-	"stdout-logging",
-	"default-plugins",
-	"custom-protocol",
-]
+default = ["gui", "stdout-logging", "default-plugins", "custom-protocol"]
 
-dev = [
-	"gui",
-	"stdout-logging",
-	"default-plugins",
-	"blender-benchmark",
-	"devtools",
-]
+dev = ["gui", "stdout-logging", "default-plugins", "blender-benchmark", "devtools"]
 
-devtools = [
-	"tauri/devtools",
-]
+devtools = ["tauri/devtools"]
 
-custom-protocol = [
-	"tauri/custom-protocol",
-]
+custom-protocol = ["tauri/custom-protocol"]
 
 # This is meant to be run stand-alone, similar to tests. It generates the rpc.ts file that the frontend runs on
-export-services = [
-	"linkme",
-	"simplydmx_plugin_framework/tsify",
-	"stdout-logging",
-	"default-plugins",
-]
+export-services = ["linkme", "simplydmx_plugin_framework/tsify", "stdout-logging", "default-plugins"]
 
-default-plugins = [
-	"output-dmx-e131",
-	"blender",
-	"api",
-]
+default-plugins = ["output-dmx-e131", "blender", "api"]
 
-verbose-debugging = [
-	"simplydmx_plugin_framework/shutdown-debug",
-]
+verbose-debugging = ["simplydmx_plugin_framework/shutdown-debug"]
 
 stdout-logging = [] # Log service in core
 
 output-dmx = []
-output-dmx-e131 = [
-	"output-dmx",
-	"sacn"
-]
+output-dmx-e131 = ["output-dmx", "sacn"]
 
 blender = []
-blender-benchmark = [
-	"blender",
-]
+blender-benchmark = ["blender"]
 
 startup-benchmark = []
 
 api = []
 
-gui = [
-	"tauri",
-]
+gui = ["tauri"]

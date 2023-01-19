@@ -1,8 +1,0 @@
-[app]
-name = "simplydmx-mobile"
-stylized-name = "SimplyDMX"
-domain = "shaunkeys.com"
-template-pack = "wry"
-
-[apple]
-development-team = "H25K78CVTM"

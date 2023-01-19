@@ -38,8 +38,6 @@ export-services = ["linkme", "tsify", "simplydmx_plugin_framework/tsify", "stdou
 
 default-plugins = ["output-dmx-e131", "blender", "api"]
 
-verbose-debugging = ["simplydmx_plugin_framework/shutdown-debug"]
-
 stdout-logging = [] # Log service in core
 
 output-dmx = []

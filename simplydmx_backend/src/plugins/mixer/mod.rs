@@ -153,24 +153,18 @@ impl MixerInterface {
 	///
 	/// Returns the ID of the new submaster
 	async fn create_layer(&self) -> Uuid {
-		println!("Locking context");
 		let mut ctx = self.1.write().await;
-		println!("Finished locking context");
 		let submaster_id = Uuid::new_v4();
 
 		ctx.default_context.user_submasters.insert(submaster_id.clone(), StaticLayer::default());
 
-		println!("Emitting event");
 		self.0.emit("mixer.new_submaster".into(), FilterCriteria::None, submaster_id.clone()).await;
-		println!("Finished emitting event");
 
 		return submaster_id;
 	}
 
 	/// Adds or removes content in a layer
 	async fn set_layer_contents(&self, submaster_id: Uuid, submaster_delta: SubmasterData) -> bool {
-		#[cfg(feature = "verbose-debugging")]
-		println!("Aquiring lock in set_layer_contents");
 		let mut ctx = self.1.write().await;
 
 		// Check if the specified submaster exists
@@ -207,12 +201,8 @@ impl MixerInterface {
 					self.2.send(()).await.ok();
 				}
 			}
-			#[cfg(feature = "verbose-debugging")]
-			println!("Dropping lock in set_layer_contents");
 			return true;
 		} else {
-			#[cfg(feature = "verbose-debugging")]
-			println!("Dropping lock in set_layer_contents");
 			return false;
 		}
 	}

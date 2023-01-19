@@ -165,11 +165,7 @@ impl PatcherInterface {
 
 	/// Create a fixture
 	pub async fn create_fixture(&self, fixture_type: Uuid, personality: String, name: Option<String>, comments: Option<String>, form_data: SerializedData) -> Result<Uuid, CreateFixtureError> {
-		#[cfg(feature = "verbose-debugging")]
-		println!("Getting writable lock for create_fixture");
 		let mut ctx = self.1.write().await;
-		#[cfg(feature = "verbose-debugging")]
-		println!("Got writable lock for create_fixture");
 		if let Some(fixture_type_info) = ctx.sharable.library.get(&fixture_type) {
 			if let Some(controller) = ctx.output_drivers.get(&fixture_type_info.output_driver) {
 				let instance_uuid = Uuid::new_v4();
@@ -201,8 +197,6 @@ impl PatcherInterface {
 		let ctx = self.1.read().await;
 
 		let mut futures = Vec::new();
-		#[cfg(feature = "verbose-debugging")]
-		println!("Pushing values");
 		for driver in ctx.output_drivers.values().cloned() {
 			let state = self.get_sharable_state().await;
 			let data = Arc::clone(&data);
@@ -212,8 +206,6 @@ impl PatcherInterface {
 		}
 		drop(ctx);
 		join_all(futures).await;
-		#[cfg(feature = "verbose-debugging")]
-		println!("Finished pushing values");
 	}
 
 	pub async fn get_sharable_state<'a>(&'a self) -> SharableStateWrapper<'a> {

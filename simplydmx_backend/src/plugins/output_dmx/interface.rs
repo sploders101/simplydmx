@@ -279,23 +279,13 @@ impl OutputDriver for DMXInterface {
 	// Updates
 
 	async fn send_updates<'a>(&self, patcher_data: &'a SharableStateWrapper<'a>, data: Arc<FullMixerOutput>) {
-		#[cfg(feature = "verbose-debugging")]
-		println!("Getting sharable state");
-		#[cfg(feature = "verbose-debugging")]
-		println!("Got sharable state. Getting DMX context");
 		let ctx = self.1.read().await;
-		#[cfg(feature = "verbose-debugging")]
-		println!("Got DMX context");
-		// let mut active_universes = HashSet::<String>::new();
 
 		// Create default universes
-		let mut universes = HashMap::<Uuid, DMXFrame>::new();
-		for universe_id in ctx.universes.keys() {
-			universes.insert(universe_id.clone(), [0u8; 512]);
-			// if let Some(ref controller_id) = universe_info.controller {
-			// 	active_universes.insert(String::clone(controller_id));
-			// }
-		}
+		let mut universes = HashMap::<Uuid, DMXFrame>::from_iter(
+			ctx.universes.keys()
+				.map(|universe_id| (universe_id.clone(), [0u8; 512]))
+		);
 
 		// Add fixtures to universes
 		for (fixture_instance_id, fixture_instance_data) in ctx.fixtures.iter() {
@@ -332,8 +322,6 @@ impl OutputDriver for DMXInterface {
 			}
 		}
 		drop(patcher_data);
-		#[cfg(feature = "verbose-debugging")]
-		println!("Dropped sharable state");
 
 		// Sort universes into designated controller-centric HashMaps
 		let mut sorted_universes = HashMap::<String, HashMap::<Uuid, DMXFrame>>::new();

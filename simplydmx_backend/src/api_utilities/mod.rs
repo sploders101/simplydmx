@@ -119,27 +119,17 @@ async fn handle_command(plugin_context: PluginContext, command: JSONCommand, jug
 		match command {
 
 			JSONCommand::CallService { message_id, plugin_id, service_id, args } => {
-				#[cfg(feature = "verbose-debugging")]
-				println!("Getting {}.{}", &plugin_id, &service_id);
 				let result = plugin_context.get_service(&plugin_id, &service_id).await;
-				#[cfg(feature = "verbose-debugging")]
-				println!("Got {}.{}", &plugin_id, &service_id);
 				match result {
 					Ok(service) => {
-						#[cfg(feature = "verbose-debugging")]
-						println!("Calling {}.{} with {:?}", &plugin_id, service_id, args);
 						match service.call_json(args).await {
 							Ok(result) => {
-								#[cfg(feature = "verbose-debugging")]
-								println!("Sending response to {}.{}", &plugin_id, &service_id);
 								sender.send(JSONResponse::CallServiceResponse {
 									message_id,
 									result,
 								}).await.ok();
 							},
 							Err(error) => {
-								#[cfg(feature = "verbose-debugging")]
-								println!("Sending response to {}.{}", &plugin_id, &service_id);
 								sender.send(JSONResponse::CallServiceError {
 									message_id,
 									error: match error {
@@ -149,8 +139,6 @@ async fn handle_command(plugin_context: PluginContext, command: JSONCommand, jug
 								}).await.ok();
 							},
 						}
-						#[cfg(feature = "verbose-debugging")]
-						println!("Call to {}.{} finished", &plugin_id, &service_id);
 					},
 					Err(_) => {
 						sender.send(JSONResponse::CallServiceError {

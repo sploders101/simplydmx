@@ -184,8 +184,9 @@ pub mod exporter {
 
 		let manifest_directory = std::env::var("CARGO_MANIFEST_DIR").expect("Could not get project directory");
 		let mut rpc_path = std::path::PathBuf::from(manifest_directory);
-		println!("Manifest directory: {}", manifest_directory);
-		let mut rpc_ts = File::create(format!("{}/../simplydmx_frontend/src/scripts/api/ipc/rpc.ts", manifest_directory)).unwrap();
+		rpc_path.pop();
+		rpc_path.extend(["simplydmx_frontend", "src", "scripts", "api", "ipc", "rpc.ts"]);
+		let mut rpc_ts = File::create(&rpc_path).unwrap();
 		rpc_ts.write_all(format!("import {{ callService }} from \"./agnostic_abstractions\";\n\n\n{}\n\n{}\n", &types.into_iter().map(|ty| {
 			if let Some(docs) = ty.2 {
 				format!("{}\n{}", docs, ty.1)
@@ -193,7 +194,7 @@ pub mod exporter {
 				format!("/** This type is currently undocumented. I will be working to resolve this for all types in the near future. */\n{}", ty.1)
 			}
 		}).collect::<Vec<String>>().join("\n\n"), &rpc_modules).as_bytes()).unwrap();
-		println!("Types have been exported");
+		println!("Types have been exported to {}", rpc_path.to_str().unwrap());
 
 	}
 }

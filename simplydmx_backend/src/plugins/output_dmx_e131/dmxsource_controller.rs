@@ -1,25 +1,13 @@
-use std::{
-	thread,
-	collections::{
-		HashMap,
-		HashSet,
-	},
-	time::{
-		Duration,
-		Instant,
-	},
-	sync::atomic::{
-		AtomicBool,
-		Ordering,
-	},
-};
 use async_std::{
-	task::block_on,
-	sync::{
-		Arc,
-		Mutex,
-	},
 	channel,
+	sync::{Arc, Mutex},
+	task::block_on,
+};
+use std::{
+	collections::{HashMap, HashSet},
+	sync::atomic::{AtomicBool, Ordering},
+	thread,
+	time::{Duration, Instant},
 };
 
 use sacn::DmxSource;
@@ -28,7 +16,6 @@ use simplydmx_plugin_framework::PluginContext;
 pub type ControllerCache = Arc<Mutex<Option<HashMap<u16, [u8; 512]>>>>;
 
 pub async fn initialize_controller(plugin_context: PluginContext) -> ControllerCache {
-
 	let cache = Arc::new(Mutex::new(Some(HashMap::<u16, [u8; 512]>::new())));
 	let e131_cache = Arc::clone(&cache);
 
@@ -85,10 +72,13 @@ pub async fn initialize_controller(plugin_context: PluginContext) -> ControllerC
 		block_on(shutdown_confirm_sender.send(())).ok();
 	});
 
-	plugin_context.register_finisher("E.131 Shutdown", async move {
-		shutting_down.store(true, Ordering::Relaxed); // Mark controller thread for shutdown on next iteration
-		shutdown_confirm_receiver.recv().await.ok(); // Wait for controller thread to shut down
-	}).await.unwrap();
+	plugin_context
+		.register_finisher("E.131 Shutdown", async move {
+			shutting_down.store(true, Ordering::Relaxed); // Mark controller thread for shutdown on next iteration
+			shutdown_confirm_receiver.recv().await.ok(); // Wait for controller thread to shut down
+		})
+		.await
+		.unwrap();
 
 	return cache;
 }

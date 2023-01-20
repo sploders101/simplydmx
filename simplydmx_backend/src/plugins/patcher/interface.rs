@@ -1,52 +1,28 @@
-use std::collections::HashMap;
-use async_std::sync::{
-	Arc,
-	RwLock,
-};
+use async_std::sync::{Arc, RwLock};
 use async_trait::async_trait;
-use thiserror::Error;
-use futures::{
-	FutureExt,
-	future::join_all,
-};
+use futures::{future::join_all, FutureExt};
 use simplydmx_plugin_framework::*;
+use std::collections::HashMap;
+use thiserror::Error;
 use uuid::Uuid;
 
 use crate::{
-	mixer_utils::state::{
-		FullMixerOutput,
-		FullMixerBlendingData,
-		BlendingData,
-		SnapData,
-	},
+	impl_anyhow,
+	mixer_utils::state::{BlendingData, FullMixerBlendingData, FullMixerOutput, SnapData},
 	plugins::saver::Savable,
-	utilities::{
-		serialized_data::SerializedData,
-		forms::FormDescriptor,
-	}, impl_anyhow,
+	utilities::{forms::FormDescriptor, serialized_data::SerializedData},
 };
 
 use super::{
+	driver_plugin_api::{self, FixtureBundle, FixtureInstance, OutputDriver, SharableStateWrapper},
+	fixture_types::{ChannelSize, ChannelType, Segment},
 	state::PatcherContext,
-	fixture_types::{
-		ChannelType,
-		ChannelSize,
-		Segment,
-	},
-	driver_plugin_api::{
-		self,
-		OutputDriver,
-		SharableStateWrapper,
-		FixtureBundle,
-		FixtureInstance,
-	},
 };
 
 #[derive(Clone)]
-pub struct PatcherInterface(PluginContext, Arc::<RwLock::<PatcherContext>>);
+pub struct PatcherInterface(PluginContext, Arc<RwLock<PatcherContext>>);
 impl PatcherInterface {
-
-	pub fn new(plugin_context: PluginContext, patcher_ctx: Arc::<RwLock::<PatcherContext>>) -> Self {
+	pub fn new(plugin_context: PluginContext, patcher_ctx: Arc<RwLock<PatcherContext>>) -> Self {
 		return PatcherInterface(plugin_context, patcher_ctx);
 	}
 
@@ -59,7 +35,9 @@ impl PatcherInterface {
 
 		for (fixture_id, fixture_data) in ctx.sharable.fixtures.iter() {
 			if let Some(fixture_info) = ctx.sharable.library.get(&fixture_data.fixture_id) {
-				if let Some(fixture_personality) = fixture_info.personalities.get(&fixture_data.personality) {
+				if let Some(fixture_personality) =
+					fixture_info.personalities.get(&fixture_data.personality)
+				{
 					// Create containers for this fixture
 					let mut fixture_defaults = HashMap::new();
 					let mut fixture_blending_data = HashMap::new();
@@ -70,31 +48,48 @@ impl PatcherInterface {
 							match &channel_info.ch_type {
 								ChannelType::Linear { priority } => {
 									// Insert default value
-									fixture_defaults.insert(channel_id.clone(), channel_info.default);
+									fixture_defaults
+										.insert(channel_id.clone(), channel_info.default);
 									// Insert blending instructions
-									fixture_blending_data.insert(channel_id.clone(), BlendingData {
-										scheme: priority.clone(),
-										snap: SnapData::NoSnap,
-										allow_wrap: false,
-										max_value: get_max_value(&channel_info.size),
-										min_value: 0,
-									});
-								},
-								ChannelType::Segmented { segments, priority, snapping } => {
+									fixture_blending_data.insert(
+										channel_id.clone(),
+										BlendingData {
+											scheme: priority.clone(),
+											snap: SnapData::NoSnap,
+											allow_wrap: false,
+											max_value: get_max_value(&channel_info.size),
+											min_value: 0,
+										},
+									);
+								}
+								ChannelType::Segmented {
+									segments,
+									priority,
+									snapping,
+								} => {
 									// Insert default value
-									fixture_defaults.insert(channel_id.clone(), channel_info.default);
+									fixture_defaults
+										.insert(channel_id.clone(), channel_info.default);
 									// Insert blending instructions
-									fixture_blending_data.insert(channel_id.clone(), BlendingData {
-										scheme: priority.clone(),
-										snap: snapping.clone().unwrap_or(SnapData::NoSnap),
-										allow_wrap: false,
-										max_value: get_max_value_segments(&segments),
-										min_value: get_min_value_segments(&segments),
-									});
-								},
+									fixture_blending_data.insert(
+										channel_id.clone(),
+										BlendingData {
+											scheme: priority.clone(),
+											snap: snapping.clone().unwrap_or(SnapData::NoSnap),
+											allow_wrap: false,
+											max_value: get_max_value_segments(&segments),
+											min_value: get_min_value_segments(&segments),
+										},
+									);
+								}
 							}
 						} else {
-							log_error!(self.0, "Could not find channel {} in fixture {}", channel_id, &fixture_info.name);
+							log_error!(
+								self.0,
+								"Could not find channel {} in fixture {}",
+								channel_id,
+								&fixture_info.name
+							);
 						}
 					}
 
@@ -102,7 +97,12 @@ impl PatcherInterface {
 					default_values.insert(fixture_id.clone(), fixture_defaults);
 					blending_data.insert(fixture_id.clone(), fixture_blending_data);
 				} else {
-					log_error!(self.0, "Could not find personality {} for fixture {}", &fixture_data.personality, &fixture_info.name);
+					log_error!(
+						self.0,
+						"Could not find personality {} for fixture {}",
+						&fixture_data.personality,
+						&fixture_info.name
+					);
 				}
 			} else {
 				log_error!(self.0, "Could not find fixture {}", fixture_id);
@@ -115,19 +115,34 @@ impl PatcherInterface {
 	/// Registers an output plugin for use by the patcher.
 	pub async fn register_output_driver<T: OutputDriver>(&self, plugin: T) {
 		let mut ctx = self.1.write().await;
-		ctx.output_drivers.insert(plugin.get_id(), Arc::new(Box::new(plugin)));
+		ctx.output_drivers
+			.insert(plugin.get_id(), Arc::new(Box::new(plugin)));
 	}
 
 	/// Import a fixture bundle
-	pub async fn import_fixture(&self, fixture_bundle: FixtureBundle) -> Result<(), ImportFixtureError> {
+	pub async fn import_fixture(
+		&self,
+		fixture_bundle: FixtureBundle,
+	) -> Result<(), ImportFixtureError> {
 		let mut ctx = self.1.write().await;
-		if let Some(output_driver) = ctx.output_drivers.get(&fixture_bundle.fixture_info.output_driver) {
-			if let Err(controller_error) = output_driver.import_fixture(&fixture_bundle.fixture_info.id, fixture_bundle.output_info).await {
+		if let Some(output_driver) = ctx
+			.output_drivers
+			.get(&fixture_bundle.fixture_info.output_driver)
+		{
+			if let Err(controller_error) = output_driver
+				.import_fixture(&fixture_bundle.fixture_info.id, fixture_bundle.output_info)
+				.await
+			{
 				return Err(ImportFixtureError::ErrorFromController(controller_error));
 			} else {
 				// Controller successfully loaded protocol-specific details
-				ctx.sharable.library.insert(fixture_bundle.fixture_info.id.clone(), fixture_bundle.fixture_info);
-				self.0.emit("patcher.new_fixture".into(), FilterCriteria::None, ()).await;
+				ctx.sharable.library.insert(
+					fixture_bundle.fixture_info.id.clone(),
+					fixture_bundle.fixture_info,
+				);
+				self.0
+					.emit("patcher.new_fixture".into(), FilterCriteria::None, ())
+					.await;
 				return Ok(());
 			}
 		} else {
@@ -136,10 +151,15 @@ impl PatcherInterface {
 	}
 
 	/// Gets the form to display for creating a new fixture
-	pub async fn get_creation_form(&self, fixture_type: &Uuid) -> Result<FormDescriptor, GetCreationFormError> {
+	pub async fn get_creation_form(
+		&self,
+		fixture_type: &Uuid,
+	) -> Result<FormDescriptor, GetCreationFormError> {
 		let ctx = self.1.read().await;
 		if let Some(fixture_info) = ctx.sharable.library.get(&fixture_type) {
-			let output_driver = ctx.output_drivers.get(&fixture_info.output_driver)
+			let output_driver = ctx
+				.output_drivers
+				.get(&fixture_info.output_driver)
 				.expect("Found reference to non-existant driver in fixture library");
 			return Ok(output_driver.get_creation_form(&fixture_info).await?);
 		} else {
@@ -148,11 +168,16 @@ impl PatcherInterface {
 	}
 
 	/// Gets the form to display for creating a new fixture
-	pub async fn get_edit_form(&self, fixture_id: &Uuid) -> Result<FormDescriptor, GetEditFormError> {
+	pub async fn get_edit_form(
+		&self,
+		fixture_id: &Uuid,
+	) -> Result<FormDescriptor, GetEditFormError> {
 		let ctx = self.1.read().await;
 		if let Some(instance_info) = ctx.sharable.fixtures.get(&fixture_id) {
 			if let Some(fixture_info) = ctx.sharable.library.get(&instance_info.fixture_id) {
-				let output_driver = ctx.output_drivers.get(&fixture_info.output_driver)
+				let output_driver = ctx
+					.output_drivers
+					.get(&fixture_info.output_driver)
 					.expect("Found reference to non-existant driver in fixture library");
 				return Ok(output_driver.get_edit_form(&fixture_id).await?);
 			} else {
@@ -164,24 +189,45 @@ impl PatcherInterface {
 	}
 
 	/// Create a fixture
-	pub async fn create_fixture(&self, fixture_type: Uuid, personality: String, name: Option<String>, comments: Option<String>, form_data: SerializedData) -> Result<Uuid, CreateFixtureError> {
+	pub async fn create_fixture(
+		&self,
+		fixture_type: Uuid,
+		personality: String,
+		name: Option<String>,
+		comments: Option<String>,
+		form_data: SerializedData,
+	) -> Result<Uuid, CreateFixtureError> {
 		let mut ctx = self.1.write().await;
 		if let Some(fixture_type_info) = ctx.sharable.library.get(&fixture_type) {
 			if let Some(controller) = ctx.output_drivers.get(&fixture_type_info.output_driver) {
 				let instance_uuid = Uuid::new_v4();
-				if let Err(controller_error) = controller.create_fixture_instance(&ctx.sharable, &instance_uuid, fixture_type_info, &personality, form_data).await {
+				if let Err(controller_error) = controller
+					.create_fixture_instance(
+						&ctx.sharable,
+						&instance_uuid,
+						fixture_type_info,
+						&personality,
+						form_data,
+					)
+					.await
+				{
 					return Err(CreateFixtureError::ErrorFromController(controller_error));
 				} else {
 					// Controller successfully loaded protocol-specific details
 					ctx.sharable.fixture_order.push(instance_uuid.clone());
-					ctx.sharable.fixtures.insert(instance_uuid.clone(), FixtureInstance {
-						id: instance_uuid.clone(),
-						fixture_id: fixture_type,
-						personality,
-						name,
-						comments,
-					});
-					self.0.emit("patcher.patch_updated".into(), FilterCriteria::None, ()).await;
+					ctx.sharable.fixtures.insert(
+						instance_uuid.clone(),
+						FixtureInstance {
+							id: instance_uuid.clone(),
+							fixture_id: fixture_type,
+							personality,
+							name,
+							comments,
+						},
+					);
+					self.0
+						.emit("patcher.patch_updated".into(), FilterCriteria::None, ())
+						.await;
 					return Ok(instance_uuid);
 				}
 			} else {
@@ -212,7 +258,6 @@ impl PatcherInterface {
 		let ctx = self.1.read().await;
 		return SharableStateWrapper::new(ctx);
 	}
-
 }
 
 #[async_trait]
@@ -227,7 +272,7 @@ fn get_max_value(channel_size: &ChannelSize) -> u16 {
 	return match channel_size {
 		ChannelSize::U8 => 255,
 		ChannelSize::U16 => 65535,
-	}
+	};
 }
 
 fn get_max_value_segments(segments: &[Segment]) -> u16 {

@@ -3,14 +3,13 @@
 	windows_subsystem = "windows"
 )]
 
-pub mod plugins;
 pub mod api_utilities;
-pub mod mixer_utils;
-pub mod utilities;
 pub mod init;
+pub mod mixer_utils;
+pub mod plugins;
+pub mod utilities;
 
 fn main() {
-
 	#[cfg(all(feature = "export-services", feature = "gui"))]
 	compile_error!("export-services cannot be used with an application runtime. Please remove the runtime feature (eg. `gui`) or use `--no-default-features`");
 
@@ -19,5 +18,4 @@ fn main() {
 
 	#[cfg(feature = "export-services")]
 	init::exporter::rpc_coverage();
-
 }

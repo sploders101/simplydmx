@@ -1,6 +1,6 @@
+mod blender;
 mod commands;
 mod state;
-mod blender;
 
 use super::{
 	patcher::PatcherInterface,
@@ -18,40 +18,53 @@ use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 use uuid::Uuid;
 
-pub async fn initialize_mixer(plugin_context: PluginContext, saver: SaverInterface, patcher: PatcherInterface) -> Result<MixerInterface, MixerInitializationError> {
-
+pub async fn initialize_mixer(
+	plugin_context: PluginContext,
+	saver: SaverInterface,
+	patcher: PatcherInterface,
+) -> Result<MixerInterface, MixerInitializationError> {
 	// Create mixer context
-	let mixer_context = Arc::new(RwLock::new(if let Ok(data) = saver.load_data(&"mixer".into()).await {
-		if let Some(data) = data {
-			MixerContext::from_file(data)
+	let mixer_context = Arc::new(RwLock::new(
+		if let Ok(data) = saver.load_data(&"mixer".into()).await {
+			if let Some(data) = data {
+				MixerContext::from_file(data)
+			} else {
+				MixerContext::new()
+			}
 		} else {
-			MixerContext::new()
-		}
-	} else {
-		return Err(MixerInitializationError::UnrecognizedData);
-	}));
-
+			return Err(MixerInitializationError::UnrecognizedData);
+		},
+	));
 
 	// Declare events
 
-	plugin_context.declare_event::<()>(
-		"mixer.blind".into(),
-		Some("Emitted when blind mode is enabled or disabled".into()),
-	).await.unwrap();
+	plugin_context
+		.declare_event::<()>(
+			"mixer.blind".into(),
+			Some("Emitted when blind mode is enabled or disabled".into()),
+		)
+		.await
+		.unwrap();
 
-	plugin_context.declare_event::<()>(
-		"mixer.new_submaster".into(),
-		Some("Emitted when a new submaster is created".into()),
-	).await.unwrap();
+	plugin_context
+		.declare_event::<()>(
+			"mixer.new_submaster".into(),
+			Some("Emitted when a new submaster is created".into()),
+		)
+		.await
+		.unwrap();
 
-	plugin_context.declare_event::<FullMixerOutput>(
-		"mixer.final_output".into(),
-		Some("Emitted when the mixer's final output has been updated".into()),
-	).await.unwrap();
-
+	plugin_context
+		.declare_event::<FullMixerOutput>(
+			"mixer.final_output".into(),
+			Some("Emitted when the mixer's final output has been updated".into()),
+		)
+		.await
+		.unwrap();
 
 	// Start blender task
-	let update_sender = blender::start_blender(plugin_context.clone(), Arc::clone(&mixer_context), patcher).await;
+	let update_sender =
+		blender::start_blender(plugin_context.clone(), Arc::clone(&mixer_context), patcher).await;
 
 	// Send kickstart to blender task to recover any data that was saved
 	// TODO: Verify this is no longer needed due to the switch from wait-then-run rate-limiting to run-then-wait
@@ -61,28 +74,68 @@ pub async fn initialize_mixer(plugin_context: PluginContext, saver: SaverInterfa
 	let interface = MixerInterface::new(plugin_context.clone(), mixer_context, update_sender);
 
 	// Register services
-	plugin_context.register_service(true, commands::EnterBlindMode::new(interface.clone())).await.unwrap();
-	plugin_context.register_service(true, commands::SetBlindOpacity::new(interface.clone())).await.unwrap();
-	plugin_context.register_service(true, commands::GetBlindOpacity::new(interface.clone())).await.unwrap();
-	plugin_context.register_service(true, commands::RevertBlind::new(interface.clone())).await.unwrap();
-	plugin_context.register_service(true, commands::CommitBlind::new(interface.clone())).await.unwrap();
-	plugin_context.register_service(true, commands::CreateLayer::new(interface.clone())).await.unwrap();
-	plugin_context.register_service(true, commands::SetLayerContents::new(interface.clone())).await.unwrap();
-	plugin_context.register_service(true, commands::GetLayerContents::new(interface.clone())).await.unwrap();
-	plugin_context.register_service(true, commands::SetLayerOpacity::new(interface.clone())).await.unwrap();
-	plugin_context.register_service(true, commands::GetLayerOpacity::new(interface.clone())).await.unwrap();
-	plugin_context.register_service(true, commands::DeleteLayer::new(interface.clone())).await.unwrap();
+	plugin_context
+		.register_service(true, commands::EnterBlindMode::new(interface.clone()))
+		.await
+		.unwrap();
+	plugin_context
+		.register_service(true, commands::SetBlindOpacity::new(interface.clone()))
+		.await
+		.unwrap();
+	plugin_context
+		.register_service(true, commands::GetBlindOpacity::new(interface.clone()))
+		.await
+		.unwrap();
+	plugin_context
+		.register_service(true, commands::RevertBlind::new(interface.clone()))
+		.await
+		.unwrap();
+	plugin_context
+		.register_service(true, commands::CommitBlind::new(interface.clone()))
+		.await
+		.unwrap();
+	plugin_context
+		.register_service(true, commands::CreateLayer::new(interface.clone()))
+		.await
+		.unwrap();
+	plugin_context
+		.register_service(true, commands::SetLayerContents::new(interface.clone()))
+		.await
+		.unwrap();
+	plugin_context
+		.register_service(true, commands::GetLayerContents::new(interface.clone()))
+		.await
+		.unwrap();
+	plugin_context
+		.register_service(true, commands::SetLayerOpacity::new(interface.clone()))
+		.await
+		.unwrap();
+	plugin_context
+		.register_service(true, commands::GetLayerOpacity::new(interface.clone()))
+		.await
+		.unwrap();
+	plugin_context
+		.register_service(true, commands::DeleteLayer::new(interface.clone()))
+		.await
+		.unwrap();
 
 	// Register saving mechanism
-	saver.register_savable("mixer", interface.clone()).await.unwrap();
+	saver
+		.register_savable("mixer", interface.clone())
+		.await
+		.unwrap();
 
 	return Ok(interface);
 }
 
 #[derive(Clone)]
-pub struct MixerInterface(PluginContext, Arc<RwLock<MixerContext>>, Sender::<()>);
+pub struct MixerInterface(PluginContext, Arc<RwLock<MixerContext>>, Sender<()>);
 impl MixerInterface {
-	pub fn new(plugin_context: PluginContext, mixer_context: Arc<RwLock<MixerContext>>, update_sender: Sender::<()>) -> Self {
+	pub fn new(
+		plugin_context: PluginContext,
+		mixer_context: Arc<RwLock<MixerContext>>,
+		update_sender: Sender<()>,
+	) -> Self {
 		return Self(plugin_context, mixer_context, update_sender);
 	}
 
@@ -90,7 +143,6 @@ impl MixerInterface {
 	///
 	/// Returns The UUID for the old layer bin. Returns None/null if blind mode is already active.
 	async fn enter_blind_mode(&self) -> () {
-
 		// Get resources
 		let mut ctx = self.1.write().await;
 
@@ -98,7 +150,9 @@ impl MixerInterface {
 			ctx.blind_opacity = 0;
 			ctx.frozen_context = Some(ctx.default_context.clone());
 
-			self.0.emit("mixer.blind".into(), FilterCriteria::None, true).await;
+			self.0
+				.emit("mixer.blind".into(), FilterCriteria::None, true)
+				.await;
 			// self.2.send(()).await; // Not needed because changes would not be visible
 		}
 	}
@@ -156,9 +210,17 @@ impl MixerInterface {
 		let mut ctx = self.1.write().await;
 		let submaster_id = Uuid::new_v4();
 
-		ctx.default_context.user_submasters.insert(submaster_id.clone(), StaticLayer::default());
+		ctx.default_context
+			.user_submasters
+			.insert(submaster_id.clone(), StaticLayer::default());
 
-		self.0.emit("mixer.new_submaster".into(), FilterCriteria::None, submaster_id.clone()).await;
+		self.0
+			.emit(
+				"mixer.new_submaster".into(),
+				FilterCriteria::None,
+				submaster_id.clone(),
+			)
+			.await;
 
 		return submaster_id;
 	}
@@ -171,7 +233,6 @@ impl MixerInterface {
 		if let Some(submaster) = ctx.default_context.user_submasters.get_mut(&submaster_id) {
 			// Loop through fixtures in the delta
 			for (fixture_id, fixture_data) in submaster_delta.iter() {
-
 				// If fixture doesn't exist in the submaster, create it, then get the mutable data
 				if !submaster.values.contains_key(fixture_id) {
 					submaster.values.insert(fixture_id.clone(), HashMap::new());
@@ -180,21 +241,18 @@ impl MixerInterface {
 
 				// Loop through attributes in the delta
 				for (attribute_id, attribute_value) in fixture_data.iter() {
-
 					match attribute_value {
 						BlenderValue::None => {
 							current_fixture_data.remove(attribute_id);
-						},
+						}
 						value => {
 							current_fixture_data.insert(attribute_id.clone(), value.clone());
-						},
+						}
 					}
-
 				}
 
 				// TODO: ST: Emit `mixer.submaster_content`
 				// TODO: LT: Remove unused fixture maps so we don't loop through them unnecessarily
-
 			}
 			if let Some(opacity) = ctx.default_context.layer_opacities.get(&submaster_id) {
 				if *opacity > 0 {
@@ -208,9 +266,13 @@ impl MixerInterface {
 	}
 
 	/// Retrieves the contents of a layer
-	async fn get_layer_contents(&self, submaster_id: Uuid) -> Option::<StaticLayer> {
+	async fn get_layer_contents(&self, submaster_id: Uuid) -> Option<StaticLayer> {
 		let ctx = self.1.read().await;
-		return ctx.default_context.user_submasters.get(&submaster_id).cloned();
+		return ctx
+			.default_context
+			.user_submasters
+			.get(&submaster_id)
+			.cloned();
 	}
 
 	/// Sets the opacity of a layer (Optionally within a specific bin)
@@ -220,15 +282,22 @@ impl MixerInterface {
 	///
 	/// Returns a boolean indicating if the operation was successful (this can be safely ignored)
 	async fn set_layer_opacity(&self, submaster_id: Uuid, opacity: u16, auto_insert: bool) -> bool {
-
 		let mut ctx = self.1.write().await;
-		if ctx.default_context.user_submasters.contains_key(&submaster_id) {
-			ctx.default_context.layer_opacities.insert(submaster_id, opacity);
+		if ctx
+			.default_context
+			.user_submasters
+			.contains_key(&submaster_id)
+		{
+			ctx.default_context
+				.layer_opacities
+				.insert(submaster_id, opacity);
 			if auto_insert {
 				if opacity > 0 && !ctx.default_context.layer_order.contains(&submaster_id) {
 					ctx.default_context.layer_order.push(submaster_id.clone())
 				} else if opacity == 0 && ctx.default_context.layer_order.contains(&submaster_id) {
-					ctx.default_context.layer_order.retain(|x| *x != submaster_id);
+					ctx.default_context
+						.layer_order
+						.retain(|x| *x != submaster_id);
 				}
 			}
 			// TODO: Send this event only if the opacity *changes*
@@ -242,7 +311,7 @@ impl MixerInterface {
 	/// Gets the opacity of a layer (Optionally within a specific bin)
 	///
 	/// Returns the opacity of the layer, or `None` if it is not in the stack
-	async fn get_layer_opacity(&self, submaster_id: Uuid) -> Option::<u16> {
+	async fn get_layer_opacity(&self, submaster_id: Uuid) -> Option<u16> {
 		let ctx = self.1.read().await;
 		return match ctx.default_context.layer_opacities.get(&submaster_id) {
 			Some(opacity) => Some(*opacity),
@@ -257,17 +326,22 @@ impl MixerInterface {
 		let mut ctx = self.1.write().await;
 
 		// Remove submaster
-		let was_removed = ctx.default_context.user_submasters.remove(&submaster_id).is_some();
+		let was_removed = ctx
+			.default_context
+			.user_submasters
+			.remove(&submaster_id)
+			.is_some();
 
 		// Remove references
-		ctx.default_context.layer_order.retain(|x| x != &submaster_id);
+		ctx.default_context
+			.layer_order
+			.retain(|x| x != &submaster_id);
 		ctx.default_context.layer_opacities.remove(&submaster_id);
 
 		// Signal to update everything and return
 		self.2.send(()).await.ok();
 		return was_removed;
 	}
-
 }
 
 #[async_trait]

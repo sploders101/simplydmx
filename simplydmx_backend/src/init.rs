@@ -1,102 +1,98 @@
-use crate::plugins::{
-	self,
-	saver::SaverInitializationStatus,
-};
+use crate::plugins::{self, saver::SaverInitializationStatus};
 use simplydmx_plugin_framework::PluginManager;
 
 // Public so the GUI plugin can run it
 pub async fn async_main(plugin_manager: &PluginManager, data: Option<Vec<u8>>) {
-
 	// TODO: Error handling during init. This wasn't originally intended to be necessary,
 	// but since file loading re-starts plugins with untrusted data, it needs to be done.
 
 	let saver = plugins::saver::initialize(
-		plugin_manager.register_plugin(
-			"saver",
-			"Data Saver/Loader",
-		).await.unwrap(),
+		plugin_manager
+			.register_plugin("saver", "Data Saver/Loader")
+			.await
+			.unwrap(),
 		data,
-	).await.unwrap();
+	)
+	.await
+	.unwrap();
 
 	// Register core plugin
 	plugins::core::initialize(
-		plugin_manager.register_plugin(
-			"core",
-			"SimplyDMX Core",
-		).await.unwrap(),
-	).await;
+		plugin_manager
+			.register_plugin("core", "SimplyDMX Core")
+			.await
+			.unwrap(),
+	)
+	.await;
 
 	let patcher_interface = plugins::patcher::initialize(
-		plugin_manager.register_plugin(
-			"patcher",
-			"SimplyDMX Fixture Patcher",
-		).await.unwrap(),
+		plugin_manager
+			.register_plugin("patcher", "SimplyDMX Fixture Patcher")
+			.await
+			.unwrap(),
 		saver.clone(),
-	).await.unwrap();
+	)
+	.await
+	.unwrap();
 
 	plugins::mixer::initialize_mixer(
-		plugin_manager.register_plugin(
-			"mixer",
-			"SimplyDMX Mixer",
-		).await.unwrap(),
+		plugin_manager
+			.register_plugin("mixer", "SimplyDMX Mixer")
+			.await
+			.unwrap(),
 		saver.clone(),
 		patcher_interface.clone(),
-	).await.unwrap();
+	)
+	.await
+	.unwrap();
 
 	#[cfg(feature = "output-dmx")]
 	let dmx_interface = plugins::output_dmx::initialize(
-		plugin_manager.register_plugin(
-			"output_dmx",
-			"E1.31/sACN DMX Output",
-		).await.unwrap(),
+		plugin_manager
+			.register_plugin("output_dmx", "E1.31/sACN DMX Output")
+			.await
+			.unwrap(),
 		saver.clone(),
 		patcher_interface.clone(),
-	).await.unwrap();
+	)
+	.await
+	.unwrap();
 
 	#[cfg(feature = "output-dmx-e131")]
 	plugins::output_dmx_e131::initialize(
-		plugin_manager.register_plugin(
-			"output_dmx_e131",
-			"E1.31/sACN DMX Output",
-		).await.unwrap(),
+		plugin_manager
+			.register_plugin("output_dmx_e131", "E1.31/sACN DMX Output")
+			.await
+			.unwrap(),
 		saver.clone(),
 		dmx_interface.clone(),
-	).await.unwrap();
+	)
+	.await
+	.unwrap();
 
 	let init_status = saver.finish_initialization().await;
 	if let SaverInitializationStatus::FinishedUnsafe = init_status {
-		panic!("Save file contains features that are not compatible with this version of SimplyDMX");
+		panic!(
+			"Save file contains features that are not compatible with this version of SimplyDMX"
+		);
 	}
-
 }
-
 
 #[cfg(feature = "export-services")]
 pub mod exporter {
 	use async_std::task::block_on;
-	use simplydmx_plugin_framework::{
-		PluginManager,
-		ServiceDescription,
-		FilterCriteria,
-		ServiceArgumentOwned,
-		DropdownOptionJSON,
-		TypeSpecifierRetrievalError,
-	};
-	use tsify::Tsify;
-	use std::{
-		cmp::Ordering,
-		collections::HashMap,
-		fs::File,
-		io::Write,
-	};
 	use linkme::distributed_slice;
+	use simplydmx_plugin_framework::{
+		DropdownOptionJSON, FilterCriteria, PluginManager, ServiceArgumentOwned,
+		ServiceDescription, TypeSpecifierRetrievalError,
+	};
+	use std::{cmp::Ordering, collections::HashMap, fs::File, io::Write};
+	use tsify::Tsify;
 
 	#[distributed_slice]
 	pub static PORTABLETYPE: [(&'static str, &'static str, &'static Option<&'static str>)] = [..];
 
-
 	pub fn rpc_coverage() {
-
 		// Create plugin manager
 		let plugin_manager = PluginManager::new();
 
@@ -105,15 +101,55 @@ pub mod exporter {
 
 		// Sort types to enable deterministic exports for git tracking
 		let mut types: Vec<(&'static str, &'static str, &'static Option<&'static str>)> = vec![
-			("Uuid", "export type Uuid = string;", &Some(r#"/** Unique identifier used in various parts of the API. In TS, UUID does not have its own data type, so this just re-exports string. */"#)),
-			("Value", "export type Value = any;", &Some(r#"/** Represents Rust's `serde_json::Value` type. This is used for dynamic typing, like when using backend-defined forms. */"#)),
-			("FilterCriteria", FilterCriteria::DECL, &Some(r#"/** Represents criteria used to filter an event. For example, a submaster UUID could be used to filter submaster updates by that specific submaster */"#)),
-			("ServiceDescription", ServiceDescription::DECL, &Some(r#"/** Describes a service that can be called from an external API */"#)),
-			("ServiceArgumentOwned", ServiceArgumentOwned::DECL, &Some(r#"/** Describes an argument that must be passed to a service call */"#)),
-			("DropdownOptionJSON", DropdownOptionJSON::DECL, &Some(r#"/** Describes a value to be shown in a dropdown list */"#)),
-			("TypeSpecifierRetrievalError", TypeSpecifierRetrievalError::DECL, &Some(r#"/** Describes an error that occurred while retrieving items for a dropdown list */"#)),
+			(
+				"Uuid",
+				"export type Uuid = string;",
+				&Some(
+					r#"/** Unique identifier used in various parts of the API. In TS, UUID does not have its own data type, so this just re-exports string. */"#,
+				),
+			),
+			(
+				"Value",
+				"export type Value = any;",
+				&Some(
+					r#"/** Represents Rust's `serde_json::Value` type. This is used for dynamic typing, like when using backend-defined forms. */"#,
+				),
+			),
+			(
+				"FilterCriteria",
+				FilterCriteria::DECL,
+				&Some(
+					r#"/** Represents criteria used to filter an event. For example, a submaster UUID could be used to filter submaster updates by that specific submaster */"#,
+				),
+			),
+			(
+				"ServiceDescription",
+				ServiceDescription::DECL,
+				&Some(r#"/** Describes a service that can be called from an external API */"#),
+			),
+			(
+				"ServiceArgumentOwned",
+				ServiceArgumentOwned::DECL,
+				&Some(r#"/** Describes an argument that must be passed to a service call */"#),
+			),
+			(
+				"DropdownOptionJSON",
+				DropdownOptionJSON::DECL,
+				&Some(r#"/** Describes a value to be shown in a dropdown list */"#),
+			),
+			(
+				"TypeSpecifierRetrievalError",
+				TypeSpecifierRetrievalError::DECL,
+				&Some(
+					r#"/** Describes an error that occurred while retrieving items for a dropdown list */"#,
+				),
+			),
 		];
-		types.append(&mut PORTABLETYPE.into_iter().cloned().collect::<Vec::<(&'static str, &'static str, &'static Option<&'static str>)>>());
+		types.append(&mut PORTABLETYPE.into_iter().cloned().collect::<Vec<(
+			&'static str,
+			&'static str,
+			&'static Option<&'static str>,
+		)>>());
 		types.sort_by(|a, b| {
 			if a.0 > b.0 {
 				return Ordering::Greater;
@@ -165,7 +201,11 @@ pub mod exporter {
 				for arg in service.arguments {
 					// Using [31..] here to trim out Tsify's `type FunctionArgument = `
 					// Ideally this would be done in the macro, but there are some weird issues compiling `FunctionArgument::DECL[..]`
-					service_args_with_types.push(format!("{}: {}", arg.id, &arg.val_type[31..arg.val_type.len()-1]));
+					service_args_with_types.push(format!(
+						"{}: {}",
+						arg.id,
+						&arg.val_type[31..arg.val_type.len() - 1]
+					));
 					service_args_no_types.push(String::from(arg.id));
 				}
 
@@ -173,7 +213,11 @@ pub mod exporter {
 					"\t{}({}): Promise<{}> {{ return callService(\"{}\", \"{}\", [{}]) }},\n",
 					&service.id,
 					&service_args_with_types.join(", "),
-					if let Some(ref arg) = service.returns {&arg.val_type[31..arg.val_type.len()-1]} else {"void"},
+					if let Some(ref arg) = service.returns {
+						&arg.val_type[31..arg.val_type.len() - 1]
+					} else {
+						"void"
+					},
 					&plugin_id,
 					&service.id,
 					&service_args_no_types.join(", "),
@@ -182,10 +226,18 @@ pub mod exporter {
 			rpc_modules += "};\n";
 		}
 
-		let manifest_directory = std::env::var("CARGO_MANIFEST_DIR").expect("Could not get project directory");
+		let manifest_directory =
+			std::env::var("CARGO_MANIFEST_DIR").expect("Could not get project directory");
 		let mut rpc_path = std::path::PathBuf::from(manifest_directory);
 		rpc_path.pop();
-		rpc_path.extend(["simplydmx_frontend", "src", "scripts", "api", "ipc", "rpc.ts"]);
+		rpc_path.extend([
+			"simplydmx_frontend",
+			"src",
+			"scripts",
+			"api",
+			"ipc",
+			"rpc.ts",
+		]);
 		let mut rpc_ts = File::create(&rpc_path).unwrap();
 		rpc_ts.write_all(format!("import {{ callService }} from \"./agnostic_abstractions\";\n\n\n{}\n\n{}\n", &types.into_iter().map(|ty| {
 			if let Some(docs) = ty.2 {
@@ -195,6 +247,5 @@ pub mod exporter {
 			}
 		}).collect::<Vec<String>>().join("\n\n"), &rpc_modules).as_bytes()).unwrap();
 		println!("Types have been exported to {}", rpc_path.to_str().unwrap());
-
 	}
 }

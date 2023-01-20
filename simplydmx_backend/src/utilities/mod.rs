@@ -9,5 +9,5 @@ macro_rules! impl_anyhow {
 				return $variant(format!("{:?}", value));
 			}
 		}
-	}
+	};
 }

@@ -1,8 +1,8 @@
-use std::collections::HashMap;
 use async_std::sync::Arc;
+use std::collections::HashMap;
 use uuid::Uuid;
 
-use super::{fixture_types::FixtureInfo, driver_plugin_api::OutputDriver};
+use super::{driver_plugin_api::OutputDriver, fixture_types::FixtureInfo};
 
 use simplydmx_plugin_framework::*;
 
@@ -19,7 +19,7 @@ impl PatcherContext {
 				fixture_order: Vec::new(),
 				fixtures: HashMap::new(),
 			},
-		}
+		};
 	}
 	pub fn from_file(file: SharablePatcherState) -> Self {
 		return PatcherContext {
@@ -28,7 +28,6 @@ impl PatcherContext {
 		};
 	}
 }
-
 
 #[portable]
 /// Sharable (and serializable) component of the patcher state containing
@@ -39,11 +38,9 @@ pub struct SharablePatcherState {
 	pub fixtures: HashMap<Uuid, FixtureInstance>,
 }
 
-
 /// Identifies an individual instance of a fixture
 #[portable]
 pub struct FixtureInstance {
-
 	/// The ID of this particular fixture
 	pub id: Uuid,
 
@@ -58,5 +55,4 @@ pub struct FixtureInstance {
 
 	/// Arbitrary comments about this particular instance left by the user
 	pub comments: Option<String>,
-
 }

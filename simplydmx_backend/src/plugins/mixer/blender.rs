@@ -1,39 +1,30 @@
-use std::time::{
-	Instant,
-	Duration,
-};
+use super::state::MixerContext;
 use async_std::{
-	channel::{
-		self,
-		Sender,
-	},
-	sync::{
-		Arc,
-		RwLock,
-	},
+	channel::{self, Sender},
+	sync::{Arc, RwLock},
 	task,
 };
 use futures::{select, FutureExt};
 use simplydmx_plugin_framework::*;
-use super::state::MixerContext;
+use std::time::{Duration, Instant};
 
 use crate::{
-	plugins::patcher::PatcherInterface,
 	mixer_utils::{
-		layer::MixerLayer,
-		state::{
-			FullMixerOutput,
-			FullMixerBlendingData,
-		},
 		data_sources::LayerDataSources,
+		layer::MixerLayer,
+		state::{FullMixerBlendingData, FullMixerOutput},
 	},
+	plugins::patcher::PatcherInterface,
 };
-
 
 /// Start the blending engine
 ///
 /// This function creates a task for
-pub async fn start_blender(plugin_context: PluginContext, ctx: Arc<RwLock<MixerContext>>, patcher_interface: PatcherInterface) -> Sender<()> {
+pub async fn start_blender(
+	plugin_context: PluginContext,
+	ctx: Arc<RwLock<MixerContext>>,
+	patcher_interface: PatcherInterface,
+) -> Sender<()> {
 	let (sender, receiver) = channel::unbounded();
 
 	// Spawn the blender task when its dependencies have been satisfied.

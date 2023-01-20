@@ -6,8 +6,8 @@ pub use simplydmx_plugin_framework::*;
 
 use self::types::ShowFile;
 
-mod types;
 mod services;
+mod types;
 
 /// The trait that plugins should implement in order to save show data
 #[async_trait]
@@ -15,11 +15,13 @@ pub trait Savable: Send + Sync + 'static {
 	async fn save_data(&self) -> Result<Option<Vec<u8>>, String>;
 }
 
-
 /// Initialize the saver plugin, returning its interface.
 ///
 /// The saver plugin should be the first plugin initialized, as all other plugins can use its API to consume previously-loaded data.
-pub async fn initialize(plugin_context: PluginContext, loaded_data: Option<Vec<u8>>) -> Result<SaverInterface, String> {
+pub async fn initialize(
+	plugin_context: PluginContext,
+	loaded_data: Option<Vec<u8>>,
+) -> Result<SaverInterface, String> {
 	plugin_context.declare_event::<SaverInitializationStatus>(
 		"saver.load_status".into(),
 		Some("Emitted whenever initialization has finished and indicates if SimplyDMX's state is safe or not.".into()),
@@ -34,13 +36,19 @@ pub async fn initialize(plugin_context: PluginContext, loaded_data: Option<Vec<u
 		None
 	};
 
-	let saver_interface = SaverInterface(plugin_context.clone(), Arc::new(RwLock::new(SaverData {
-		status: SaverInitializationStatus::Initializing,
-		loaded_data,
-		savers: HashMap::new(),
-	})));
+	let saver_interface = SaverInterface(
+		plugin_context.clone(),
+		Arc::new(RwLock::new(SaverData {
+			status: SaverInitializationStatus::Initializing,
+			loaded_data,
+			savers: HashMap::new(),
+		})),
+	);
 
-	plugin_context.register_service(true, services::SaveShow::new(saver_interface.clone())).await.unwrap();
+	plugin_context
+		.register_service(true, services::SaveShow::new(saver_interface.clone()))
+		.await
+		.unwrap();
 
 	return Ok(saver_interface);
 }
@@ -57,9 +65,12 @@ pub struct SaverData {
 pub struct SaverInterface(PluginContext, Arc<RwLock<SaverData>>);
 
 impl SaverInterface {
-
 	/// Registers a `Savable<T>` interface
-	pub async fn register_savable(&self, id: impl Into<String>, interface: impl Savable) -> Result<(), RegisterSavableError> {
+	pub async fn register_savable(
+		&self,
+		id: impl Into<String>,
+		interface: impl Savable,
+	) -> Result<(), RegisterSavableError> {
 		let id = id.into();
 		let mut ctx = self.1.write().await;
 
@@ -84,7 +95,7 @@ impl SaverInterface {
 					if let Some(saved_data) = saved_data {
 						show_file.plugin_data.insert(String::clone(id), saved_data);
 					}
-				},
+				}
 				Err(error) => return Err(SaveError::SaverReturnedErr { error }),
 			}
 		}
@@ -95,7 +106,10 @@ impl SaverInterface {
 	}
 
 	/// Obtains a plugin's data from a file
-	pub async fn load_data<T: BidirectionalPortable>(&self, id: &String) -> Result<Option<T>, String> {
+	pub async fn load_data<T: BidirectionalPortable>(
+		&self,
+		id: &String,
+	) -> Result<Option<T>, String> {
 		let mut ctx = self.1.write().await;
 		if let Some(ref mut loaded_data) = ctx.loaded_data {
 			if let Some(encoded_data) = loaded_data.plugin_data.remove(id) {
@@ -121,12 +135,17 @@ impl SaverInterface {
 			ctx.status = SaverInitializationStatus::FinishedSafe;
 		}
 
-		self.0.emit("saver.load_status".into(), FilterCriteria::None, ctx.status.clone()).await;
+		self.0
+			.emit(
+				"saver.load_status".into(),
+				FilterCriteria::None,
+				ctx.status.clone(),
+			)
+			.await;
 		self.0.set_init_flag("finished".into()).await;
 
 		return ctx.status.clone();
 	}
-
 
 	pub async fn get_status(&self) -> SaverInitializationStatus {
 		return self.1.read().await.status.clone();
@@ -144,8 +163,12 @@ pub enum RegisterSavableError {
 #[portable]
 #[serde(tag = "type", content = "data")]
 pub enum SaveError {
-	SaverReturnedErr { error: String },
-	ErrorSerializing { error: String },
+	SaverReturnedErr {
+		error: String,
+	},
+	ErrorSerializing {
+		error: String,
+	},
 	/// This error is returned when a save operation would be considered unsafe, such as halfway through initialization
 	/// or if any unrecognized data is in the file.
 	Unsafe,
@@ -153,7 +176,9 @@ pub enum SaveError {
 impl<T: std::fmt::Debug> From<ciborium::ser::Error<T>> for SaveError {
 	fn from(error: ciborium::ser::Error<T>) -> Self {
 		match error {
-			ciborium::ser::Error::Io(error) => Self::ErrorSerializing { error: format!("{:?}", error) },
+			ciborium::ser::Error::Io(error) => Self::ErrorSerializing {
+				error: format!("{:?}", error),
+			},
 			ciborium::ser::Error::Value(error) => Self::ErrorSerializing { error },
 		}
 	}

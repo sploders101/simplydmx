@@ -1,12 +1,8 @@
-use simplydmx_plugin_framework::*;
 use super::MixerInterface;
-use crate::mixer_utils::{
-	state::SubmasterData,
-	static_layer::StaticLayer,
-};
+use crate::mixer_utils::{state::SubmasterData, static_layer::StaticLayer};
+use simplydmx_plugin_framework::*;
 
 use uuid::Uuid;
-
 
 // ┌──────────────────────────┐
 // │    Layer Bin Commands    │
@@ -15,14 +11,15 @@ use uuid::Uuid;
 #[interpolate_service(
 	"enter_blind_mode",
 	"Enter Blind Mode",
-	"Copies the default layer bin to a new one with 0 opacity, setting it as the new default.",
+	"Copies the default layer bin to a new one with 0 opacity, setting it as the new default."
 )]
 impl EnterBlindMode {
 	#![inner_raw(MixerInterface)]
-	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
+	pub fn new(mixer_interface: MixerInterface) -> Self {
+		Self(mixer_interface)
+	}
 
-	#[service_main(
-	)]
+	#[service_main()]
 	async fn main(self) -> () {
 		return self.0.enter_blind_mode().await;
 	}
@@ -31,11 +28,13 @@ impl EnterBlindMode {
 #[interpolate_service(
 	"set_blind_opacity",
 	"Set Blind Opacity",
-	"Sets the opacity of the blind layer",
+	"Sets the opacity of the blind layer"
 )]
 impl SetBlindOpacity {
 	#![inner_raw(MixerInterface)]
-	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
+	pub fn new(mixer_interface: MixerInterface) -> Self {
+		Self(mixer_interface)
+	}
 
 	#[service_main(
 		("Opacity", "The desired opacity of the layer bin"),
@@ -48,11 +47,13 @@ impl SetBlindOpacity {
 #[interpolate_service(
 	"get_blind_opacity",
 	"Get Layer Bin Opacity",
-	"Gets the opacity of the blind layer",
+	"Gets the opacity of the blind layer"
 )]
 impl GetBlindOpacity {
 	#![inner_raw(MixerInterface)]
-	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
+	pub fn new(mixer_interface: MixerInterface) -> Self {
+		Self(mixer_interface)
+	}
 
 	#[service_main(
 		("Blind Opacity", "The opacity of the blind layer bin. This will be None or null if blind mode is inactive"),
@@ -69,14 +70,15 @@ impl GetBlindOpacity {
 )]
 impl RevertBlind {
 	#![inner_raw(MixerInterface)]
-	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
+	pub fn new(mixer_interface: MixerInterface) -> Self {
+		Self(mixer_interface)
+	}
 
 	#[service_main()]
 	async fn main(self) {
 		return self.0.revert_blind().await;
 	}
 }
-
 
 #[interpolate_service(
 	"commit_blind",
@@ -85,14 +87,15 @@ impl RevertBlind {
 )]
 impl CommitBlind {
 	#![inner_raw(MixerInterface)]
-	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
+	pub fn new(mixer_interface: MixerInterface) -> Self {
+		Self(mixer_interface)
+	}
 
 	#[service_main()]
 	async fn main(self) {
 		return self.0.commit_blind().await;
 	}
 }
-
 
 // ┌──────────────────────┐
 // │    Layer Commands    │
@@ -101,11 +104,13 @@ impl CommitBlind {
 #[interpolate_service(
 	"create_layer",
 	"Create Submaster",
-	"Creates a new submaster that can be used for blending",
+	"Creates a new submaster that can be used for blending"
 )]
 impl CreateLayer {
 	#![inner_raw(MixerInterface)]
-	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
+	pub fn new(mixer_interface: MixerInterface) -> Self {
+		Self(mixer_interface)
+	}
 
 	#[service_main(
 		("Submaster ID", "UUID value that should be used from this point forward to identify the submaster", "mixer::layer_id"),
@@ -118,11 +123,13 @@ impl CreateLayer {
 #[interpolate_service(
 	"set_layer_contents",
 	"Set Layer Contents",
-	"Adds or removes content in a layer",
+	"Adds or removes content in a layer"
 )]
 impl SetLayerContents {
 	#![inner_raw(MixerInterface)]
-	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
+	pub fn new(mixer_interface: MixerInterface) -> Self {
+		Self(mixer_interface)
+	}
 
 	#[service_main(
 		("Submaster ID", "UUID value to identify the submaster", "mixer::layer_id"),
@@ -130,24 +137,29 @@ impl SetLayerContents {
 		("Success", "Boolean indicating whether or not the set was successful"),
 	)]
 	async fn main(self, submaster_id: Uuid, submaster_delta: SubmasterData) -> bool {
-		return self.0.set_layer_contents(submaster_id, submaster_delta).await;
+		return self
+			.0
+			.set_layer_contents(submaster_id, submaster_delta)
+			.await;
 	}
 }
 
 #[interpolate_service(
 	"get_layer_contents",
 	"Get Layer Contents",
-	"Retrieves the contents of a layer",
+	"Retrieves the contents of a layer"
 )]
 impl GetLayerContents {
 	#![inner_raw(MixerInterface)]
-	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
+	pub fn new(mixer_interface: MixerInterface) -> Self {
+		Self(mixer_interface)
+	}
 
 	#[service_main(
 		("Submaster ID", "The UUID that identifies the submaster in question", "mixer::layer_id"),
 		("Submaster Data", "The submaster's visible contents"),
 	)]
-	async fn main(self, submaster_id: Uuid) -> Option::<StaticLayer> {
+	async fn main(self, submaster_id: Uuid) -> Option<StaticLayer> {
 		return self.0.get_layer_contents(submaster_id).await;
 	}
 }
@@ -155,11 +167,13 @@ impl GetLayerContents {
 #[interpolate_service(
 	"set_layer_opacity",
 	"Set Layer Opacity",
-	"Sets the opacity of a layer (Optionally within a specific bin)",
+	"Sets the opacity of a layer (Optionally within a specific bin)"
 )]
 impl SetLayerOpacity {
 	#![inner_raw(MixerInterface)]
-	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
+	pub fn new(mixer_interface: MixerInterface) -> Self {
+		Self(mixer_interface)
+	}
 
 	#[service_main(
 		("Submaster ID", "The UUID that identifies the submaster to be changed", "mixer::layer_id"),
@@ -168,36 +182,39 @@ impl SetLayerOpacity {
 		("Success", "A boolean indicating if the opacity setting was successfully applied."),
 	)]
 	async fn main(self, submaster_id: Uuid, opacity: u16, auto_insert: bool) -> bool {
-		return self.0.set_layer_opacity(submaster_id, opacity, auto_insert).await;
+		return self
+			.0
+			.set_layer_opacity(submaster_id, opacity, auto_insert)
+			.await;
 	}
 }
 
 #[interpolate_service(
 	"get_layer_opacity",
 	"Get Layer Opacity",
-	"Gets the opacity of a layer (Optionally within a specific bin)",
+	"Gets the opacity of a layer (Optionally within a specific bin)"
 )]
 impl GetLayerOpacity {
 	#![inner_raw(MixerInterface)]
-	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
+	pub fn new(mixer_interface: MixerInterface) -> Self {
+		Self(mixer_interface)
+	}
 
 	#[service_main(
 		("Submaster ID", "The UUID that identifies the submaster to be changed", "mixer::layer_id"),
 		("Layer Opacity", "The opacity if the layer from 0 to 65535. None or null if the submaster is not currently in the stack. (effective 0)"),
 	)]
-	async fn main(self, submaster_id: Uuid) -> Option::<u16> {
+	async fn main(self, submaster_id: Uuid) -> Option<u16> {
 		return self.0.get_layer_opacity(submaster_id).await;
 	}
 }
 
-#[interpolate_service(
-	"delete_layer",
-	"Delete Layer",
-	"Deletes a layer from the registry",
-)]
+#[interpolate_service("delete_layer", "Delete Layer", "Deletes a layer from the registry")]
 impl DeleteLayer {
 	#![inner_raw(MixerInterface)]
-	pub fn new(mixer_interface: MixerInterface) -> Self { Self(mixer_interface) }
+	pub fn new(mixer_interface: MixerInterface) -> Self {
+		Self(mixer_interface)
+	}
 
 	#[service_main(
 		("Submaster ID", "The ID of the submaster you would like to delete", "mixer::layer_id"),

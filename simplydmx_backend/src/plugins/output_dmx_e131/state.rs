@@ -7,11 +7,7 @@ use uuid::Uuid;
 
 use crate::plugins::output_dmx::driver_types::DMXFrame;
 
-use super::{
-	dmxsource_controller::ControllerCache,
-	interface::E131DMXShowSave,
-};
-
+use super::{dmxsource_controller::ControllerCache, interface::E131DMXShowSave};
 
 pub struct E131State {
 	pub controller: Arc<Mutex<Option<HashMap<u16, DMXFrame>>>>,

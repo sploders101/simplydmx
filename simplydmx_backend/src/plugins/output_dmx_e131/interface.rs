@@ -1,46 +1,50 @@
 use std::collections::HashMap;
 
-use async_std::sync::{
-	Arc,
-	RwLock,
-};
+use async_std::sync::{Arc, RwLock};
 
-use uuid::Uuid;
 use async_trait::async_trait;
+use uuid::Uuid;
 
-use simplydmx_plugin_framework::*;
 use crate::{
-	plugins::{
-		patcher::driver_plugin_api::*,
-		output_dmx::driver_types::*,
-		saver::Savable,
-	},
+	plugins::{output_dmx::driver_types::*, patcher::driver_plugin_api::*, saver::Savable},
 	utilities::serialized_data::SerializedData,
 };
+use simplydmx_plugin_framework::*;
 
 use super::{
-	state::{
-		E131State,
-		E131Universe,
-	},
 	dmxsource_controller::initialize_controller,
+	state::{E131State, E131Universe},
 };
 
-
 #[derive(Clone)]
-pub struct E131DMXDriver(PluginContext, Arc::<RwLock::<E131State>>);
+pub struct E131DMXDriver(PluginContext, Arc<RwLock<E131State>>);
 impl E131DMXDriver {
 	pub async fn new(plugin_context: PluginContext) -> Self {
-		return E131DMXDriver(plugin_context.clone(), Arc::new(RwLock::new(E131State::new(initialize_controller(plugin_context).await))));
+		return E131DMXDriver(
+			plugin_context.clone(),
+			Arc::new(RwLock::new(E131State::new(
+				initialize_controller(plugin_context).await,
+			))),
+		);
 	}
 	pub async fn from_file(plugin_context: PluginContext, file: E131DMXShowSave) -> Self {
-		return E131DMXDriver(plugin_context.clone(), Arc::new(RwLock::new(E131State::from_file(initialize_controller(plugin_context).await, file))));
+		return E131DMXDriver(
+			plugin_context.clone(),
+			Arc::new(RwLock::new(E131State::from_file(
+				initialize_controller(plugin_context).await,
+				file,
+			))),
+		);
 	}
 
 	async fn create_universe(self, int_id: Uuid, data: E131Universe) -> Result<(), &'static str> {
 		let mut ctx = self.1.write().await;
 
-		if let Some(_) = ctx.universes.values().find(|universe| universe.external_universe == data.external_universe) {
+		if let Some(_) = ctx
+			.universes
+			.values()
+			.find(|universe| universe.external_universe == data.external_universe)
+		{
 			return Err("This external universe ID is taken");
 		}
 
@@ -89,7 +93,6 @@ impl E131DMXDriver {
 			*controller_lock = None;
 		}
 	}
-
 }
 
 #[portable]
@@ -102,15 +105,17 @@ pub struct E131DMXShowSave {
 impl Savable for E131DMXDriver {
 	async fn save_data(&self) -> Result<Option<Vec<u8>>, String> {
 		let ctx = self.1.read().await;
-		return Ok(Some(E131DMXShowSave {
-			universes: ctx.universes.clone(),
-		}.serialize_cbor()?));
+		return Ok(Some(
+			E131DMXShowSave {
+				universes: ctx.universes.clone(),
+			}
+			.serialize_cbor()?,
+		));
 	}
 }
 
 #[async_trait]
 impl DMXDriver for E131DMXDriver {
-
 	/// The unique ID of the DMX driver
 	fn get_id(&self) -> String {
 		return "e131".into();
@@ -132,7 +137,11 @@ impl DMXDriver for E131DMXDriver {
 	}
 
 	/// Registers a universe using data from a filled-in form
-	async fn register_universe(&self, id: &Uuid, form: SerializedData) -> Result<(), RegisterUniverseError> {
+	async fn register_universe(
+		&self,
+		id: &Uuid,
+		form: SerializedData,
+	) -> Result<(), RegisterUniverseError> {
 		let ctx = self.clone();
 		if let Err(error) = ctx.create_universe(id.clone(), form.deserialize()?).await {
 			return Err(RegisterUniverseError::Other(error.into()));
@@ -151,5 +160,4 @@ impl DMXDriver for E131DMXDriver {
 		let ctx = self.clone();
 		ctx.send_frames(universes).await;
 	}
-
 }

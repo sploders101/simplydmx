@@ -1,13 +1,10 @@
-mod validation;
 mod interactivity;
+mod validation;
 
 use simplydmx_plugin_framework::*;
 
 pub use self::interactivity::InteractiveDescription;
-pub use self::validation::{
-	NumberValidation,
-	ImplicitNumberValidation,
-};
+pub use self::validation::{ImplicitNumberValidation, NumberValidation};
 
 #[portable]
 #[serde(transparent)]
@@ -24,7 +21,10 @@ impl FormDescriptor {
 		conditions: InteractiveDescription,
 		builder: impl FnOnce(FormDescriptor) -> FormDescriptor,
 	) -> Self {
-		self.0.push(FormItem::Dynamic(conditions, builder(FormDescriptor::new()).0));
+		self.0.push(FormItem::Dynamic(
+			conditions,
+			builder(FormDescriptor::new()).0,
+		));
 		return self;
 	}
 
@@ -129,7 +129,9 @@ impl FormDescriptor {
 		self.0.push(FormItem::Dropdown(FormDropdown {
 			label: label.into(),
 			id: id.into(),
-			item_source: FormItemOptionSource::TypeSpec { typespec_id: typespec_id.into() },
+			item_source: FormItemOptionSource::TypeSpec {
+				typespec_id: typespec_id.into(),
+			},
 			value: serde_json::Value::Null,
 		}));
 		return self;
@@ -146,7 +148,9 @@ impl FormDescriptor {
 		self.0.push(FormItem::Dropdown(FormDropdown {
 			label: label.into(),
 			id: id.into(),
-			item_source: FormItemOptionSource::TypeSpec { typespec_id: typespec_id.into() },
+			item_source: FormItemOptionSource::TypeSpec {
+				typespec_id: typespec_id.into(),
+			},
 			value,
 		}));
 		return self;
@@ -182,7 +186,10 @@ impl FormDescriptor {
 		};
 
 		// Add section to FormDescriptor
-		self.0.push(FormItem::Section(FormSection { label: label.into(), form_item: Box::new(item) }));
+		self.0.push(FormItem::Section(FormSection {
+			label: label.into(),
+			form_item: Box::new(item),
+		}));
 		return self;
 	}
 
@@ -199,7 +206,8 @@ impl FormDescriptor {
 	///     )
 	/// ```
 	pub fn vertical(mut self, builder: impl FnOnce(FormDescriptor) -> FormDescriptor) -> Self {
-		self.0.push(FormItem::VerticalStack(builder(FormDescriptor::new()).0));
+		self.0
+			.push(FormItem::VerticalStack(builder(FormDescriptor::new()).0));
 		return self;
 	}
 
@@ -216,7 +224,8 @@ impl FormDescriptor {
 	///     )
 	/// ```
 	pub fn horizontal(mut self, builder: impl FnOnce(FormDescriptor) -> FormDescriptor) -> Self {
-		self.0.push(FormItem::HorizontalStack(builder(FormDescriptor::new()).0));
+		self.0
+			.push(FormItem::HorizontalStack(builder(FormDescriptor::new()).0));
 		return self;
 	}
 
@@ -289,18 +298,12 @@ pub struct FormDropdown {
 #[portable]
 /// Describes a source for dropdown/autocomplete options
 pub enum FormItemOptionSource {
-
 	/// Use a static set of values as the dropdown options
-	Static {
-		values: Vec<DropdownOptionJSON>,
-	},
+	Static { values: Vec<DropdownOptionJSON> },
 
 	/// Use a type specifier to source dropdown options. These are a plugin
 	/// framework construct that can be queried through the JSON API.
-	TypeSpec{
-		typespec_id: String
-	},
-
+	TypeSpec { typespec_id: String },
 }
 
 pub struct OptionsBuilder(Vec<DropdownOptionJSON>);
@@ -315,8 +318,6 @@ impl OptionsBuilder {
 }
 impl Into<FormItemOptionSource> for OptionsBuilder {
 	fn into(self) -> FormItemOptionSource {
-		return FormItemOptionSource::Static {
-			values: self.0,
-		};
+		return FormItemOptionSource::Static { values: self.0 };
 	}
 }

@@ -1,30 +1,24 @@
+use crate::{mixer_utils::state::SnapData, utilities::serialized_data::SerializedData};
 use simplydmx_plugin_framework::*;
-use uuid::Uuid;
-use crate::{
-	mixer_utils::state::SnapData,
-	utilities::serialized_data::SerializedData,
-};
 use std::collections::HashMap;
+use uuid::Uuid;
 
 use crate::mixer_utils::state::BlendingScheme;
 
 #[portable]
 /// Importable fixture descriptor bundle that includes output driver-specific information
 pub struct FixtureBundle {
-
 	/// Contains information about the fixture used for blending, identification, and capability detection
 	pub fixture_info: FixtureInfo,
 
 	/// Stores output information for the controller
 	pub output_info: SerializedData,
-
 }
 
 /// Data type that contains generic, protocol-erased information about a fixture such as name,
 /// metadata, personalities, and references to services within the output controller.
 #[portable]
 pub struct FixtureInfo {
-
 	/// The UUID to store this fixture as. This should be regenerated whenever a breaking change is made to the data.
 	///
 	/// Instances of this fixture will contain this UUID as a reference to the source data.
@@ -53,7 +47,6 @@ pub struct FixtureInfo {
 
 	/// Contains a string referencing the output driver associated with the fixture.
 	pub output_driver: String,
-
 }
 
 /// Metadata about the fixture, used for display in the UI
@@ -66,7 +59,6 @@ pub struct FixtureMeta {
 /// Information about a specific channel available on the fixture
 #[portable]
 pub struct Channel {
-
 	/// Size of the channel. SimplyDMX can store values as larger types, but the mixer will ensure the bounds of this
 	/// type are met, and outputs will truncate data to this length
 	pub size: ChannelSize,
@@ -77,7 +69,6 @@ pub struct Channel {
 
 	/// Dictates how the channel should be blended/controlled
 	pub ch_type: ChannelType,
-
 }
 
 /// Dictates the size of the output. Values will be stored as the largest of these options, but bounds
@@ -105,7 +96,6 @@ pub enum ChannelType {
 /// Identifies a segment used in a segmented channel
 #[portable]
 pub struct Segment {
-
 	/// The minimum value available within this segment
 	pub start: u16,
 
@@ -117,7 +107,6 @@ pub struct Segment {
 
 	/// An arbitrary ID used to identify this segment
 	pub id: String,
-
 }
 
 /// Identifies non-implementation-specific features of a personality.

@@ -1,6 +1,5 @@
 use simplydmx_plugin_framework::*;
 
-
 #[portable]
 /// Describes a function that can be used to add interactivity to a form
 pub enum InteractiveDescription {

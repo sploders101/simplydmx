@@ -1,29 +1,22 @@
 use std::ops::Deref;
 
+pub use crate::{impl_anyhow, utilities::forms::FormDescriptor};
+use crate::{
+	impl_deserialize_err, mixer_utils::state::FullMixerOutput,
+	utilities::serialized_data::SerializedData,
+};
 use async_std::sync::{Arc, RwLockReadGuard};
 pub use uuid::Uuid;
-use crate::{
-	impl_deserialize_err,
-	utilities::serialized_data::SerializedData,
-	mixer_utils::state::FullMixerOutput,
-};
-pub use crate::{
-	impl_anyhow,
-	utilities::forms::FormDescriptor,
-};
 
 use async_trait::async_trait;
-use thiserror::Error;
 use simplydmx_plugin_framework::*;
+use thiserror::Error;
 
-pub use super::PatcherInterface;
 use super::state::PatcherContext;
+pub use super::PatcherInterface;
 pub use super::{
 	fixture_types::*,
-	state::{
-		SharablePatcherState,
-		FixtureInstance,
-	},
+	state::{FixtureInstance, SharablePatcherState},
 };
 
 pub struct SharableStateWrapper<'a>(RwLockReadGuard<'a, PatcherContext>);
@@ -41,7 +34,6 @@ impl<'a> Deref for SharableStateWrapper<'a> {
 
 #[async_trait]
 pub trait OutputDriver: Send + Sync + 'static {
-
 	/// Gets the ID of the output driver, for use internally
 	fn get_id(&self) -> String;
 
@@ -95,8 +87,11 @@ pub trait OutputDriver: Send + Sync + 'static {
 	/// in a live setting.
 	///
 	/// `data` is the full mixer output. It is the responsibility of the driver to filter for items it cares about
-	async fn send_updates<'a>(&self, patcher_data: &'a SharableStateWrapper<'a>, data: Arc<FullMixerOutput>);
-
+	async fn send_updates<'a>(
+		&self,
+		patcher_data: &'a SharableStateWrapper<'a>,
+		data: Arc<FullMixerOutput>,
+	);
 }
 
 #[portable]

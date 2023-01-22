@@ -3,16 +3,12 @@ use std::{
 		HashMap,
 		HashSet,
 	},
-	sync::{
-		Arc,
-	},
+	sync::Arc,
 	future::Future,
 };
 use uuid::Uuid;
 use async_std::{
-	sync::{
-		RwLock,
-	},
+	sync::RwLock,
 	channel::{
 		self,
 		Sender,
@@ -32,6 +28,7 @@ use crate::{
 		RegisterEncodedListenerError,
 		PortableCborEvent,
 		PortableMessageGenericDeserializer,
+		ListenerHandle,
 	},
 	keep_alive::KeepAlive,
 	services::{
@@ -46,6 +43,7 @@ use crate::{
 		},
 	},
 	PortableMessageDeserializer,
+	ArcPortable,
 };
 
 use crate::keep_alive::{
@@ -138,8 +136,6 @@ impl PluginManager {
 #[derive(Clone)]
 pub struct PluginContext (Arc<PluginRegistry>, Arc<Plugin>);
 impl PluginContext {
-
-
 	// ┌──────────────────┐
 	// │    Public API    │
 	// └──────────────────┘
@@ -150,10 +146,17 @@ impl PluginContext {
 	///
 	/// Only one plugin can claim an ID at a time. If a plugin tries to register an ID that already exists,
 	/// an error will be returned.
-	async fn new(registry: &Arc<PluginRegistry>, id: String, name: String) -> Result<PluginContext, RegisterPluginError> {
-
+	async fn new(
+		registry: &Arc<PluginRegistry>,
+		id: String,
+		name: String,
+	) -> Result<PluginContext, RegisterPluginError> {
 		// Add a slot for discoverable services
-		registry.discoverable_services.write().await.insert(String::clone(&id), HashMap::new());
+		registry
+			.discoverable_services
+			.write()
+			.await
+			.insert(String::clone(&id), HashMap::new());
 
 		// Register the plugin
 		let mut plugins = registry.plugins.write().await;
@@ -164,7 +167,7 @@ impl PluginContext {
 
 		let plugin = Arc::new(Plugin {
 			id: String::clone(&id),
-			name: name,
+			name,
 			services: RwLock::new(HashMap::new()),
 			deserializers: RwLock::new(HashMap::new()),
 			init_flags: RwLock::new(HashSet::new()),
@@ -172,19 +175,34 @@ impl PluginContext {
 		plugins.insert(String::clone(&id), Arc::clone(&plugin));
 
 		// Signal that a new plugin has been registered
-		registry.evt_bus.write().await.emit(String::from("simplydmx.plugin_registered"), FilterCriteria::String(String::clone(&id)), String::clone(&id)).await;
+		registry
+			.evt_bus
+			.write()
+			.await
+			.emit(
+				String::from("simplydmx.plugin_registered"),
+				FilterCriteria::String(String::clone(&id)),
+				String::clone(&id),
+			)
+			.await;
 
 		// Create plugin context
-		let plugin_context = PluginContext (Arc::clone(&registry), plugin);
-		plugin_context.signal_dep(Dependency::Plugin{ plugin_id: id }).await;
+		let plugin_context = PluginContext(Arc::clone(&registry), plugin);
+		plugin_context
+			.signal_dep(Dependency::Plugin { plugin_id: id })
+			.await;
 
 		return Ok(plugin_context);
 	}
 
 	/// Set init flag to notify dependents of an initialization step
 	pub async fn set_init_flag(&self, flag_name: String) {
-		self.1.init_flags.write().await.insert(String::clone(&flag_name));
-		let dependency = Dependency::Flag{
+		self.1
+			.init_flags
+			.write()
+			.await
+			.insert(String::clone(&flag_name));
+		let dependency = Dependency::Flag {
 			plugin_id: self.1.id.clone(),
 			flag_id: flag_name,
 		};
@@ -197,10 +215,17 @@ impl PluginContext {
 
 	pub async fn register_deserializer<T: BidirectionalPortable>(&self, deserializer_id: String) {
 		let mut deserializers = self.1.deserializers.write().await;
-		deserializers.insert(deserializer_id, Arc::new(Box::new(PortableMessageDeserializer::<T>::new())));
+		deserializers.insert(
+			deserializer_id,
+			Arc::new(Box::new(PortableMessageDeserializer::<T>::new())),
+		);
 	}
 
-	pub async fn get_deserializer(&self, plugin_id: &str, deserializer_id: &str) -> Option<Arc<Box<dyn PortableMessageGenericDeserializer>>> {
+	pub async fn get_deserializer(
+		&self,
+		plugin_id: &str,
+		deserializer_id: &str,
+	) -> Option<Arc<Box<dyn PortableMessageGenericDeserializer>>> {
 		let plugins = self.0.plugins.read().await;
 		if let Some(plugin) = plugins.get(plugin_id) {
 			if let Some(deserializer) = plugin.deserializers.read().await.get(deserializer_id) {
@@ -216,14 +241,26 @@ impl PluginContext {
 	/// Register a new service with the system. This service can be discovered and called by other plugins, either by
 	/// downcasting to the original type, or using generic call methods implemented by the `Service` trait, allowing
 	/// things like user configuration.
-	pub async fn register_service<T: Service + Sync + Send + 'static>(&self, discoverable: bool, service: T) -> Result<(), ServiceRegistrationError> {
+	pub async fn register_service<T: Service + Sync + Send + 'static>(
+		&self,
+		discoverable: bool,
+		service: T,
+	) -> Result<(), ServiceRegistrationError> {
 		let service: Box<dyn Service + Sync + Send> = Box::new(service);
 		let id = String::from(service.get_id());
 		let name = String::from(service.get_name());
 		let description = String::from(service.get_description());
 		let signature = service.get_signature();
-		let arguments = signature.0.iter().map(|arg| ServiceArgumentOwned::from(arg.clone())).collect();
-		let returns = if let Some(ret) = signature.1 { Some(ServiceArgumentOwned::from(ret.clone())) } else { None };
+		let arguments = signature
+			.0
+			.iter()
+			.map(|arg| ServiceArgumentOwned::from(arg.clone()))
+			.collect();
+		let returns = if let Some(ret) = signature.1 {
+			Some(ServiceArgumentOwned::from(ret.clone()))
+		} else {
+			None
+		};
 
 		// Register service
 		let mut self_services = self.1.services.write().await;
@@ -235,46 +272,72 @@ impl PluginContext {
 
 		// Add service to discoverable list if applicable
 		if discoverable {
-			self.0.discoverable_services.write().await
-				.get_mut(&self.1.id).unwrap() // TODO: Add empty hashmap when plugin is created
-				.insert(String::clone(&id), ServiceDescription {
-					plugin_id: String::clone(&self.1.id),
-					id: String::clone(&id),
-					name,
-					description,
-					arguments,
-					returns,
-				});
+			self.0
+				.discoverable_services
+				.write()
+				.await
+				.get_mut(&self.1.id)
+				.unwrap() // TODO: Add empty hashmap when plugin is created
+				.insert(
+					String::clone(&id),
+					ServiceDescription {
+						plugin_id: String::clone(&self.1.id),
+						id: String::clone(&id),
+						name,
+						description,
+						arguments,
+						returns,
+					},
+				);
 		}
 
 		// Advertise service via evt_bus
-		self.0.evt_bus.write().await
-			.emit(String::from("simplydmx.service_registered"), FilterCriteria::None, String::from(&self.1.id) + "." + &id).await;
+		self.0
+			.evt_bus
+			.write()
+			.await
+			.emit(
+				String::from("simplydmx.service_registered"),
+				FilterCriteria::None,
+				String::from(&self.1.id) + "." + &id,
+			)
+			.await;
 
-		self.signal_dep(Dependency::Service{
+		self.signal_dep(Dependency::Service {
 			plugin_id: self.1.id.clone(),
 			service_id: id,
-		}).await;
+		})
+		.await;
 
 		return Ok(());
 	}
 
 	/// Unregister a service, removing it from any discovery lists
 	pub async fn unregister_service(&self, svc_id: &str) {
-
 		// Unregister Service
 		self.1.services.write().await.remove(svc_id);
 
 		// Remove service from discoverable list if applicable
-		self.0.discoverable_services.write().await
-			.get_mut(&self.1.id).unwrap()
+		self.0
+			.discoverable_services
+			.write()
+			.await
+			.get_mut(&self.1.id)
+			.unwrap()
 			.remove(svc_id);
 
 		// Advertise removal via evt_bus
 		let service_name = String::from(&self.1.id) + "." + svc_id;
-		self.0.evt_bus.write().await
-			.emit(String::from("simplydmx.service_removed"), FilterCriteria::String(service_name.clone()), service_name).await;
-
+		self.0
+			.evt_bus
+			.write()
+			.await
+			.emit(
+				String::from("simplydmx.service_removed"),
+				FilterCriteria::String(service_name.clone()),
+				service_name,
+			)
+			.await;
 	}
 
 	/// List Services
@@ -296,24 +359,26 @@ impl PluginContext {
 	/// `plugin_id`: The plugin that owns the service
 	///
 	/// `svc_id`: The ID of the service
-	pub async fn get_service(&self, plugin_id: &str, svc_id: &str) -> Result<Arc<Box<dyn Service + Sync + Send>>, GetServiceError> {
-
+	pub async fn get_service(
+		&self,
+		plugin_id: &str,
+		svc_id: &str,
+	) -> Result<Arc<Box<dyn Service + Sync + Send>>, GetServiceError> {
 		// Get plugin
 		let plugins = self.0.plugins.read().await;
 		let plugin = plugins.get(plugin_id);
 		if let Some(plugin) = plugin {
-
 			// Get service
 			let services = plugin.services.read().await;
 			let service = services.get(svc_id);
 			if let Some(service) = service {
-
 				return Ok(Arc::clone(service));
-
-			} else { return Err(GetServiceError::ServiceNotFound) }
-
-		} else { return Err(GetServiceError::PluginNotFound) }
-
+			} else {
+				return Err(GetServiceError::ServiceNotFound);
+			}
+		} else {
+			return Err(GetServiceError::PluginNotFound);
+		}
 	}
 
 	/// Declares an event on the bus so it can be translated between data formats and included in self-documentation.
@@ -324,72 +389,162 @@ impl PluginContext {
 	/// The type parameter is used to construct a generic deserializer used for translation.
 	///
 	/// Event description will be used for the SDK, and was added for future-proofing
-	pub async fn declare_event<T: BidirectionalPortable>(&self, event_name: String, _event_description: Option<String>) -> Result<(), DeclareEventError> {
-		return self.0.evt_bus.write().await.declare_event::<T>(event_name.into());
+	pub async fn declare_event<T: BidirectionalPortable>(
+		&self,
+		event_name: String,
+		_event_description: Option<String>,
+	) -> Result<(), DeclareEventError> {
+		return self
+			.0
+			.evt_bus
+			.write()
+			.await
+			.declare_event::<T>(event_name.into());
 	}
 
 	/// Sends an event on the bus. `T` gets cast to `Any`, boxed, wrapped in `Arc`,
 	/// and sent to all registered listeners.
-	pub async fn emit<T: BidirectionalPortable>(&self, event_name: String, filter: FilterCriteria, message: T) {
-		self.0.evt_bus.write().await.emit(event_name, filter, message).await;
+	pub async fn emit<T: BidirectionalPortable>(
+		&self,
+		event_name: String,
+		filter: FilterCriteria,
+		message: T,
+	) {
+		self.0
+			.evt_bus
+			.write()
+			.await
+			.emit(event_name, filter, message)
+			.await;
 	}
-	pub async fn emit_borrowed<T: BidirectionalPortable + Clone>(&self, event_name: String, filter: FilterCriteria, message: Arc<T>) {
-		self.0.evt_bus.write().await.emit_borrowed(event_name, filter, message).await;
+	pub async fn emit_borrowed<T: BidirectionalPortable + Clone>(
+		&self,
+		event_name: String,
+		filter: FilterCriteria,
+		message: Arc<T>,
+	) {
+		self.0
+			.evt_bus
+			.write()
+			.await
+			.emit_borrowed(event_name, filter, message)
+			.await;
 	}
 
 	/// Emits a JSON value to the bus, deserializing for listeners of other formats if
 	/// necessary/possible. It will always be repeated to JSON listeners, but will silently
 	/// fail to repeat on listeners of other protocols if deserialization fails
-	pub async fn emit_json(&self, event_name: String, filter: FilterCriteria, message: serde_json::Value) {
-		self.0.evt_bus.write().await.emit_json(event_name, filter, message).await;
+	pub async fn emit_json(
+		&self,
+		event_name: String,
+		filter: FilterCriteria,
+		message: serde_json::Value,
+	) {
+		self.0
+			.evt_bus
+			.write()
+			.await
+			.emit_json(event_name, filter, message)
+			.await;
 	}
 
 	/// Emits a CBOR value to the bus, deserializing for listeners of other formats if
 	/// necessary/possible. It will always be repeated to CBOR listeners, but will silently
 	/// fail to repeat on listeners of other protocols if deserialization fails
 	pub async fn emit_cbor(&self, event_name: String, filter: FilterCriteria, message: Vec<u8>) {
-		self.0.evt_bus.write().await.emit_cbor(event_name, filter, message).await;
+		self.0
+			.evt_bus
+			.write()
+			.await
+			.emit_cbor(event_name, filter, message)
+			.await;
+	}
+
+	pub async fn on<T: BidirectionalPortable>(
+		&self,
+		event_name: impl Into<String>,
+		filter: FilterCriteria,
+		callback: impl FnMut(ArcPortable<T>, Arc<FilterCriteria>) + Send + Sync + 'static,
+	) -> Result<ListenerHandle, RegisterListenerError> {
+		return self
+			.0
+			.evt_bus
+			.write()
+			.await
+			.on(event_name.into(), filter, callback);
+	}
+
+	pub async fn off<T: BidirectionalPortable>(&self, event_handle: ListenerHandle) {
+		return self.0.evt_bus.write().await.off(event_handle);
 	}
 
 	/// Registers an event listener on the bus of the given type. Returns
 	/// an instance of `EventReceiver<T>` which filters for the desired type
 	/// and wraps resulting values in `ArcPortable<T>` to make usage of the data
 	/// simpler.
-	pub async fn on<T: BidirectionalPortable>(&self, event_name: String, filter: FilterCriteria) -> Result<EventReceiver<T>, RegisterListenerError> {
-		return self.0.evt_bus.write().await.on::<T>(event_name, filter);
+	pub async fn listen<T: BidirectionalPortable>(
+		&self,
+		event_name: String,
+		filter: FilterCriteria,
+	) -> Result<EventReceiver<T>, RegisterListenerError> {
+		return self.0.evt_bus.write().await.listen::<T>(event_name, filter);
 	}
 
 	/// Registers a listener on the event bus that receives pre-encoded JSON events
-	pub async fn on_json(&self, event_name: String, filter: FilterCriteria) -> Result<Receiver<PortableJSONEvent>, RegisterEncodedListenerError> {
-		return self.0.evt_bus.write().await.on_json(event_name, filter);
+	pub async fn listen_json(
+		&self,
+		event_name: String,
+		filter: FilterCriteria,
+	) -> Result<Receiver<PortableJSONEvent>, RegisterEncodedListenerError> {
+		return self.0.evt_bus.write().await.listen_json(event_name, filter);
 	}
 
 	/// Registers a listener on the bus that receives pre-encoded CBOR events
-	pub async fn on_cbor(&self, event_name: String, filter: FilterCriteria) -> Result<Receiver<PortableCborEvent>, RegisterEncodedListenerError> {
+	pub async fn on_cbor(
+		&self,
+		event_name: String,
+		filter: FilterCriteria,
+	) -> Result<Receiver<PortableCborEvent>, RegisterEncodedListenerError> {
 		return self.0.evt_bus.write().await.on_cbor(event_name, filter);
 	}
 
 	/// Spawn the specified task when the set of dependencies has finished.
-	pub async fn spawn_when<'a, F>(&self, name: impl Into<String>, mut dependencies: Vec<Dependency>, blocker: F) -> Result<(), KeepAliveRegistrationError>
+	pub async fn spawn_when<'a, F>(
+		&self,
+		name: impl Into<String>,
+		mut dependencies: Vec<Dependency>,
+		blocker: F,
+	) -> Result<(), KeepAliveRegistrationError>
 	where
-		F: Future<Output = ()> + Send + 'static
+		F: Future<Output = ()> + Send + 'static,
 	{
 		// Consolidate list of dependencies to eliminate unnecessary locking
 		let mut needed_resources = HashMap::<&String, ConsolidatedDependencies>::new();
 		for dependency in dependencies.iter() {
 			match dependency {
-				Dependency::Flag{ plugin_id, flag_id } => {
+				Dependency::Flag { plugin_id, flag_id } => {
 					ensure_deplist(&mut needed_resources, plugin_id);
-					needed_resources.get_mut(plugin_id).unwrap().flags.push(flag_id);
-				},
-				Dependency::Plugin{ plugin_id } => {
+					needed_resources
+						.get_mut(plugin_id)
+						.unwrap()
+						.flags
+						.push(flag_id);
+				}
+				Dependency::Plugin { plugin_id } => {
 					ensure_deplist(&mut needed_resources, plugin_id);
 					needed_resources.get_mut(plugin_id).unwrap().plugin = true;
-				},
-				Dependency::Service{ plugin_id, service_id } => {
+				}
+				Dependency::Service {
+					plugin_id,
+					service_id,
+				} => {
 					ensure_deplist(&mut needed_resources, plugin_id);
-					needed_resources.get_mut(plugin_id).unwrap().services.push(service_id);
-				},
+					needed_resources
+						.get_mut(plugin_id)
+						.unwrap()
+						.services
+						.push(service_id);
+				}
 			}
 		}
 
@@ -405,13 +560,15 @@ impl PluginContext {
 			let plugin = plugins.get(plugin_id);
 			if let Some(plugin) = plugin {
 				if deps.plugin {
-					known_dependencies.push(Dependency::Plugin{ plugin_id: plugin_id.clone() });
+					known_dependencies.push(Dependency::Plugin {
+						plugin_id: plugin_id.clone(),
+					});
 				}
 				if deps.services.len() > 0 {
 					let services = plugin.services.read().await;
 					for service_id in deps.services {
 						if services.contains_key(service_id) {
-							known_dependencies.push(Dependency::Service{
+							known_dependencies.push(Dependency::Service {
 								plugin_id: plugin_id.clone(),
 								service_id: service_id.clone(),
 							});
@@ -422,7 +579,7 @@ impl PluginContext {
 					let flags = plugin.init_flags.read().await;
 					for flag_id in deps.flags {
 						if flags.contains(flag_id) {
-							known_dependencies.push(Dependency::Flag{
+							known_dependencies.push(Dependency::Flag {
 								plugin_id: plugin_id.clone(),
 								flag_id: flag_id.clone(),
 							});
@@ -436,27 +593,34 @@ impl PluginContext {
 		dependencies.retain(|dependency| !known_dependencies.contains(dependency));
 
 		// Spawn task to finish the process
-		return self.spawn(name, async move {
-			// Wait for dependencies to be resolved
-			while dependencies.len() > 0 {
-				if let Ok(next_dep) = receiver.recv().await {
-					dependencies.retain(|dependency| *dependency != *next_dep);
-				} else {
-					// The sender may be destroyed during shutdown, so
-					break;
+		return self
+			.spawn(name, async move {
+				// Wait for dependencies to be resolved
+				while dependencies.len() > 0 {
+					if let Ok(next_dep) = receiver.recv().await {
+						dependencies.retain(|dependency| *dependency != *next_dep);
+					} else {
+						// The sender may be destroyed during shutdown, so
+						break;
+					}
 				}
-			}
 
-			blocker.await;
-		}).await;
+				blocker.await;
+			})
+			.await;
 	}
 
 	/// Spawn the specified task when the set of dependencies has finished.
 	///
 	/// Ignore errors resulting from imminent shutdown
-	pub async fn spawn_when_volatile<'a, F>(&self, name: impl Into<String>, dependencies: Vec<Dependency>, blocker: F) -> ()
+	pub async fn spawn_when_volatile<'a, F>(
+		&self,
+		name: impl Into<String>,
+		dependencies: Vec<Dependency>,
+		blocker: F,
+	) -> ()
 	where
-		F: Future<Output = ()> + Send + 'static
+		F: Future<Output = ()> + Send + 'static,
 	{
 		let result = self.spawn_when(name, dependencies, blocker).await;
 		match result {
@@ -470,7 +634,11 @@ impl PluginContext {
 	/// Spawns a task that prevents application shutdown until complete.
 	///
 	/// `blocker`: The future to let finish before shutting down
-	pub async fn spawn<F>(&self, name: impl Into<String>, blocker: F) -> Result<(), KeepAliveRegistrationError>
+	pub async fn spawn<F>(
+		&self,
+		name: impl Into<String>,
+		blocker: F,
+	) -> Result<(), KeepAliveRegistrationError>
 	where
 		F: Future<Output = ()> + Send + 'static,
 	{
@@ -500,7 +668,11 @@ impl PluginContext {
 	/// sockets, notifying clients of shutdown, saving files, etc.
 	///
 	/// `finisher`: The future to drive during shutdown
-	pub async fn register_finisher<F>(&self, name: impl Into<String>, finisher: F) -> Result<Uuid, KeepAliveRegistrationError>
+	pub async fn register_finisher<F>(
+		&self,
+		name: impl Into<String>,
+		finisher: F,
+	) -> Result<Uuid, KeepAliveRegistrationError>
 	where
 		F: Future<Output = ()> + Send + 'static,
 	{
@@ -511,7 +683,10 @@ impl PluginContext {
 	/// Unregisters a previously-registered finisher, removing it from the list of things to do during shutdown
 	///
 	/// `finisher_id`: The UUID returned from the `register_finisher` call
-	pub async fn deregister_finisher<F>(&self, finisher_id: Uuid) -> Result<(), KeepAliveDeregistrationError> {
+	pub async fn deregister_finisher<F>(
+		&self,
+		finisher_id: Uuid,
+	) -> Result<(), KeepAliveDeregistrationError> {
 		let mut keep_alive = self.0.keep_alive.write().await;
 		return keep_alive.deregister_finisher(finisher_id).await;
 	}
@@ -521,7 +696,11 @@ impl PluginContext {
 	/// `type_id`: The ID of the type specifier, used in a service's `get_signature` function
 	///
 	/// `type_specifier`: The type specifier to be boxed and stored
-	pub async fn register_service_type_specifier<T: TypeSpecifier + Sync + Send + 'static>(&self, type_id: String, type_specifier: T) -> Result<(), TypeSpecifierRegistrationError> {
+	pub async fn register_service_type_specifier<T: TypeSpecifier + Sync + Send + 'static>(
+		&self,
+		type_id: String,
+		type_specifier: T,
+	) -> Result<(), TypeSpecifierRegistrationError> {
 		let mut type_specifiers = self.0.type_specifiers.write().await;
 		if type_specifiers.contains_key(&type_id) {
 			return Err(TypeSpecifierRegistrationError::NameConflict);
@@ -540,7 +719,10 @@ impl PluginContext {
 	/// `exclusive`: Whether or not the user should be allowed to type in their own values
 	///
 	/// `options`: The options themselves
-	pub async fn get_service_type_options(&self, type_id: &str) -> Result<Vec<DropdownOptionNative>, TypeSpecifierRetrievalError> {
+	pub async fn get_service_type_options(
+		&self,
+		type_id: &str,
+	) -> Result<Vec<DropdownOptionNative>, TypeSpecifierRetrievalError> {
 		let type_specifiers = self.0.type_specifiers.read().await;
 		if let Some(specifier) = type_specifiers.get(type_id) {
 			return Ok(specifier.get_options().await);
@@ -558,20 +740,26 @@ impl PluginContext {
 	/// `exclusive`: Whether or not the user should be allowed to type in their own values
 	///
 	/// `options`: The options themselves
-	pub async fn get_service_type_options_json(&self, type_id: &str) -> Result<Vec<DropdownOptionJSON>, TypeSpecifierRetrievalError> {
+	pub async fn get_service_type_options_json(
+		&self,
+		type_id: &str,
+	) -> Result<Vec<DropdownOptionJSON>, TypeSpecifierRetrievalError> {
 		let type_specifiers = self.0.type_specifiers.read().await;
 		if let Some(specifier) = type_specifiers.get(type_id) {
 			let native_options = specifier.get_options().await;
 			let mut json_options = Vec::<DropdownOptionJSON>::with_capacity(native_options.len());
 			for option in native_options {
-				json_options.push(option.try_into().map_err(|_| TypeSpecifierRetrievalError::SerializationError)?);
+				json_options.push(
+					option
+						.try_into()
+						.map_err(|_| TypeSpecifierRetrievalError::SerializationError)?,
+				);
 			}
 			return Ok(json_options);
 		} else {
 			return Err(TypeSpecifierRetrievalError::SpecifierNotFound);
 		}
 	}
-
 
 	// ┌────────────────────────┐
 	// │    Helper functions    │
@@ -586,6 +774,8 @@ impl PluginContext {
 		}
 	}
 }
+
+
 
 #[portable]
 pub enum TypeSpecifierRegistrationError {

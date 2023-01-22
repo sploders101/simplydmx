@@ -4,16 +4,14 @@ mod portable_message;
 
 use std::{
 	sync::Arc,
-	collections::HashMap,
+	collections::{HashMap, BTreeMap},
 	any::TypeId,
 };
 
-use async_std::{
-	channel::{
-		self,
-		Sender,
-		Receiver,
-	},
+use async_std::channel::{
+	self,
+	Sender,
+	Receiver,
 };
 
 use uuid::Uuid;
@@ -45,8 +43,14 @@ pub enum PortableEventGeneric<T: Sync + Send> {
 impl<T: Sync + Send> Clone for PortableEventGeneric<T> {
 	fn clone(&self) -> Self {
 		return match self {
-			&PortableEventGeneric::Msg { ref data, ref criteria } => { PortableEventGeneric::Msg { data: Arc::clone(data), criteria: Arc::clone(criteria) } },
-			&PortableEventGeneric::Shutdown => { PortableEventGeneric::Shutdown },
+			&PortableEventGeneric::Msg {
+				ref data,
+				ref criteria,
+			} => PortableEventGeneric::Msg {
+				data: Arc::clone(data),
+				criteria: Arc::clone(criteria),
+			},
+			&PortableEventGeneric::Shutdown => PortableEventGeneric::Shutdown,
 		};
 	}
 }
@@ -167,7 +171,10 @@ impl EventEmitter {
 	/// data (JSON and CBOR, for example) will be repeated verbatim on the bus for any listeners of the same protocol.
 	///
 	/// The type parameter is used to construct a generic deserializer used for translation.
-	pub fn declare_event<T: BidirectionalPortable>(&mut self, event_name: String) -> Result<(), DeclareEventError> {
+	pub fn declare_event<T: BidirectionalPortable>(
+		&mut self,
+		event_name: String,
+	) -> Result<(), DeclareEventError> {
 		// Check if event already exists
 		if self.listeners.contains_key(&event_name) {
 			let listener_info = self.listeners.get_mut(&event_name).unwrap();
@@ -193,13 +200,18 @@ impl EventEmitter {
 	/// an instance of `EventReceiver<T>` which filters for the desired type
 	/// and wraps resulting values in `ArcPortable<T>` to make usage of the data
 	/// simpler.
-	pub fn on<T: BidirectionalPortable>(&mut self, event_name: String, filter: FilterCriteria) -> Result<EventReceiver<T>, RegisterListenerError> {
+	pub fn listen<T: BidirectionalPortable>(
+		&mut self,
+		event_name: String,
+		filter: FilterCriteria,
+	) -> Result<EventReceiver<T>, RegisterListenerError> {
 		self.gc();
 
 		if !self.listeners.contains_key(&event_name) {
 			self.listeners.insert(String::clone(&event_name), ListenerInfo::new());
 		}
 
+		// Unwrap ok here because we just created the entry
 		let listener_info = self.listeners.get_mut(&event_name).unwrap();
 
 		// Return error if types are incompatible. This is not required, but is done out of principle to
@@ -216,8 +228,51 @@ impl EventEmitter {
 		return Ok(EventReceiver::new(event_name, receiver));
 	}
 
+	/// Registers an event listeners on the bus of the given type.
+	///
+	/// Takes a closure to be called when an event occurs.
+	pub fn on<T: BidirectionalPortable>(
+		&mut self,
+		event_name: String,
+		filter: FilterCriteria,
+		mut callback: impl FnMut(ArcPortable<T>, Arc<FilterCriteria>) -> () + Sync + Send + 'static,
+	) -> Result<ListenerHandle, RegisterListenerError> {
+		self.gc();
+
+		if !self.listeners.contains_key(&event_name) {
+			self.listeners.insert(String::clone(&event_name), ListenerInfo::new());
+		}
+
+		// Unwrap ok here because we just created the entry
+		let listener_info = self.listeners.get_mut(&event_name).unwrap();
+
+		// Return error if types are incompatible. This is not required, but is done out of principle to
+		// ensure event types are consistent, which will help later with automated self-documentation.
+		if let Some(ref evt_info) = listener_info.evt_info {
+			if evt_info.type_id != TypeId::of::<T>() {
+				return Err(RegisterListenerError::EventClaimedAsType);
+			}
+		}
+
+		let listener = Box::new(move |event: Arc<Box<dyn PortableMessage>>, criteria: Arc<FilterCriteria>| {
+			if let Some(event) = ArcPortable::new(event) {
+				callback(event, criteria);
+			}
+		});
+
+		let id = Uuid::new_v4();
+		listener_info.closure_listeners.insert(id, (filter, listener));
+		return Ok(ListenerHandle(event_name, id));
+	}
+
+	pub fn off(&mut self, handle: ListenerHandle) {
+		if let Some(listener_info) = self.listeners.get_mut(&handle.0) {
+			listener_info.closure_listeners.remove(&handle.1);
+		}
+	}
+
 	/// Registers a listener on the event bus that receives pre-encoded JSON events
-	pub fn on_json(&mut self, event_name: String, filter: FilterCriteria) -> Result<Receiver<PortableJSONEvent>, RegisterEncodedListenerError> {
+	pub fn listen_json(&mut self, event_name: String, filter: FilterCriteria) -> Result<Receiver<PortableJSONEvent>, RegisterEncodedListenerError> {
 		self.gc();
 
 		if !self.listeners.contains_key(&event_name) {
@@ -401,6 +456,13 @@ pub struct ListenerInfo {
 	pub evt_info: Option<EventInfo>,
 	pub persistent: bool,
 	pub listeners: Vec<(FilterCriteria, Sender<PortableEvent>)>,
+	pub closure_listeners: BTreeMap<
+		Uuid,
+		(
+			FilterCriteria,
+			Box<dyn FnMut(Arc<Box<dyn PortableMessage>>, Arc<FilterCriteria>) -> () + Sync + Send + 'static>,
+		),
+	>,
 	pub json_listeners: Vec<(FilterCriteria, Sender<PortableJSONEvent>)>,
 	pub cbor_listeners: Vec<(FilterCriteria, Sender<PortableCborEvent>)>,
 }
@@ -416,6 +478,7 @@ impl ListenerInfo {
 			evt_info: None,
 			persistent: false,
 			listeners: Vec::new(),
+			closure_listeners: BTreeMap::new(),
 			json_listeners: Vec::new(),
 			cbor_listeners: Vec::new(),
 		};
@@ -428,6 +491,7 @@ impl ListenerInfo {
 			}),
 			persistent: true,
 			listeners: Vec::new(),
+			closure_listeners: BTreeMap::new(),
 			json_listeners: Vec::new(),
 			cbor_listeners: Vec::new(),
 		}
@@ -471,6 +535,17 @@ async fn send_shutdown<T: Send + Sync>(listeners: &[(FilterCriteria, Sender<Port
 	for listener in listeners {
 		listener.1.send(PortableEventGeneric::Shutdown).await.ok();
 	}
+}
+
+#[must_use]
+/// A handle to a listener. This can be used to clean up the listener later
+/// by calling the `off` function.
+pub struct ListenerHandle(String, Uuid);
+impl ListenerHandle {
+	/// This function drops the handle to the event, causing it to run for the
+	/// duration of the `EventEmitter`'s lifetime. Avoid calling this outside
+	/// of a setup function.
+	pub fn drop(self) {}
 }
 
 #[portable]

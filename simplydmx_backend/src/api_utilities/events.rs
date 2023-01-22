@@ -46,7 +46,7 @@ impl EventJuggler {
 		let descriptor = EventDescriptor(event_name.clone(), criteria.clone());
 		if !info.listeners.contains_key(&descriptor) {
 			let (sender, command_receiver) = channel::bounded(1);
-			let event_receiver = self.0.on_json(event_name.clone(), criteria.clone()).await?;
+			let event_receiver = self.0.listen_json(event_name.clone(), criteria.clone()).await?;
 			info.listeners.insert(descriptor, sender);
 
 			let juggler = Self::clone(&self);

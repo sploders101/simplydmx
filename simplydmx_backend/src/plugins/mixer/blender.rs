@@ -40,7 +40,7 @@ pub async fn start_blender(
 		};
 
 		// Set up patch updated listener
-		match plugin_context.on::<()>(String::from("patcher.patch_updated"), FilterCriteria::None).await {
+		match plugin_context.listen::<()>(String::from("patcher.patch_updated"), FilterCriteria::None).await {
 			Ok(listener) => {
 				let mut broken_link = false;
 				loop {

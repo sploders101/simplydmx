@@ -21,6 +21,7 @@ use self::{
 		GetPatcherState,
 		GetCreationForm,
 		GetEditForm,
+		EditFixture,
 	},
 };
 
@@ -53,6 +54,7 @@ pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface) ->
 	plugin_context.register_service(true, GetCreationForm::new(patcher_interface.clone())).await.unwrap();
 	plugin_context.register_service(true, GetPatcherState::new(patcher_interface.clone())).await.unwrap();
 	plugin_context.register_service(true, GetEditForm::new(patcher_interface.clone())).await.unwrap();
+	plugin_context.register_service(true, EditFixture::new(patcher_interface.clone())).await.unwrap();
 
 	saver.register_savable("patcher", patcher_interface.clone()).await.unwrap();
 

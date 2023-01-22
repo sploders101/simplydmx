@@ -298,11 +298,14 @@ impl OutputDriver for DMXInterface {
 
 	async fn edit_fixture_instance(
 		&self,
-		id: &Uuid,
+		patcher_state: &SharablePatcherState,
+		instance_id: &Uuid,
+		fixture_type_info: &FixtureInfo,
+		personality_id: &str,
 		form: SerializedData,
-	) -> Result<(), EditError> {
+	) -> Result<(), EditInstanceError> {
 		let mut ctx = self.1.write().await;
-		ctx.fixtures.insert(id.clone(), form.deserialize()?);
+		ctx.fixtures.insert(instance_id.clone(), form.deserialize()?);
 		return Ok(());
 	}
 

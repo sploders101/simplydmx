@@ -238,6 +238,66 @@ impl PatcherInterface {
 		}
 	}
 
+	/// Edit a fixture
+	pub async fn edit_fixture(
+		&self,
+		instance_id: &Uuid,
+		personality: String,
+		name: Option<String>,
+		comments: Option<String>,
+		form_data: SerializedData,
+	) -> Result<(), EditFixtureError> {
+		let mut ctx = self.1.write().await;
+
+		// Need to take ownership in order to mutate ctx. Make sure it gets put back.
+		if let Some((instance_id, fixture)) = ctx.sharable.fixtures.remove_entry(instance_id) {
+			if let Some(fixture_type_info) = ctx.sharable.library.get(&fixture.fixture_id) {
+				if let Some(controller) = ctx.output_drivers.get(&fixture_type_info.output_driver) {
+					if let Err(controller_err) = controller
+						.edit_fixture_instance(
+							&ctx.sharable,
+							&instance_id,
+							fixture_type_info,
+							&personality,
+							form_data,
+						)
+						.await
+					{
+						// Put the fixture back since we're not replacing it
+						ctx.sharable.fixtures.insert(instance_id, fixture);
+						return Err(EditFixtureError::ErrorFromController(controller_err));
+					} else {
+						// Insert the new fixture
+						ctx.sharable.fixtures.insert(
+							fixture.id,
+							FixtureInstance {
+								id: instance_id,
+								fixture_id: fixture.fixture_id,
+								personality,
+								name,
+								comments,
+							},
+						);
+						self.0
+							.emit("patcher.patch_updated".into(), FilterCriteria::None, ())
+							.await;
+						return Ok(());
+					}
+				} else {
+					// Put the fixture back since we can't edit
+					ctx.sharable.fixtures.insert(instance_id.clone(), fixture);
+					return Err(EditFixtureError::ControllerMissing);
+				}
+			} else {
+				// Put the fixture back since we can't edit
+				ctx.sharable.fixtures.insert(instance_id.clone(), fixture);
+				return Err(EditFixtureError::FixtureTypeMissing);
+			}
+		} else {
+			return Err(EditFixtureError::FixtureMissing);
+		}
+	}
+
 	/// Write values to the output plugins
 	pub async fn write_values(&self, data: Arc<FullMixerOutput>) {
 		let ctx = self.1.read().await;
@@ -355,4 +415,18 @@ impl From<anyhow::Error> for GetEditFormError {
 	fn from(value: anyhow::Error) -> Self {
 		return Self::ControllerError(value.to_string());
 	}
+}
+
+#[portable]
+#[derive(Error)]
+/// An error that could occur when creating a fixture
+pub enum EditFixtureError {
+	#[error("This fixture does not exist")]
+	FixtureMissing,
+	#[error("The fixture definition is missing for the requested fixture type")]
+	FixtureTypeMissing,
+	#[error("The controller responsible for this fixture is missing")]
+	ControllerMissing,
+	#[error("The controller reported an error while creating an instance of the fixture:\n{0:?}")]
+	ErrorFromController(driver_plugin_api::EditInstanceError),
 }

@@ -158,7 +158,7 @@ pub mod exporter {
 			} else {
 				return Ordering::Equal;
 			}
-		});
+	});
 
 		// Export services
 		let mut value = block_on(plugin_manager.list_services());

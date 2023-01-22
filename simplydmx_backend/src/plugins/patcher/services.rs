@@ -4,7 +4,10 @@ use uuid::Uuid;
 
 use super::{
 	driver_plugin_api::{FixtureBundle, SharablePatcherState},
-	interface::{CreateFixtureError, GetCreationFormError, GetEditFormError, ImportFixtureError},
+	interface::{
+		CreateFixtureError, EditFixtureError, GetCreationFormError, GetEditFormError,
+		ImportFixtureError,
+	},
 	PatcherInterface,
 };
 
@@ -53,8 +56,8 @@ impl CreateFixture {
 		self,
 		fixture_type: Uuid,
 		personality: String,
-		name: Option<String>,
-		comments: Option<String>,
+		name: Option::<String>,
+		comments: Option::<String>,
 		form_data: SerializedData,
 	) -> Result<Uuid, CreateFixtureError> {
 		return self
@@ -124,5 +127,37 @@ impl GetEditForm {
 	)]
 	async fn main(self, fixture_id: Uuid) -> Result<FormDescriptor, GetEditFormError> {
 		return self.0.get_edit_form(&fixture_id).await;
+	}
+}
+
+#[interpolate_service(
+	"edit_fixture",
+	"Edit Fixture",
+	"Edits the requested fixture using data provided by the user"
+)]
+impl EditFixture {
+	#![inner_raw(PatcherInterface)]
+
+	pub fn new(patcher_interface: PatcherInterface) -> Self {
+		Self(patcher_interface)
+	}
+
+	#[service_main(
+		("Fixture Instance ID", "The UUID of the particular fixture instance you would like to edit"),
+		("Personality ID", "The UUID of the personality you would like to use for the fixture"),
+		("Name", "An arbitrary name"),
+		("Comments", "Arbitrary comments"),
+		("Form Data", "Form data as given by the dynamic form from `get_edit_form`"),
+		("Form Descriptor", "A result containing either a FormDescriptor object or an error"),
+	)]
+	async fn main(
+		self,
+		instance_id: Uuid,
+		personality: String,
+		name: Option::<String>,
+		comments: Option::<String>,
+		form_data: SerializedData,
+	) -> Result<(), EditFixtureError> {
+		return self.0.edit_fixture(&instance_id, personality, name, comments, form_data).await;
 	}
 }

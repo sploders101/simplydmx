@@ -1,4 +1,8 @@
-use crate::mixer_utils::static_layer::StaticLayer;
+use crate::mixer_utils::{
+	layer::MixerLayer,
+	state::{FullMixerBlendingData, FullMixerOutput},
+	static_layer::StaticLayer,
+};
 use simplydmx_plugin_framework::*;
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -16,6 +20,19 @@ pub struct MixerContext {
 
 	/// The opacity of `default_context` when `frozen_context.is_some()`
 	pub blind_opacity: u16,
+}
+
+impl MixerContext {
+	pub async fn cleanup(&mut self, patcher_data: &(FullMixerOutput, FullMixerBlendingData)) {
+		for submaster in self.default_context.user_submasters.iter_mut() {
+			submaster.1.cleanup(patcher_data).await;
+		}
+		if let Some(ref mut mixing_context) = self.frozen_context {
+			for submaster in mixing_context.user_submasters.iter_mut() {
+				submaster.1.cleanup(patcher_data).await;
+			}
+		}
+	}
 }
 
 impl Default for MixerContext {

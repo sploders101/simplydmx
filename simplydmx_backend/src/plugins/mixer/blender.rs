@@ -1,4 +1,4 @@
-use super::state::MixerContext;
+use super::state::{MixerContext, MixingContext};
 use async_std::{
 	channel::{self, Sender},
 	sync::{Arc, RwLock},
@@ -6,6 +6,7 @@ use async_std::{
 };
 use futures::{select, FutureExt};
 use simplydmx_plugin_framework::*;
+use uuid::Uuid;
 use std::time::{Duration, Instant};
 
 use crate::{
@@ -50,17 +51,17 @@ pub async fn start_blender(
 					let mut animated = false;
 
 					// Unlock context
-					let ctx = ctx.read().await;
+					let ctx_read = ctx.read().await;
 
 					let locked_data_sources = data_sources.lock().await;
 
 					#[cfg(feature = "blender-benchmark")]
 					let start_bench = Instant::now();
 					let mut cumulative_layer: FullMixerOutput = locked_data_sources.base_layer().clone();
-					for layer_id in ctx.default_context.layer_order.iter() {
-						if let Some(opacity) = ctx.default_context.layer_opacities.get(layer_id) {
+					for layer_id in ctx_read.default_context.layer_order.iter() {
+						if let Some(opacity) = ctx_read.default_context.layer_opacities.get(layer_id) {
 							if *opacity == 0 { continue } // Skip if opacity is 0
-							if let Some(layer) = ctx.default_context.user_submasters.get(layer_id) {
+							if let Some(layer) = ctx_read.default_context.user_submasters.get(layer_id) {
 								if layer.animated() {
 									animated = true;
 								}
@@ -74,7 +75,7 @@ pub async fn start_blender(
 					let result = Arc::new(cumulative_layer);
 					patcher_interface.write_values(Arc::clone(&result)).await;
 
-					drop(ctx);
+					drop(ctx_read);
 
 					// Rate-limit the blender to cut down on unnecessary CPU usage
 					select! {
@@ -82,10 +83,10 @@ pub async fn start_blender(
 						// Patcher updates and shutdown requests can interrupt rate-limiting
 						msg = listener.receive().fuse() => match msg {
 							Event::Msg { .. } => {
-								let (new_base_layer, new_blending_data): (FullMixerOutput, FullMixerBlendingData) = patcher_interface.get_base_layer().await;
-								*data_sources.base_layer.write().await = Arc::new(new_base_layer);
-								*data_sources.blending_data.write().await = Arc::new(new_blending_data);
-								// TODO: Clean up submasters
+								let patcher_data: (FullMixerOutput, FullMixerBlendingData) = patcher_interface.get_base_layer().await;
+								ctx.write().await.cleanup(&patcher_data);
+								*data_sources.base_layer.write().await = Arc::new(patcher_data.0);
+								*data_sources.blending_data.write().await = Arc::new(patcher_data.1);
 							},
 							Event::Shutdown => break,
 						},
@@ -134,28 +135,3 @@ pub async fn start_blender(
 
 	return sender;
 }
-
-// /// Prunes all submasters of values associated with missing attributes
-// async fn prune_blender(ctx: &mut MixerContext, patcher_data: &(FullMixerOutput, FullMixerBlendingData)) -> () {
-// 	// Iterate over submasters
-// 	for submaster_data in ctx.submasters.values_mut() {
-// 		// Iterate over fixtures
-// 		let fixture_keys: Vec<Uuid> = submaster_data.data.keys().cloned().collect();
-// 		for fixture_id in fixture_keys {
-// 			if let Some(fixture_base) = patcher_data.0.get(&fixture_id) {
-// 				let fixture_data = submaster_data.data.get_mut(&fixture_id).unwrap(); // unwrapped because key was sourced from here
-// 				// Iterate over attributes
-// 				let attribute_keys: Vec<String> = fixture_data.keys().cloned().collect();
-// 				for attribute_id in attribute_keys {
-// 					if !fixture_base.contains_key(&attribute_id) {
-// 						// Delete attributes that no longer exist
-// 						fixture_data.remove(&attribute_id);
-// 					}
-// 				}
-// 			} else {
-// 				// Delete fixtures that no longer exist
-// 				submaster_data.data.remove(&fixture_id);
-// 			}
-// 		}
-// 	}
-// }

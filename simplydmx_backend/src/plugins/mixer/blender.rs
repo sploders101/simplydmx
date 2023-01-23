@@ -1,4 +1,4 @@
-use super::state::{MixerContext, MixingContext};
+use super::state::MixerContext;
 use async_std::{
 	channel::{self, Sender},
 	sync::{Arc, RwLock},
@@ -6,7 +6,6 @@ use async_std::{
 };
 use futures::{select, FutureExt};
 use simplydmx_plugin_framework::*;
-use uuid::Uuid;
 use std::time::{Duration, Instant};
 
 use crate::{
@@ -84,7 +83,7 @@ pub async fn start_blender(
 						msg = listener.receive().fuse() => match msg {
 							Event::Msg { .. } => {
 								let patcher_data: (FullMixerOutput, FullMixerBlendingData) = patcher_interface.get_base_layer().await;
-								ctx.write().await.cleanup(&patcher_data);
+								ctx.write().await.cleanup(&patcher_data).await;
 								*data_sources.base_layer.write().await = Arc::new(patcher_data.0);
 								*data_sources.blending_data.write().await = Arc::new(patcher_data.1);
 							},

@@ -3,7 +3,7 @@ use uuid::Uuid;
 
 use crate::utilities::serialized_data::SerializedData;
 
-use super::interface::{DMXInterface, LinkUniverseError};
+use super::interface::{DMXDriverDescription, DMXInterface, LinkUniverseError};
 
 #[interpolate_service(
 	"create_universe",
@@ -67,7 +67,7 @@ impl LinkUniverse {
 		driver: String,
 		form_data: SerializedData,
 	) -> Result<(), LinkUniverseError> {
-		return self.0.link_universe(&universe_id, driver, form_data).await;
+		return self.0.link_universe(universe_id, driver, form_data).await;
 	}
 }
 
@@ -87,5 +87,43 @@ impl UnlinkUniverse {
 	)]
 	async fn main(self, universe_id: Uuid) {
 		return self.0.unlink_universe(&universe_id).await;
+	}
+}
+
+#[interpolate_service(
+	"list_universes",
+	"List Universes",
+	"Lists the universes registered in the DMX driver"
+)]
+impl ListUniverses {
+	#![inner_raw(DMXInterface)]
+	pub fn new(interface: DMXInterface) -> Self {
+		Self(interface)
+	}
+
+	#[service_main(
+		("Universes", "An array of all universes registered with the DMX output driver"),
+	)]
+	async fn main(self) -> Vec<(Uuid, String)> {
+		return self.0.list_universes().await;
+	}
+}
+
+#[interpolate_service(
+	"list_drivers",
+	"List Drivers",
+	"List the DMX device drivers registered with the DMX output driver"
+)]
+impl ListDrivers {
+	#![inner_raw(DMXInterface)]
+	pub fn new(interface: DMXInterface) -> Self {
+		Self(interface)
+	}
+
+	#[service_main(
+		("Drivers", "An array of all driver descriptions"),
+	)]
+	async fn main(self) -> Vec<DMXDriverDescription> {
+		return self.0.list_drivers().await;
 	}
 }

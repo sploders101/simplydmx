@@ -37,6 +37,15 @@ impl DMXInterface {
 		let mut ctx = self.1.write().await;
 		ctx.drivers
 			.insert(plugin.get_id().into(), Arc::new(Box::new(plugin)));
+
+		// Emit event for any plugins that care
+		self.0
+			.emit(
+				"dmx.drivers_updated".into(),
+				FilterCriteria::None,
+				(),
+			)
+			.await;
 	}
 
 	/// Creates a new universe
@@ -51,6 +60,17 @@ impl DMXInterface {
 				controller: None,
 			},
 		);
+		ctx.universe_display_order.push(new_id);
+
+		// Emit event for any plugins that care
+		self.0
+			.emit(
+				"dmx.universes_updated".into(),
+				FilterCriteria::None,
+				(),
+			)
+			.await;
+
 		return new_id;
 	}
 
@@ -77,12 +97,13 @@ impl DMXInterface {
 
 			// Delete universe
 			ctx.universes.remove(&universe_id);
+			ctx.universe_display_order.retain(|id| id != &universe_id);
 
 			// Emit event for any plugins that care
 			self.0
 				.emit(
-					"dmx.universe_removed".into(),
-					FilterCriteria::Uuid(universe_id),
+					"dmx.universes_updated".into(),
+					FilterCriteria::None,
 					(),
 				)
 				.await;
@@ -92,14 +113,14 @@ impl DMXInterface {
 	/// Links an existing universe to a driver
 	pub async fn link_universe(
 		&self,
-		universe_id: &Uuid,
+		universe_id: Uuid,
 		driver: String,
 		form_data: SerializedData,
 	) -> Result<(), LinkUniverseError> {
 		let mut ctx = self.1.write().await;
-		if ctx.universes.contains_key(universe_id) {
+		if ctx.universes.contains_key(&universe_id) {
 			if let Some(controller) = ctx.drivers.get(&driver) {
-				if let Err(err) = controller.register_universe(universe_id, form_data).await {
+				if let Err(err) = controller.register_universe(&universe_id, form_data).await {
 					return Err(LinkUniverseError::ErrorFromController(err));
 				}
 			} else {
@@ -109,7 +130,17 @@ impl DMXInterface {
 			return Err(LinkUniverseError::UniverseNotFound);
 		}
 
-		ctx.universes.get_mut(universe_id).unwrap().controller = Some(driver);
+		ctx.universes.get_mut(&universe_id).unwrap().controller = Some(driver);
+
+		// Emit event for any plugins that care
+		self.0
+			.emit(
+				"dmx.universe_link_changed".into(),
+				FilterCriteria::Uuid(universe_id),
+				(),
+			)
+			.await;
+
 		return Ok(());
 	}
 
@@ -126,16 +157,50 @@ impl DMXInterface {
 				controller.delete_universe(universe_id).await;
 			}
 		}
+
+		// Emit event for any plugins that care
+		self.0
+			.emit(
+				"dmx.universe_link_changed".into(),
+				FilterCriteria::None,
+				(),
+			)
+			.await;
 	}
 
 	pub async fn list_universes(&self) -> Vec<(Uuid, String)> {
 		let ctx = self.1.write().await;
 		return ctx
-			.universes
-			.values()
-			.map(|universe| (universe.id.clone(), universe.name.clone()))
+			.universe_display_order
+			.iter()
+			.filter_map(|universe_id| {
+				ctx.universes
+					.get(universe_id)
+					.map(|universe| (universe_id.clone(), universe.name.clone()))
+			})
 			.collect();
 	}
+
+	pub async fn list_drivers(&self) -> Vec<DMXDriverDescription> {
+		let ctx = self.1.write().await;
+		return ctx
+			.drivers
+			.values()
+			.map(|driver| DMXDriverDescription {
+				name: String::from(driver.get_name()),
+				description: String::from(driver.get_description()),
+				id: String::from(driver.get_id()),
+			})
+			.collect();
+	}
+}
+
+#[portable]
+/// A description for a DMX driver
+pub struct DMXDriverDescription {
+	name: String,
+	description: String,
+	id: String,
 }
 
 #[portable]

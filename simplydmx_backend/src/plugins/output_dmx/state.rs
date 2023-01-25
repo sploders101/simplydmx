@@ -48,6 +48,7 @@ pub struct DMXState {
 	pub drivers: HashMap<String, Arc<Box<dyn DMXDriver>>>,
 	pub library: HashMap<Uuid, DMXFixtureData>,
 	pub fixtures: HashMap<Uuid, DMXFixtureInstance>,
+	pub universe_display_order: Vec<Uuid>,
 	pub universes: HashMap<Uuid, UniverseInstance>,
 }
 impl DMXState {
@@ -56,6 +57,7 @@ impl DMXState {
 			drivers: HashMap::new(),
 			library: HashMap::new(),
 			fixtures: HashMap::new(),
+			universe_display_order: Vec::new(),
 			universes: HashMap::new(),
 		};
 	}
@@ -64,6 +66,7 @@ impl DMXState {
 			drivers: HashMap::new(),
 			library: file.library,
 			fixtures: file.fixtures,
+			universe_display_order: Vec::new(),
 			universes: file.universes,
 		};
 	}

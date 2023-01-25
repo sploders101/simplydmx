@@ -31,15 +31,40 @@ pub async fn initialize(
 		.register_output_driver(output_context.clone())
 		.await;
 
-	plugin_context.declare_event::<Vec<u8>>(
-		"dmx.output".into(),
-		Some("The output of the DMX plugin, for display by the UI. This should not be used by DMX drivers.".into()),
-	).await.unwrap();
+	plugin_context
+		.declare_event::<Vec<u8>>(
+			"dmx.output".into(),
+			Some("The output of the DMX plugin, for display by the UI. This should not be used by DMX drivers.".into()),
+		)
+		.await
+		.unwrap();
 
 	plugin_context
 		.declare_event::<()>(
-			"dmx.universe_removed".into(),
-			Some("Emitted when a universe is removed from the DMX plugin".into()),
+			"dmx.universe_link_changed".into(),
+			Some("Emitted whenever a universe is linked/unlinked from a transport driver.".into()),
+		)
+		.await
+		.unwrap();
+	plugin_context
+		.declare_event::<()>(
+			"dmx.universes_updated".into(),
+			Some("Emitted whenever a universe is created or deleted.".into()),
+		)
+		.await
+		.unwrap();
+	plugin_context
+		.declare_event::<()>(
+			"dmx.drivers_updated".into(),
+			Some("Emitted whenever a driver is added.".into()),
+		)
+		.await
+		.unwrap();
+
+	plugin_context
+		.declare_event::<()>(
+			"dmx.universes_changed".into(),
+			Some("Emitted when a universe is removed from the DMX plugin.".into()),
 		)
 		.await
 		.unwrap();
@@ -58,6 +83,14 @@ pub async fn initialize(
 		.unwrap();
 	plugin_context
 		.register_service(true, services::UnlinkUniverse::new(output_context.clone()))
+		.await
+		.unwrap();
+	plugin_context
+		.register_service(true, services::ListUniverses::new(output_context.clone()))
+		.await
+		.unwrap();
+	plugin_context
+		.register_service(true, services::ListDrivers::new(output_context.clone()))
 		.await
 		.unwrap();
 

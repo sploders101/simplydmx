@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use async_std::sync::{Arc, RwLock};
 
 use async_trait::async_trait;
+use crate::utilities::forms::NumberValidation;
 use uuid::Uuid;
 
 use crate::{
@@ -117,23 +118,27 @@ impl Savable for E131DMXDriver {
 #[async_trait]
 impl DMXDriver for E131DMXDriver {
 	/// The unique ID of the DMX driver
-	fn get_id(&self) -> String {
-		return "e131".into();
+	fn get_id<'a>(&'a self) -> &'a str {
+		return "e131";
 	}
 
 	/// The human-readable name of the DMX driver
-	fn get_name(&self) -> String {
-		return "E.131/sACN".into();
+	fn get_name<'a>(&'a self) -> &'a str {
+		return "E.131/sACN";
 	}
 
 	/// A human-readable description of the driver, such as what devices and protocols it uses
-	fn get_description(&self) -> String {
-		return "Controls an E.131/sACN universe attached to the network".into();
+	fn get_description<'a>(&'a self) -> &'a str {
+		return "Controls an E.131/sACN universe attached to the network";
 	}
 
 	/// Gets a form used by the UI for linking a universe to this driver
 	async fn get_register_universe_form(&self) -> FormDescriptor {
-		return FormDescriptor::new();
+		return FormDescriptor::new()
+			.number("E.131 universe ID", "external_universe", NumberValidation::And(vec![
+				NumberValidation::Between(1.0, 63999.0),
+				NumberValidation::DivisibleBy(1.0),
+			]));
 	}
 
 	/// Registers a universe using data from a filled-in form

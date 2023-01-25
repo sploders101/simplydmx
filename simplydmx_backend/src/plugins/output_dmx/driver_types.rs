@@ -12,13 +12,13 @@ use uuid::Uuid;
 #[async_trait]
 pub trait DMXDriver: Send + Sync + 'static {
 	/// The unique ID of the DMX driver
-	fn get_id(&self) -> String;
+	fn get_id<'a>(&'a self) -> &'a str;
 
 	/// The human-readable name of the DMX driver
-	fn get_name(&self) -> String;
+	fn get_name<'a>(&'a self) -> &'a str;
 
 	/// A human-readable description of the driver, such as what devices and protocols it uses
-	fn get_description(&self) -> String;
+	fn get_description<'a>(&'a self) -> &'a str;
 
 	/// Gets a form used by the UI for linking a universe to this driver
 	async fn get_register_universe_form(&self) -> FormDescriptor;

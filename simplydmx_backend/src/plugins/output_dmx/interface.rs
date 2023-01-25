@@ -36,7 +36,7 @@ impl DMXInterface {
 	pub async fn register_dmx_driver<T: DMXDriver>(&self, plugin: T) {
 		let mut ctx = self.1.write().await;
 		ctx.drivers
-			.insert(plugin.get_id(), Arc::new(Box::new(plugin)));
+			.insert(plugin.get_id().into(), Arc::new(Box::new(plugin)));
 	}
 
 	/// Creates a new universe

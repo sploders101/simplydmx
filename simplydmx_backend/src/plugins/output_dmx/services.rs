@@ -1,9 +1,11 @@
 use simplydmx_plugin_framework::*;
 use uuid::Uuid;
 
-use crate::utilities::serialized_data::SerializedData;
+use crate::utilities::{forms::FormDescriptor, serialized_data::SerializedData};
 
-use super::interface::{DMXDriverDescription, DMXInterface, LinkUniverseError};
+use super::interface::{
+	DMXDriverDescription, DMXInterface, GetLinkUniverseFormError, LinkUniverseError,
+};
 
 #[interpolate_service(
 	"create_universe",
@@ -125,5 +127,59 @@ impl ListDrivers {
 	)]
 	async fn main(self) -> Vec<DMXDriverDescription> {
 		return self.0.list_drivers().await;
+	}
+}
+
+#[interpolate_service(
+	"get_linked_controller",
+	"Get Linked Controller",
+	"Gets the ID of the controller linked to a universe"
+)]
+impl GetLinkedController {
+	#![inner_raw(DMXInterface)]
+	pub fn new(interface: DMXInterface) -> Self {
+		Self(interface)
+	}
+
+	#[service_main(
+		("Universe ID", "The ID of the universe in question"),
+		("Controller ID", "The ID of the controller associated with the universe"),
+	)]
+	async fn main(self, universe_id: Uuid) -> Option<String> {
+		return self.0.get_linked_controller(&universe_id).await;
+	}
+}
+
+// pub async fn get_link_universe_form(
+// 		&self,
+// 		driver_id: &str,
+// 		universe_id: Option<&Uuid>,
+// 	) -> Result<FormDescriptor, GetLinkUniverseFormError>
+
+#[interpolate_service(
+	"get_link_universe_form",
+	"Get Link Universe Form",
+	"Gets a form for linking a universe"
+)]
+impl GetLinkUniverseForm {
+	#![inner_raw(DMXInterface)]
+	pub fn new(interface: DMXInterface) -> Self {
+		Self(interface)
+	}
+
+	#[service_main(
+		("Driver ID", "The ID of the driver to link the universe against"),
+		("Universe ID", "Optional universe ID whose data the form should be pre-filled with"),
+		("Form Descriptor", "A data object indicating how the 'link universe' form should be laid out")
+	)]
+	async fn main(
+		self,
+		driver_id: String,
+		universe_id: Option::<Uuid>,
+	) -> Result<FormDescriptor, GetLinkUniverseFormError> {
+		return self
+			.0
+			.get_link_universe_form(&driver_id, universe_id.as_ref())
+			.await;
 	}
 }

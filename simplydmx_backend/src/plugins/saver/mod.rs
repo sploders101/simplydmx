@@ -154,14 +154,12 @@ impl SaverInterface {
 
 /// An error returned when registering a saver. This is usually okay to unwrap, since it should be during init
 #[portable]
-#[serde(tag = "type")]
 pub enum RegisterSavableError {
 	SaverAlreadyExists,
 }
 
 /// An error returned by the saver if saving data failed
 #[portable]
-#[serde(tag = "type", content = "data")]
 pub enum SaveError {
 	SaverReturnedErr {
 		error: String,
@@ -185,7 +183,6 @@ impl<T: std::fmt::Debug> From<ciborium::ser::Error<T>> for SaveError {
 }
 
 #[portable]
-#[serde(tag = "type")]
 /// Describes the state of the show controller backend during initialization
 pub enum SaverInitializationStatus {
 	FinishedSafe,

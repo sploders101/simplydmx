@@ -81,7 +81,6 @@ pub enum ChannelSize {
 
 /// Describes information used for controlling and blending the channel
 #[portable]
-#[serde(tag = "type")]
 pub enum ChannelType {
 	Segmented {
 		segments: Vec<Segment>,

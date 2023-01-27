@@ -93,6 +93,14 @@ pub async fn initialize(
 		.register_service(true, services::ListDrivers::new(output_context.clone()))
 		.await
 		.unwrap();
+	plugin_context
+		.register_service(true, services::GetLinkedController::new(output_context.clone()))
+		.await
+		.unwrap();
+	plugin_context
+		.register_service(true, services::GetLinkUniverseForm::new(output_context.clone()))
+		.await
+		.unwrap();
 
 	plugin_context
 		.register_service_type_specifier(

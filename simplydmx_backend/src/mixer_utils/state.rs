@@ -13,7 +13,6 @@ pub type AbstractLayerLight = HashMap<String, BlenderValue>;
 
 /// Value to be used in a submaster with instructions for mixing it into the result
 #[portable]
-#[serde(tag = "type", content = "value")]
 pub enum BlenderValue {
 
 	/// Transparent value
@@ -59,7 +58,6 @@ pub enum BlendingScheme {
 }
 
 #[portable]
-#[serde(tag = "type", content = "data")]
 /// This indicates if a value should snap to a new value. This is useful for things like gobos, where
 /// intermediate values don't blend, and can instead cause distraction by rapidly switching between noticably
 /// discrete states.

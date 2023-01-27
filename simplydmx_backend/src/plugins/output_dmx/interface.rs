@@ -110,6 +110,39 @@ impl DMXInterface {
 		}
 	}
 
+	pub async fn get_linked_controller(
+		&self,
+		universe_id: &Uuid,
+	) -> Option<String> {
+		return self.1.read().await
+			.universes
+			.get(universe_id)
+			.and_then(|thing| thing.controller.clone());
+	}
+
+	/// Gets a form for linking a universe
+	///
+	/// `driver_id`: The ID of the currently-selected driver
+	/// `universe_id`: The ID of the universe being edited, if applicable
+	pub async fn get_link_universe_form(
+		&self,
+		driver_id: &str,
+		universe_id: Option<&Uuid>,
+	) -> Result<FormDescriptor, GetLinkUniverseFormError> {
+		let ctx = self.1.read().await;
+		if let Some(driver) = ctx.drivers.get(driver_id) {
+			return match driver.get_register_universe_form(universe_id).await {
+				Ok(form) => Ok(form),
+				Err(error) => Err(GetLinkUniverseFormError::ErrorFromController(format!(
+					"{:?}",
+					error
+				))),
+			};
+		} else {
+			return Err(GetLinkUniverseFormError::ControllerNotFound);
+		}
+	}
+
 	/// Links an existing universe to a driver
 	pub async fn link_universe(
 		&self,
@@ -507,10 +540,15 @@ fn insert_fixture_data(
 }
 
 #[portable]
-#[serde(tag = "type", content = "data")]
 /// An error that could occur while linking a DMX universe to a universe controller
 pub enum LinkUniverseError {
 	ErrorFromController(RegisterUniverseError),
 	UniverseNotFound,
+	ControllerNotFound,
+}
+
+#[portable]
+pub enum GetLinkUniverseFormError {
+	ErrorFromController(String),
 	ControllerNotFound,
 }

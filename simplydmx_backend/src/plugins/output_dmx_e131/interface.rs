@@ -133,12 +133,20 @@ impl DMXDriver for E131DMXDriver {
 	}
 
 	/// Gets a form used by the UI for linking a universe to this driver
-	async fn get_register_universe_form(&self) -> FormDescriptor {
-		return FormDescriptor::new()
-			.number("E.131 universe ID", "external_universe", NumberValidation::And(vec![
+	async fn get_register_universe_form(&self, universe_id: Option<&Uuid>) -> anyhow::Result<FormDescriptor> {
+		let ctx = if universe_id.is_some() { Some(self.1.read().await) } else { None };
+		let universe = if let Some(ref ctx) = ctx { ctx.universes.get(universe_id.unwrap()) } else { None };
+		return Ok(FormDescriptor::new().number_prefilled(
+			"E.131 universe ID",
+			"external_universe",
+			NumberValidation::And(vec![
 				NumberValidation::Between(1.0, 63999.0),
 				NumberValidation::DivisibleBy(1.0),
-			]));
+			]),
+			universe
+				.and_then(|universe| Some(universe.external_universe as f64))
+				.unwrap_or(1.0),
+		));
 	}
 
 	/// Registers a universe using data from a filled-in form

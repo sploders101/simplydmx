@@ -21,7 +21,7 @@ pub trait DMXDriver: Send + Sync + 'static {
 	fn get_description<'a>(&'a self) -> &'a str;
 
 	/// Gets a form used by the UI for linking a universe to this driver
-	async fn get_register_universe_form(&self) -> FormDescriptor;
+	async fn get_register_universe_form(&self, universe_id: Option<&Uuid>) -> anyhow::Result<FormDescriptor>;
 
 	/// Registers a universe using data from a filled-in form
 	async fn register_universe(

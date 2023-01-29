@@ -145,9 +145,7 @@ pub async fn initialize(
 	let mixer_interface_universe_linked = mixer_interface.clone();
 	plugin_context.on::<()>("dmx.universe_linked", FilterCriteria::None, move |_, _| {
 		let mixer_interface = mixer_interface_universe_linked.clone();
-		println!("Starting requester task");
 		task::spawn(async move {
-			println!("Requesting blend");
 			mixer_interface.request_blend().await;
 		});
 	}).await.unwrap().drop();

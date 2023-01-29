@@ -331,7 +331,9 @@ impl EventEmitter {
 				}
 			}
 
-			send_filtered(&filter, PortableEvent::Msg { data: Arc::new(Box::new(message)), criteria: Arc::clone(&filter) }, &listeners.listeners);
+			let message: Arc<Box<dyn PortableMessage>> = Arc::new(Box::new(message));
+			send_filtered(&filter, PortableEvent::Msg { data: Arc::clone(&message), criteria: Arc::clone(&filter) }, &listeners.listeners);
+			send_filtered_closures(&filter, &message, &mut listeners.closure_listeners.values_mut());
 		}
 
 	}
@@ -357,7 +359,9 @@ impl EventEmitter {
 			}
 
 			if relevant_listener(&filter, &listeners.listeners) {
-				send_filtered(&filter, PortableEvent::Msg { data: Arc::new(Box::new(T::clone(&message))), criteria: Arc::clone(&filter) }, &listeners.listeners);
+				let message: Arc<Box<dyn PortableMessage>> = Arc::new(Box::new(T::clone(&message)));
+				send_filtered(&filter, PortableEvent::Msg { data: Arc::clone(&message), criteria: Arc::clone(&filter) }, &listeners.listeners);
+				send_filtered_closures(&filter, &message, &mut listeners.closure_listeners.values_mut());
 			}
 
 		}
@@ -393,7 +397,9 @@ impl EventEmitter {
 
 			// Deserialized
 			if let Some(deserialized) = deserialized {
-				send_filtered(&filter, PortableEvent::Msg { data: Arc::new(deserialized), criteria: Arc::clone(&filter) }, &listeners.listeners);
+				let message: Arc<Box<dyn PortableMessage>> = Arc::new(deserialized);
+				send_filtered(&filter, PortableEvent::Msg { data: Arc::clone(&message), criteria: Arc::clone(&filter) }, &listeners.listeners);
+				send_filtered_closures(&filter, &message, &mut listeners.closure_listeners.values_mut());
 			}
 
 		}
@@ -428,7 +434,9 @@ impl EventEmitter {
 
 			// Deserialized
 			if let Some(deserialized) = deserialized {
-				send_filtered(&filter, PortableEvent::Msg { data: Arc::new(deserialized), criteria: Arc::clone(&filter) }, &listeners.listeners);
+				let message: Arc<Box<dyn PortableMessage>> = Arc::new(deserialized);
+				send_filtered(&filter, PortableEvent::Msg { data: Arc::clone(&message), criteria: Arc::clone(&filter) }, &listeners.listeners);
+				send_filtered_closures(&filter, &message, &mut listeners.closure_listeners.values_mut());
 			}
 
 		}
@@ -530,6 +538,33 @@ fn send_filtered<T: Sync + Send + 'static>(filter: &FilterCriteria, message: Por
 		}
 	}
 }
+
+fn send_filtered_closures(
+	filter: &Arc<FilterCriteria>,
+	message: &Arc<Box<dyn PortableMessage>>,
+	listeners: &mut dyn Iterator<
+		Item = &mut (
+			FilterCriteria,
+			Box<
+				dyn FnMut(Arc<Box<dyn PortableMessage>>, Arc<FilterCriteria>) -> ()
+					+ Sync
+					+ Send
+					+ 'static,
+			>,
+		),
+	>,
+) {
+	for listener in listeners {
+		if let FilterCriteria::None = listener.0 {
+			let cloned_message = Arc::clone(message);
+			listener.1(cloned_message, Arc::clone(filter));
+		} else if listener.0 == **filter {
+			let cloned_message = Arc::clone(message);
+			listener.1(cloned_message, Arc::clone(filter));
+		}
+	}
+}
+
 
 async fn send_shutdown<T: Send + Sync>(listeners: &[(FilterCriteria, Sender<PortableEventGeneric<T>>)]) {
 	for listener in listeners {

@@ -75,19 +75,19 @@ impl DMXInterface {
 	}
 
 	/// Delete a universe from the registry
-	pub async fn delete_universe(&self, universe_id: Uuid) {
+	pub async fn delete_universe(&self, universe_id: &Uuid) {
 		let mut ctx = self.1.write().await;
 		if ctx.universes.contains_key(&universe_id) {
 			// Unlink fixtures from universe
 			for fixture_info in ctx.fixtures.values_mut() {
-				if fixture_info.universe == Some(universe_id) {
+				if fixture_info.universe == Some(*universe_id) {
 					fixture_info.universe = None;
 					fixture_info.offset = None;
 				}
 			}
 
 			// Unlink universe from controller
-			if let Some(universe_data) = ctx.universes.get(&universe_id) {
+			if let Some(universe_data) = ctx.universes.get(universe_id) {
 				if let Some(ref driver_id) = universe_data.controller {
 					if let Some(ref driver) = ctx.drivers.get(driver_id) {
 						driver.delete_universe(&universe_id).await;
@@ -97,7 +97,7 @@ impl DMXInterface {
 
 			// Delete universe
 			ctx.universes.remove(&universe_id);
-			ctx.universe_display_order.retain(|id| id != &universe_id);
+			ctx.universe_display_order.retain(|id| id != universe_id);
 
 			// Emit event for any plugins that care
 			self.0
@@ -107,6 +107,14 @@ impl DMXInterface {
 					(),
 				)
 				.await;
+		}
+	}
+
+	/// Rename a universe
+	pub async fn rename_universe(&self, universe_id: &Uuid, name: String) {
+		let mut ctx = self.1.write().await;
+		if let Some(universe) = ctx.universes.get_mut(universe_id) {
+			universe.name = name;
 		}
 	}
 
@@ -150,6 +158,9 @@ impl DMXInterface {
 		driver: String,
 		form_data: SerializedData,
 	) -> Result<(), LinkUniverseError> {
+		self.unlink_universe(&universe_id).await;
+		// Order matters here. `unlink_universe` aquires a mutually exclusive lock,
+		// so call it before we do the same.
 		let mut ctx = self.1.write().await;
 		if ctx.universes.contains_key(&universe_id) {
 			if let Some(controller) = ctx.drivers.get(&driver) {
@@ -168,7 +179,7 @@ impl DMXInterface {
 		// Emit event for any plugins that care
 		self.0
 			.emit(
-				"dmx.universe_link_changed".into(),
+				"dmx.universe_linked".into(),
 				FilterCriteria::Uuid(universe_id),
 				(),
 			)
@@ -194,7 +205,7 @@ impl DMXInterface {
 		// Emit event for any plugins that care
 		self.0
 			.emit(
-				"dmx.universe_link_changed".into(),
+				"dmx.universe_unlinked".into(),
 				FilterCriteria::None,
 				(),
 			)
@@ -231,9 +242,9 @@ impl DMXInterface {
 #[portable]
 /// A description for a DMX driver
 pub struct DMXDriverDescription {
-	name: String,
-	description: String,
-	id: String,
+	pub name: String,
+	pub description: String,
+	pub id: String,
 }
 
 #[portable]

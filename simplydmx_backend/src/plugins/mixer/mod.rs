@@ -342,6 +342,10 @@ impl MixerInterface {
 		self.2.send(()).await.ok();
 		return was_removed;
 	}
+
+	pub async fn request_blend(&self) {
+		self.2.send(()).await.ok();
+	}
 }
 
 #[async_trait]

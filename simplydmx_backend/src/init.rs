@@ -35,7 +35,7 @@ pub async fn async_main(plugin_manager: &PluginManager, data: Option<Vec<u8>>) {
 	.await
 	.unwrap();
 
-	plugins::mixer::initialize_mixer(
+	let mixer_interface = plugins::mixer::initialize_mixer(
 		plugin_manager
 			.register_plugin("mixer", "SimplyDMX Mixer")
 			.await
@@ -53,6 +53,7 @@ pub async fn async_main(plugin_manager: &PluginManager, data: Option<Vec<u8>>) {
 			.await
 			.unwrap(),
 		saver.clone(),
+		mixer_interface.clone(),
 		patcher_interface.clone(),
 	)
 	.await

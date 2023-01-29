@@ -4,16 +4,18 @@ pub mod interface;
 pub mod services;
 pub mod state;
 
+use async_std::task;
 use async_trait::async_trait;
 use simplydmx_plugin_framework::*;
 
 use self::interface::DMXInterface;
 
-use super::{patcher::PatcherInterface, saver::SaverInterface};
+use super::{patcher::PatcherInterface, saver::SaverInterface, mixer::MixerInterface};
 
 pub async fn initialize(
 	plugin_context: PluginContext,
 	saver: SaverInterface,
+	mixer_interface: MixerInterface,
 	patcher_interface: PatcherInterface,
 ) -> Result<DMXInterface, DMXInitializationError> {
 	// Create plugin interface
@@ -41,8 +43,15 @@ pub async fn initialize(
 
 	plugin_context
 		.declare_event::<()>(
-			"dmx.universe_link_changed".into(),
-			Some("Emitted whenever a universe is linked/unlinked from a transport driver.".into()),
+			"dmx.universe_linked".into(),
+			Some("Emitted whenever a universe is linked to a transport driver.".into()),
+		)
+		.await
+		.unwrap();
+	plugin_context
+		.declare_event::<()>(
+			"dmx.universe_unlinked".into(),
+			Some("Emitted whenever a universe is unlinked from a transport driver.".into()),
 		)
 		.await
 		.unwrap();
@@ -101,6 +110,10 @@ pub async fn initialize(
 		.register_service(true, services::GetLinkUniverseForm::new(output_context.clone()))
 		.await
 		.unwrap();
+	plugin_context
+		.register_service(true, services::RenameUniverse::new(output_context.clone()))
+		.await
+		.unwrap();
 
 	plugin_context
 		.register_service_type_specifier(
@@ -116,11 +129,28 @@ pub async fn initialize(
 		)
 		.await
 		.unwrap();
+	plugin_context
+		.register_service_type_specifier(
+			"dmx_drivers_optional".into(),
+			OptionalDMXDriverTypeSpecifier(output_context.clone()),
+		)
+		.await
+		.unwrap();
 
 	saver
 		.register_savable("output_dmx", output_context.clone())
 		.await
 		.unwrap();
+
+	let mixer_interface_universe_linked = mixer_interface.clone();
+	plugin_context.on::<()>("dmx.universe_linked", FilterCriteria::None, move |_, _| {
+		let mixer_interface = mixer_interface_universe_linked.clone();
+		println!("Starting requester task");
+		task::spawn(async move {
+			println!("Requesting blend");
+			mixer_interface.request_blend().await;
+		});
+	}).await.unwrap().drop();
 
 	return Ok(output_context);
 }
@@ -163,6 +193,26 @@ impl TypeSpecifier for OptionalUniverseTypeSpecifier {
 				name,
 				description: None,
 				value: Box::new(Some(id)),
+			}
+		}));
+		return options;
+	}
+}
+
+pub struct OptionalDMXDriverTypeSpecifier(DMXInterface);
+#[async_trait]
+impl TypeSpecifier for OptionalDMXDriverTypeSpecifier {
+	async fn get_options(&self) -> Vec<DropdownOptionNative> {
+		let mut options = vec![DropdownOptionNative {
+			name: String::from("Unlinked"),
+			description: None,
+			value: Box::new(Option::<uuid::Uuid>::None),
+		}];
+		options.extend(self.0.list_drivers().await.into_iter().map(|description| {
+			DropdownOptionNative {
+				name: description.name,
+				description: Some(description.description),
+				value: Box::new(Some(description.id)),
 			}
 		}));
 		return options;

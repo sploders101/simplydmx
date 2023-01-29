@@ -42,7 +42,7 @@ impl DeleteUniverse {
 		("Universe ID", "The ID of the universe you would like to delete"),
 	)]
 	async fn main(self, universe_id: Uuid) -> () {
-		return self.0.delete_universe(universe_id).await;
+		return self.0.delete_universe(&universe_id).await;
 	}
 }
 
@@ -150,12 +150,6 @@ impl GetLinkedController {
 	}
 }
 
-// pub async fn get_link_universe_form(
-// 		&self,
-// 		driver_id: &str,
-// 		universe_id: Option<&Uuid>,
-// 	) -> Result<FormDescriptor, GetLinkUniverseFormError>
-
 #[interpolate_service(
 	"get_link_universe_form",
 	"Get Link Universe Form",
@@ -180,6 +174,34 @@ impl GetLinkUniverseForm {
 		return self
 			.0
 			.get_link_universe_form(&driver_id, universe_id.as_ref())
+			.await;
+	}
+}
+
+// pub async fn rename_universe(&self, universe_id: &Uuid, name: String)
+#[interpolate_service(
+	"rename_universe",
+	"Rename Universe",
+	"Renames a universe"
+)]
+impl RenameUniverse {
+	#![inner_raw(DMXInterface)]
+	pub fn new(interface: DMXInterface) -> Self {
+		Self(interface)
+	}
+
+	#[service_main(
+		("Universe ID", "ID of the universe to rename"),
+		("New Name", "The new name to give the universe")
+	)]
+	async fn main(
+		self,
+		universe_id: Uuid,
+		universe_name: String,
+	) -> () {
+		return self
+			.0
+			.rename_universe(&universe_id, universe_name)
 			.await;
 	}
 }

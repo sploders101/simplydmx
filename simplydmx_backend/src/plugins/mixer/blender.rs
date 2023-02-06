@@ -72,6 +72,8 @@ pub async fn start_blender(
 					println!("Blender took {:?}", start_bench.elapsed());
 
 					let result = Arc::new(cumulative_layer);
+					// TODO: These events don't need to be so frequent
+					plugin_context.emit_borrowed("mixer.final_output".into(), FilterCriteria::None, Arc::clone(&result)).await;
 					patcher_interface.write_values(Arc::clone(&result)).await;
 
 					drop(ctx_read);

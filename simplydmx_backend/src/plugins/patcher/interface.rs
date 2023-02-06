@@ -19,6 +19,16 @@ use super::{
 	state::PatcherContext,
 };
 
+macro_rules! unwrap_continue {
+	($opt:expr) => {
+		if let Some(tmp) = $opt {
+			tmp
+		} else {
+			continue
+		}
+	}
+}
+
 #[derive(Clone)]
 pub struct PatcherInterface(PluginContext, Arc<RwLock<PatcherContext>>);
 impl PatcherInterface {
@@ -298,9 +308,66 @@ impl PatcherInterface {
 		}
 	}
 
+	/// Applies any virtual intensity channels defined in each fixture's
+	/// type definition
+	fn apply_virtual_intensities(
+		data: &HashMap<Uuid, HashMap<String, u16>>,
+		ctx: &PatcherContext,
+	) -> Arc<HashMap<Uuid, HashMap<String, u16>>> {
+		let mut new_data = data.clone();
+
+		// Loop over every fixture in immutable data
+		for (fixture_id, fixture_values) in data {
+			let fixture_instance = unwrap_continue!(ctx.sharable.fixtures.get(fixture_id));
+			let fixture_type = unwrap_continue!(ctx.sharable.library.get(&fixture_instance.fixture_id));
+			let fixture_personality = unwrap_continue!(fixture_type
+				.personalities
+				.get(&fixture_instance.personality));
+			let new_fixture_values = unwrap_continue!(new_data.get_mut(fixture_id));
+
+			// Loop over every channel in the current fixture (within immutable data)
+			for channel_id in fixture_personality.available_channels.iter() {
+				let channel = unwrap_continue!(fixture_type.channels.get(channel_id));
+				let channel_value = *unwrap_continue!(fixture_values.get(channel_id));
+				let inhibited_channels = unwrap_continue!(&channel.intensity_emulation);
+
+				// Loop over every channel inhibited by this one, which we have by now determined
+				// to be a virtual intensity channel (otherwise `continue` would have been called by now)
+				for inhibited_channel_id in inhibited_channels {
+					let inhibited_channel =
+						unwrap_continue!(fixture_type.channels.get(inhibited_channel_id));
+					let inhibited_channel_value =
+						*unwrap_continue!(fixture_values.get(inhibited_channel_id));
+					new_fixture_values.insert(
+						inhibited_channel_id.clone(),
+
+						// Different variations of the blending algorithm are needed based on channel size
+						// combination
+						match channel.size {
+							ChannelSize::U8 => match inhibited_channel.size {
+								ChannelSize::U8 => inhibited_channel_value * channel_value / 255u16,
+								ChannelSize::U16 => {
+									(inhibited_channel_value as u32 * channel_value as u32 / 255u32)
+										as u16
+								}
+							},
+							ChannelSize::U16 => {
+								(inhibited_channel_value as u32 * channel_value as u32 / 65535u32)
+									as u16
+							}
+						},
+					);
+				}
+			}
+		}
+		return Arc::new(new_data);
+	}
+
 	/// Write values to the output plugins
 	pub async fn write_values(&self, data: Arc<FullMixerOutput>) {
 		let ctx = self.1.read().await;
+
+		let data = Self::apply_virtual_intensities(&data, &ctx);
 
 		let mut futures = Vec::new();
 		for driver in ctx.output_drivers.values().cloned() {

@@ -47,6 +47,24 @@ pub struct FixtureInfo {
 
 	/// Contains a string referencing the output driver associated with the fixture.
 	pub output_driver: String,
+
+	/// Contains data about groups of channels that can be assigned to a user-friendly controller
+	///
+	/// These get filtered by what channels are available in the selected personality
+	pub control_groups: Vec<ControlGroup>,
+}
+
+/// Contains data about a group of channels that can be controlled using a special controller
+#[portable]
+pub enum ControlGroup {
+	Intensity(String),
+	RGBGroup { red: String, green: String, blue: String },
+	CMYKGroup { cyan: String, magenta: String, yellow: String, black: String},
+	PanTilt { pan: String, tilt: String },
+	Gobo(String),
+	ColorWheel(String),
+	Zoom(String),
+	GenericInput(String),
 }
 
 /// Metadata about the fixture, used for display in the UI
@@ -59,8 +77,19 @@ pub struct FixtureMeta {
 /// Information about a specific channel available on the fixture
 #[portable]
 pub struct Channel {
-	/// Size of the channel. SimplyDMX can store values as larger types, but the mixer will ensure the bounds of this
-	/// type are met, and outputs will truncate data to this length
+	/// Designates this channel as a virtual intensity channel.
+	///
+	/// If `None`, this channel is output directly.
+	///
+	/// If `Some(vec!["channel_id_1", ...])`, each channel listed will
+	/// be inhibited by the value of this channel before being sent to
+	/// the output driver.
+	/// TODO: Implement this in the mixer
+	pub intensity_emulation: Option<Vec<String>>,
+
+	/// Size of the channel. SimplyDMX can store values as larger types,
+	/// but the mixer will ensure the bounds of this type are met, and
+	/// outputs will truncate data to this length
 	pub size: ChannelSize,
 
 	/// The default value, to be used in the background layer during blending
@@ -92,6 +121,23 @@ pub enum ChannelType {
 	},
 }
 
+/// Describes an image to display
+#[portable]
+pub enum AssetDescriptor {
+	BuiltIn(String),
+	SVGInline(String),
+}
+
+/// Describes how a segment should be displayed to the user in the UI
+#[portable]
+pub enum SegmentDisplay {
+	/// Displays
+	Gobo { asset: AssetDescriptor },
+	Color { red: u8, green: u8, blue: u8 },
+	Image { asset: AssetDescriptor },
+	Other,
+}
+
 /// Identifies a segment used in a segmented channel
 #[portable]
 pub struct Segment {
@@ -104,8 +150,8 @@ pub struct Segment {
 	/// The name of the segment, for display in user interfaces
 	pub name: String,
 
-	/// An arbitrary ID used to identify this segment
-	pub id: String,
+	/// Indicates how the segment should be displayed to the user
+	pub display: SegmentDisplay,
 }
 
 /// Identifies non-implementation-specific features of a personality.

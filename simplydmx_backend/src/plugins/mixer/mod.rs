@@ -118,6 +118,10 @@ pub async fn initialize_mixer(
 		.register_service(true, commands::DeleteLayer::new(interface.clone()))
 		.await
 		.unwrap();
+	plugin_context
+		.register_service(true, commands::RequestBlend::new(interface.clone()))
+		.await
+		.unwrap();
 
 	// Register saving mechanism
 	saver

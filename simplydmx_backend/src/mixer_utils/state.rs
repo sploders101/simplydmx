@@ -30,11 +30,13 @@ pub enum BlenderValue {
 /// Represents the full output of the mixer, ready to send out to the lights.
 ///
 /// `Fixture ID --> Attribute ID --> Value`
+#[portable]
 pub type FullMixerOutput = HashMap<Uuid, FixtureMixerOutput>;
 
 /// Represents the finished, pre-mixed values of a light.
 ///
 /// `Attribute ID --> Value`
+#[portable]
 pub type FixtureMixerOutput = HashMap<String, u16>;
 
 #[portable]

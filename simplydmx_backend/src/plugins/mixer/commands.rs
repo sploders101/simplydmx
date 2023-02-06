@@ -224,3 +224,20 @@ impl DeleteLayer {
 		return self.0.delete_layer(submaster_id).await;
 	}
 }
+
+#[interpolate_service(
+	"request_blend",
+	"Request Reblend",
+	"Manually requests the mixer to blend layers and emit new output"
+)]
+impl RequestBlend {
+	#![inner_raw(MixerInterface)]
+	pub fn new(mixer_interface: MixerInterface) -> Self {
+		Self(mixer_interface)
+	}
+
+	#[service_main()]
+	async fn main(self) {
+		return self.0.request_blend().await;
+	}
+}

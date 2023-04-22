@@ -1,37 +1,24 @@
 # SimplyDMX
 
-This is the plugin-oriented rewrite of SimplyDMX, which focuses on communication between different parts of
-the application and splitting out responsibilities among semi-independent plugins.
+SimplyDMX aims to be a performant, reliable, and simple program for stage lighting that is highly modular
+and easy to use. I'm not a big fan of the current state of the stage lighting software industry, and I
+want to change it. Some programs are easy to use, some are powerful, some are good at effects, some at
+timecoding, and some at live control. Across these strengths though, there isn't much overlap. My goal
+with SimplyDMX is to make something modular that can fit all of these, with the primary focus being on
+live control.
 
-## Abstract
+SimplyDMX's backend logic is written in Rust and controlled via an RPC API. It is very performant (though
+I have plans to make it better) and can run on fairly low-end hardware. The main prerequisite at the
+moment is that the target machine must be able to run a web app. The frontend is written in Vue.JS and
+TypeScript, with RPC API bindings automatically generated from Rust.
 
-This rewrite of SimplyDMX is completely modular, and will include many "connectors" which allow it to run in
-a flexible manner, such that any client can run as if it were part of the code itself, using serde-based
-serialization and a variety of transports. Because of this, the backend can be compiled to run on many different
-systems, containing all platform-dependent logic such as MIDI drivers and graphical interfaces in swappable
-plugins.
+The UI is designed to be very unique, but simple and intuitive. Every UI element is hand-crafted from
+scratch with a modern take on a retro neon style that leverages glowing effects to show focus.
 
-There will be many layers of communication in order to provide maximum flexibility. MIDI can talk to the mixer,
-which talks to the DMX renderer, which talks to the DMX driver. In this way, SimplyDMX isn't limited to a
-specific DMX transport or adapter, nor is it limited to DMX at all.
+SimplyDMX is designed to be my software of choice going forward. It's taken a ***LONG*** time, but I
+believe I've built a good enough foundation that I will be able to make exponential progress, and things
+will get easier as I continue to build out the lower levels of abstraction. This means that myself and
+future authors will have an easy, high-level API to work with that allows easy addition of almost any
+feature with seamless integration with the rest of the program.
 
-## Services
-
-One unique feature of SimplyDMX is the service subsystem. Services provide a common mechanism for plugins to
-expose functionality to other plugins in a discoverable, consistent, user-configurable way. Plugins can register
-services that power automation and user input devices. For example, the MIDI controller plugin doesn't need to
-be programmed to control a light if the mixer plugin can advertise the API. Using the service subsystem, the
-MIDI controller plugin can discover a "Toggle Light" service for example, which indicates it takes a `String`
-representing a `light-id`. Once the user decides they want a MIDI button to toggle a light, the MIDI controller
-plugin can query a list of options for `light-id`, and present them to the user in a neat drop-down. The MIDI
-controller plugin has no idea how to toggle a light, but the mixer plugin can hold its hand and walk it through
-the configuration, after which the behavior can be delegated by *call*ing the service.
-
-This is all done primarily through two macros:
-* The `Service` derive macro
-* The `interpolate_service` attribute macro
-
-Using these two macros, all of the boilerplate code necessary for the service to document its signature in a
-way that is consistent across all services is written for you. You can have a service up and running in as little
-as 17 lines of code, most of which is just descriptions and names for your service and variables, and you don't
-need to write *any* of the downcasting/deserializing logic!
+More details to come.

@@ -1,0 +1,40 @@
+:root {
+	font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+	font-size: 16px;
+	// line-height: 24px;
+	font-weight: 400;
+
+	color-scheme: dark;
+	color: rgba(255, 255, 255, 0.87);
+	background-color: var(--background-color);
+
+	font-synthesis: none;
+	text-rendering: optimizeLegibility;
+
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	min-height: var(--app-height);
+}
+
+.spacer {
+	margin: auto;
+}
+
+p {
+	margin: 0.75rem;
+}
+
+label {
+	margin: 1rem;
+	margin-bottom: 0;
+}
+
+.spaced {
+	margin: 0.75rem;
+}

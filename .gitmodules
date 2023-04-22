@@ -1,3 +1,0 @@
-[submodule "simplydmx_frontend"]
-	path = simplydmx_frontend
-	url = git@github.com:sploders101/simplydmx-ui.git

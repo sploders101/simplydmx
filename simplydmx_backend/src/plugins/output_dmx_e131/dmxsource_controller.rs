@@ -3,6 +3,7 @@ use async_std::{
 	sync::{Arc, Mutex},
 	task::block_on,
 };
+use uuid::uuid;
 use std::{
 	collections::{HashMap, HashSet},
 	sync::atomic::{AtomicBool, Ordering},
@@ -42,7 +43,7 @@ pub async fn initialize_controller(plugin_context: PluginContext) -> ControllerC
 
 			if let Some(ref unlocked_cache) = *unlocked_cache {
 				if unlocked_cache.len() > 0 && controller.is_none() {
-					controller = DmxSource::new("SimplyDMX").ok();
+					controller = DmxSource::with_cid("SimplyDMX", uuid!("7725e1df-53cf-4365-b530-ce1705ca1860")).ok();
 					if controller.is_none() {
 						thread::sleep(Duration::from_secs(5));
 					}

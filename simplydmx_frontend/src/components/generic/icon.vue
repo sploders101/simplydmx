@@ -8,6 +8,7 @@
 		mdiClose,
 		mdiPlus,
 		mdiArrowDownLeft,
+		mdiLayers,
 	} from "@mdi/js";
 
 	const paths = {
@@ -20,6 +21,7 @@
 		close: mdiClose,
 		plus: mdiPlus,
 		arrowDownLeft: mdiArrowDownLeft,
+		layers: mdiLayers,
 	} as const;
 
 	export type IconPath = keyof typeof paths;

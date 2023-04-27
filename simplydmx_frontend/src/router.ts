@@ -1,6 +1,7 @@
 import { createRouter, createWebHashHistory } from "vue-router";
 import Home from "./views/Home.vue";
 import Patcher from "./views/patcher/patcher.vue";
+import Submasters from "./views/submasters/submasters.vue";
 
 const router = createRouter({
 	history: createWebHashHistory(),
@@ -11,6 +12,14 @@ const router = createRouter({
 			name: "Home",
 			meta: {
 				icon: "home",
+			},
+		},
+		{
+			path: "/submasters",
+			component: Submasters,
+			name: "Submasters",
+			meta: {
+				icon: "layers",
 			},
 		},
 		{

@@ -84,6 +84,15 @@
 					manufacturer: null,
 				},
 				channels: {
+					intensity: {
+						intensity_emulation: ["red", "green", "blue", "white", "red16", "green16", "blue16", "white16"],
+						size: "U8",
+						ch_type: {
+							Linear: {
+								priority: "HTP",
+							},
+						},
+					},
 					red: colorChannel("U8"),
 					green: colorChannel("U8"),
 					blue: colorChannel("U8"),
@@ -95,14 +104,15 @@
 				},
 				personalities: {
 					"8-bit": {
-						available_channels: ["red", "green", "blue", "white"],
+						available_channels: ["intensity", "red", "green", "blue", "white"],
 					},
 					"16-bit": {
-						available_channels: ["red16", "green16", "blue16", "white16"],
+						available_channels: ["intensity", "red16", "green16", "blue16", "white16"],
 					},
 				},
 				output_driver: "DMX",
 				control_groups: [
+					{ Intensity: "intensity" },
 					{ RGBGroup: { red: "red", green: "green", blue: "blue" } },
 					{ RGBGroup: { red: "red16", green: "green16", blue: "blue16" } },
 				],
@@ -110,10 +120,10 @@
 			output_info: {
 				personalities: {
 					"8-bit": {
-						dmx_channel_order: ["red", "green", "blue", "white"],
+						dmx_channel_order: ["intensity", "red", "green", "blue", "white"],
 					},
 					"16-bit": {
-						dmx_channel_order: ["red16", "green16", "blue16", "white16"],
+						dmx_channel_order: ["intensity", "red16", "green16", "blue16", "white16"],
 					},
 				},
 			},
@@ -137,6 +147,7 @@
 		let submasterId = await rpc.mixer.create_layer();
 		let newContents = {
 			[fixtureId]: {
+				intensity: blenderValue(255),
 				red: blenderValue(255),
 				green: blenderValue(30),
 				blue: blenderValue(0),

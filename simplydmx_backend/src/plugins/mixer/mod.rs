@@ -14,7 +14,8 @@ use async_std::{channel::Sender, sync::RwLock};
 use async_trait::async_trait;
 use simplydmx_plugin_framework::*;
 use state::MixerContext;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
+use rustc_hash::FxHashMap;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -239,7 +240,7 @@ impl MixerInterface {
 			for (fixture_id, fixture_data) in submaster_delta.iter() {
 				// If fixture doesn't exist in the submaster, create it, then get the mutable data
 				if !submaster.values.contains_key(fixture_id) {
-					submaster.values.insert(fixture_id.clone(), HashMap::new());
+					submaster.values.insert(fixture_id.clone(), FxHashMap::default());
 				}
 				let current_fixture_data = submaster.values.get_mut(fixture_id).unwrap();
 

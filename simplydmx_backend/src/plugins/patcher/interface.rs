@@ -2,7 +2,7 @@ use async_std::sync::{Arc, RwLock};
 use async_trait::async_trait;
 use futures::{future::join_all, FutureExt};
 use simplydmx_plugin_framework::*;
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -38,8 +38,8 @@ impl PatcherInterface {
 
 	/// Gets the initial background layer for the mixer to blend data with.
 	pub async fn get_base_layer(&self) -> (FullMixerOutput, FullMixerBlendingData) {
-		let mut default_values: FullMixerOutput = HashMap::new();
-		let mut blending_data: FullMixerBlendingData = HashMap::new();
+		let mut default_values: FullMixerOutput = FxHashMap::default();
+		let mut blending_data: FullMixerBlendingData = FxHashMap::default();
 
 		let ctx = self.1.read().await;
 
@@ -49,8 +49,8 @@ impl PatcherInterface {
 					fixture_info.personalities.get(&fixture_data.personality)
 				{
 					// Create containers for this fixture
-					let mut fixture_defaults = HashMap::new();
-					let mut fixture_blending_data = HashMap::new();
+					let mut fixture_defaults = FxHashMap::default();
+					let mut fixture_blending_data = FxHashMap::default();
 
 					// Iterate through channels, populating the fixture containers
 					for channel_id in fixture_personality.available_channels.iter() {
@@ -311,9 +311,9 @@ impl PatcherInterface {
 	/// Applies any virtual intensity channels defined in each fixture's
 	/// type definition
 	fn apply_virtual_intensities(
-		data: &HashMap<Uuid, HashMap<String, u16>>,
+		data: &FxHashMap<Uuid, FxHashMap<String, u16>>,
 		ctx: &PatcherContext,
-	) -> Arc<HashMap<Uuid, HashMap<String, u16>>> {
+	) -> Arc<FxHashMap<Uuid, FxHashMap<String, u16>>> {
 		let mut new_data = data.clone();
 
 		// Loop over every fixture in immutable data

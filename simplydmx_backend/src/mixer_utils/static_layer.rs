@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 use async_trait::async_trait;
 
@@ -25,7 +25,7 @@ pub struct StaticLayer {
 impl Default for StaticLayer {
 	fn default() -> Self {
 		return StaticLayer {
-			values: HashMap::new(),
+			values: FxHashMap::default(),
 		}
 	}
 }

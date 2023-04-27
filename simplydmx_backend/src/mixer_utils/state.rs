@@ -1,15 +1,15 @@
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use simplydmx_plugin_framework::*;
 use uuid::Uuid;
 
 /// Represents the data within a submaster used for blending
 #[portable]
-pub type SubmasterData = HashMap<Uuid, AbstractLayerLight>;
+pub type SubmasterData = FxHashMap<Uuid, AbstractLayerLight>;
 
 /// Represents the abstract data for a single light in a layer.
 /// A value's binary may be masked if the output is u8 (integer overflow cast)
 #[portable]
-pub type AbstractLayerLight = HashMap<String, BlenderValue>;
+pub type AbstractLayerLight = FxHashMap<String, BlenderValue>;
 
 /// Value to be used in a submaster with instructions for mixing it into the result
 #[portable]
@@ -31,13 +31,13 @@ pub enum BlenderValue {
 ///
 /// `Fixture ID --> Attribute ID --> Value`
 #[portable]
-pub type FullMixerOutput = HashMap<Uuid, FixtureMixerOutput>;
+pub type FullMixerOutput = FxHashMap<Uuid, FixtureMixerOutput>;
 
 /// Represents the finished, pre-mixed values of a light.
 ///
 /// `Attribute ID --> Value`
 #[portable]
-pub type FixtureMixerOutput = HashMap<String, u16>;
+pub type FixtureMixerOutput = FxHashMap<String, u16>;
 
 #[portable]
 /// The method in which conflicts are resolved while blending
@@ -96,4 +96,4 @@ pub struct BlendingData {
 
 }
 
-pub type FullMixerBlendingData = HashMap<Uuid, HashMap<String, BlendingData>>;
+pub type FullMixerBlendingData = FxHashMap<Uuid, FxHashMap<String, BlendingData>>;

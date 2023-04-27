@@ -230,7 +230,7 @@ export async function getTypeSpecOptions(provider_id: string): Promise<DropdownO
 export type RustEnum = Record<string, any> | string;
 export type MatchArms<Enum extends RustEnum, ReturnType> =
 	UnionToIntersection<Enum extends string ? { [K in Enum]: () => ReturnType } : {
-		[K in keyof Enum]: (arg: Enum[K]) => ReturnType
+		[K in keyof Enum]: ((arg: Enum[K]) => ReturnType) | null
 	}>;
 export type MatchReturn<Enum extends RustEnum, Cases extends MatchArms<Enum, any>> =
 	Cases extends MatchArms<Enum, infer ReturnType>

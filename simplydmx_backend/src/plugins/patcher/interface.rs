@@ -16,7 +16,7 @@ use crate::{
 use super::{
 	driver_plugin_api::{self, FixtureBundle, FixtureInstance, OutputDriver, SharableStateWrapper},
 	fixture_types::{ChannelSize, ChannelType, Segment},
-	state::PatcherContext,
+	state::{PatcherContext, VisualizationInfo},
 };
 
 macro_rules! unwrap_continue {
@@ -233,6 +233,7 @@ impl PatcherInterface {
 							personality,
 							name,
 							comments,
+							visualization_info: Default::default(),
 						},
 					);
 					self.0
@@ -286,6 +287,7 @@ impl PatcherInterface {
 								personality,
 								name,
 								comments,
+								visualization_info: Default::default(),
 							},
 						);
 						self.0
@@ -305,6 +307,32 @@ impl PatcherInterface {
 			}
 		} else {
 			return Err(EditFixtureError::FixtureMissing);
+		}
+	}
+
+	/// Edits the position of a fixture within the visualizer
+	pub async fn edit_fixture_placement(&self, instance_id: &Uuid, x: u16, y: u16) {
+		let mut ctx = self.1.write().await;
+
+		if let Some(fixture) = ctx.sharable.fixtures.get_mut(instance_id) {
+			fixture.visualization_info.x = x;
+			fixture.visualization_info.y = y;
+		}
+
+		self.0.emit("patcher.visualization_updated".into(), FilterCriteria::None, VisualizationInfo {
+			x,
+			y,
+		}).await;
+	}
+
+	/// Gets the position of a fixture within the visualizer
+	pub async fn get_fixture_placement(&self, instance_id: &Uuid) -> Option<(u16, u16)> {
+		let ctx = self.1.read().await;
+
+		if let Some(fixture) = ctx.sharable.fixtures.get(instance_id) {
+			return Some((fixture.visualization_info.x, fixture.visualization_info.y));
+		} else {
+			return None;
 		}
 	}
 

@@ -8,6 +8,7 @@
 	import { usePatcherState } from "@/stores/patcher";
 	import { Channel, ChannelSize } from "@/scripts/api/ipc";
 	import { useTypeSpecState } from "@/stores/typespec";
+	import Visualizer from "@/components/visualizer/visualizer.vue";
 
 	const patcherState = usePatcherState();
 
@@ -101,7 +102,10 @@
 					},
 				},
 				output_driver: "DMX",
-				control_groups: [],
+				control_groups: [
+					{ RGBGroup: { red: "red", green: "green", blue: "blue" } },
+					{ RGBGroup: { red: "red16", green: "green16", blue: "blue16" } },
+				],
 			},
 			output_info: {
 				personalities: {
@@ -165,6 +169,11 @@
 			<p>{{ test }}</p>
 			<p>{{ test2 }}</p>
 			<p>{{ JSON.stringify(typespec) }}</p>
+			<Textbox v-model="test" class="spaced" />
+			<NumberInput v-model="testNumber" class="spaced" />
+			<Dropdown v-model="test2" :options="options" class="spaced" />
+			<Dropdown v-model="test3" :options="typespec || []" class="spaced" />
+			<Button @click="testButton()" class="spaced">Run initialization test</button>
 		</Tabitem>
 		<Tabitem tab="test2">
 			<LargeSelect :options="[1, 2, 3, 4, 5].map((i) => ({ name: 'Test ' + i, value: i}))" v-model="selectValue" enableSearch />
@@ -178,13 +187,11 @@
 				</template>
 			</LargeSelect>
 		</Tabitem>
+		<Tabitem tab="test4">
+			<Visualizer/>
+		</Tabitem>
 	</Tabs>
 
-	<Textbox v-model="test" class="spaced" />
-	<NumberInput v-model="testNumber" class="spaced" />
-	<Dropdown v-model="test2" :options="options" class="spaced" />
-	<Dropdown v-model="test3" :options="typespec || []" class="spaced" />
-	<Button @click="testButton()" class="spaced">Run initialization test</button>
 	<Dialog v-model:visible="dialogVisible">
 		<template #header>
 			Test Ran

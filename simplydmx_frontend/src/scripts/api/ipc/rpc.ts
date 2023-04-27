@@ -205,6 +205,7 @@ export interface FixtureInstance {
     personality: string;
     name: string | null;
     comments: string | null;
+    visualization_info: VisualizationInfo;
 }
 
 /**
@@ -489,6 +490,12 @@ export type Uuid = string;
 /** Represents Rust's `serde_json::Value` type. This is used for dynamic typing, like when using backend-defined forms. */
 export type Value = any;
 
+/** This type is currently undocumented. I will be working to resolve this for all types in the near future. */
+export interface VisualizationInfo {
+    x: number;
+    y: number;
+}
+
 
 export const core = {
 	log(msg: string): Promise<void> { return callService("core", "log", [msg]) },
@@ -525,6 +532,7 @@ export const output_dmx = {
 export const patcher = {
 	create_fixture(fixture_type: Uuid, personality: string, name: string | null, comments: string | null, form_data: SerializedData): Promise<{ Ok: Uuid } | { Err: CreateFixtureError }> { return callService("patcher", "create_fixture", [fixture_type, personality, name, comments, form_data]) },
 	edit_fixture(instance_id: Uuid, personality: string, name: string | null, comments: string | null, form_data: SerializedData): Promise<{ Ok: null } | { Err: EditFixtureError }> { return callService("patcher", "edit_fixture", [instance_id, personality, name, comments, form_data]) },
+	edit_fixture_placement(fixture_id: Uuid, x: number, y: number): Promise<void> { return callService("patcher", "edit_fixture_placement", [fixture_id, x, y]) },
 	get_creation_form(fixture_type: Uuid): Promise<{ Ok: FormDescriptor } | { Err: GetCreationFormError }> { return callService("patcher", "get_creation_form", [fixture_type]) },
 	get_edit_form(fixture_id: Uuid): Promise<{ Ok: FormDescriptor } | { Err: GetEditFormError }> { return callService("patcher", "get_edit_form", [fixture_id]) },
 	get_patcher_state(): Promise<SharablePatcherState> { return callService("patcher", "get_patcher_state", []) },

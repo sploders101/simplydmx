@@ -1,31 +1,21 @@
 pub mod driver_plugin_api;
-mod state;
 mod fixture_types;
-mod services;
-
-use async_std::sync::{
-	Arc,
-	RwLock,
-};
-
 mod interface;
-pub use interface::PatcherInterface;
-
-use simplydmx_plugin_framework::*;
+mod services;
+mod state;
 
 use self::{
-	state::PatcherContext,
 	services::{
-		ImportFixtureDefinition,
-		CreateFixture,
-		GetPatcherState,
-		GetCreationForm,
-		GetEditForm,
-		EditFixture,
+		CreateFixture, EditFixture, EditFixturePlacement, GetCreationForm, GetEditForm,
+		GetPatcherState, ImportFixtureDefinition,
 	},
+	state::{PatcherContext, VisualizationInfo},
 };
-
 use super::saver::SaverInterface;
+use async_std::sync::{Arc, RwLock};
+pub use interface::PatcherInterface;
+use simplydmx_plugin_framework::*;
+use uuid::Uuid;
 
 pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface) -> Result<PatcherInterface, PatcherInitializationError> {
 	// Create patcher context
@@ -49,12 +39,18 @@ pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface) ->
 		Some("Event emitted when a new fixture type has been successfully imported into SimplyDMX".into()),
 	).await.unwrap();
 
+	plugin_context.declare_event::<(Uuid, VisualizationInfo)>(
+		"patcher.visualization_updated".into(),
+		Some("Event emitted when a fixture's visualization properties have been updated".into()),
+	).await.unwrap();
+
 	plugin_context.register_service(true, ImportFixtureDefinition::new(patcher_interface.clone())).await.unwrap();
 	plugin_context.register_service(true, CreateFixture::new(patcher_interface.clone())).await.unwrap();
 	plugin_context.register_service(true, GetCreationForm::new(patcher_interface.clone())).await.unwrap();
 	plugin_context.register_service(true, GetPatcherState::new(patcher_interface.clone())).await.unwrap();
 	plugin_context.register_service(true, GetEditForm::new(patcher_interface.clone())).await.unwrap();
 	plugin_context.register_service(true, EditFixture::new(patcher_interface.clone())).await.unwrap();
+	plugin_context.register_service(true, EditFixturePlacement::new(patcher_interface.clone())).await.unwrap();
 
 	saver.register_savable("patcher", patcher_interface.clone()).await.unwrap();
 

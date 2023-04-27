@@ -161,3 +161,25 @@ impl EditFixture {
 		return self.0.edit_fixture(&instance_id, personality, name, comments, form_data).await;
 	}
 }
+
+#[interpolate_service(
+	"edit_fixture_placement",
+	"Edit Fixture Placement",
+	"Edits the x,y coordinates of the fixture within the visualizer"
+)]
+impl EditFixturePlacement {
+	#![inner_raw(PatcherInterface)]
+
+	pub fn new(patcher_interface: PatcherInterface) -> Self {
+		Self(patcher_interface)
+	}
+
+	#[service_main(
+		("Fixture ID", "The UUID of the particular fixture instance you would like to edit"),
+		("X Coordinate", "The fixture's new X coordinate"),
+		("Y Coordinate", "The fixture's new Y coordinate")
+	)]
+	async fn main(self, fixture_id: Uuid, x: u16, y: u16) {
+		return self.0.edit_fixture_placement(&fixture_id, x, y).await;
+	}
+}

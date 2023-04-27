@@ -70,6 +70,8 @@
 	.sdmx-tabs {
 		display: flex;
 		flex-flow: column nowrap;
+		width: 100%;
+		height: 100%;
 
 		& > .tabs-container {
 			// border: 1px solid red;

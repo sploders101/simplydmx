@@ -55,4 +55,21 @@ pub struct FixtureInstance {
 
 	/// Arbitrary comments about this particular instance left by the user
 	pub comments: Option<String>,
+
+	/// Information about this particular fixture for the visualizer
+	pub visualization_info: VisualizationInfo,
+}
+
+#[portable]
+pub struct VisualizationInfo {
+	pub x: u16,
+	pub y: u16,
+}
+impl Default for VisualizationInfo {
+	fn default() -> Self {
+		return VisualizationInfo {
+			x: 0,
+			y: 0,
+		};
+	}
 }

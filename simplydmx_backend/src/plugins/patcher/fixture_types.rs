@@ -59,7 +59,7 @@ pub struct FixtureInfo {
 pub enum ControlGroup {
 	Intensity(String),
 	RGBGroup { red: String, green: String, blue: String },
-	CMYKGroup { cyan: String, magenta: String, yellow: String, black: String},
+	CMYKGroup { cyan: String, magenta: String, yellow: String, black: String },
 	PanTilt { pan: String, tilt: String },
 	Gobo(String),
 	ColorWheel(String),

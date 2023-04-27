@@ -1,3 +1,14 @@
+# sacn-simplydmx
+
+This folder contains a modified copy of the sacn crate for use in SimplyDMX.
+The original crate used an outdated version of the uuid crate, which was not
+compatible with the version used in SimplyDMX, so patches have been applied
+to mitigate this, allowing SimplyDMX to maintain a consistent CID.
+
+The plan is to eventually merge these changes into the new version of the
+crate and use that, but this serves as a short-term stop-gap so I can
+continue work on the software until I have an MVP.
+
 # Project moved
 This project has moved to https://github.com/RustLight/sacn
 

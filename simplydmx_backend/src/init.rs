@@ -103,6 +103,13 @@ pub mod exporter {
 		// Sort types to enable deterministic exports for git tracking
 		let mut types: Vec<(&'static str, &'static str, &'static Option<&'static str>)> = vec![
 			(
+				"FxHashMap",
+				"export type FxHashMap<K extends string | number | symbol, V> = Record<K, V>;",
+				&Some(
+					r#"/** This is the same as a HashMap, but uses a more efficient hashing algorithm in the backend */"#
+				),
+			),
+			(
 				"Uuid",
 				"export type Uuid = string;",
 				&Some(

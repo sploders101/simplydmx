@@ -8,7 +8,7 @@ import { callService } from "./agnostic_abstractions";
  * Represents the abstract data for a single light in a layer.
  * A value's binary may be masked if the output is u8 (integer overflow cast)
  */
-export type AbstractLayerLight = Record<string, BlenderValue>;
+export type AbstractLayerLight = FxHashMap<string, BlenderValue>;
 
 /**
  * Describes an image to display
@@ -221,7 +221,7 @@ export interface FixtureMeta {
  * 
  * `Attribute ID --> Value`
  */
-export type FixtureMixerOutput = Record<string, number>;
+export type FixtureMixerOutput = FxHashMap<string, number>;
 
 /**
  * Describes a form-style UI using a frontend-agnostic generic data structure
@@ -280,7 +280,10 @@ export interface FormTextbox {
  * 
  * `Fixture ID --> Attribute ID --> Value`
  */
-export type FullMixerOutput = Record<Uuid, FixtureMixerOutput>;
+export type FullMixerOutput = FxHashMap<Uuid, FixtureMixerOutput>;
+
+/** This is the same as a HashMap, but uses a more efficient hashing algorithm in the backend */
+export type FxHashMap<K extends string | number | symbol, V> = Record<K, V>;
 
 /**
  * An error that could occur while retrieving a fixture creation form
@@ -470,7 +473,7 @@ export interface StaticLayer {
 /**
  * Represents the data within a submaster used for blending
  */
-export type SubmasterData = Record<Uuid, AbstractLayerLight>;
+export type SubmasterData = FxHashMap<Uuid, AbstractLayerLight>;
 
 /** Describes an error that occurred while retrieving items for a dropdown list */
 export type TypeSpecifierRetrievalError = "SpecifierNotFound" | "SerializationError";

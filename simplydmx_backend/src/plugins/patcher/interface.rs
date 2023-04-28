@@ -319,10 +319,13 @@ impl PatcherInterface {
 			fixture.visualization_info.y = y;
 		}
 
-		self.0.emit("patcher.visualization_updated".into(), FilterCriteria::None, VisualizationInfo {
-			x,
-			y,
-		}).await;
+		self.0.emit("patcher.visualization_updated".into(), FilterCriteria::None, (
+			instance_id.clone(),
+			VisualizationInfo {
+				x,
+				y,
+			},
+		)).await;
 	}
 
 	/// Gets the position of a fixture within the visualizer

@@ -2,9 +2,9 @@
 	import { computed, reactive, ref, onMounted, nextTick, watch } from 'vue';
 	import { usePatcherState } from "@/stores/patcher";
 	import { useLiveMixState } from "@/stores/live";
-	import { Canvas, Circle, Gradient, Object as FabricObject } from "fabric";
+	import { ActiveSelection, Canvas, Circle, Gradient, Object as FabricObject } from "fabric";
 	import { useElementBounding } from '@vueuse/core';
-	import { ControlGroup, exhaustiveMatch, FixtureInfo, FixtureMixerOutput } from '@/scripts/api/ipc';
+	import { ControlGroup, exhaustiveMatch, FixtureInfo, FixtureMixerOutput, patcher } from '@/scripts/api/ipc';
 
 	let patcherState = usePatcherState();
 	let liveMix = useLiveMixState();
@@ -13,7 +13,15 @@
 	const vis = ref<Canvas | null>(null);
 	const viewport = ref<HTMLDivElement | null>(null);
 	const viewportBounds = useElementBounding(viewport);
+
+	/** Map of fixture IDs to fabric objects */
 	const fixtures = reactive(new Map<string, Circle>());
+
+	/**
+	 * Map of fabric objects to fixture IDs.
+	 * Weakly typed due to the number of incompatible fabric object types
+	 */
+	const fixtureObjToId = new WeakMap<any, string>();
 
 	watch(liveMix, () => {
 		if (!liveMix.value) return;
@@ -195,11 +203,12 @@
 					radius: 15,
 					strokeWidth: 1,
 					fill: createGradient(0, 0, 0, 0),
-					x: Math.random() * 100,
-					y: Math.random() * 100,
+					left: fixture.visualization_info.x,
+					top: fixture.visualization_info.y,
 					hasControls: false,
 				});
 				fixtures.set(fixture.id, fixtureObj);
+				fixtureObjToId.set(fixtureObj, fixture.id);
 				foundFixtures.push(fixture.id);
 				updateLight(fixture.id);
 				if (vis.value) vis.value.add(fixtureObj);
@@ -256,6 +265,21 @@
 		vis.value.on("selection:created", (event) => selected.value = event.selected);
 		vis.value.on("selection:updated", (event) => selected.value = event.selected);
 		vis.value.on("selection:cleared", () => selected.value = []);
+
+		vis.value.on("object:modified", (event) => {
+			let objects = event.target instanceof ActiveSelection
+				? event.target.getObjects()
+				: [event.target];
+			objects.forEach((fixtureObject) => {
+				let fixtureId = fixtureObjToId.get(fixtureObject);
+				let coords = fixtureObject.getCoords(true)[0];
+				if (fixtureId) patcher.edit_fixture_placement(
+					fixtureId,
+					coords.x,
+					coords.y,
+				);
+			});
+		});
 
 		// vis.value.add(new Circle({
 		// 	stroke: "#FFFFFF",

@@ -56,7 +56,20 @@ pub struct FixtureInfo {
 
 /// Contains data about a group of channels that can be controlled using a special controller
 #[portable]
-pub enum ControlGroup {
+pub struct ControlGroup {
+	/// A name can be specified for a non-standard control.
+	///
+	/// If a name is specified, the control will only be grouped with those from instances of
+	/// identical fixtures.
+	name: Option<String>,
+
+	/// Specifies the type of control to use and the associated channels
+	channels: ControlGroupData,
+}
+
+/// Specifies the type of ControlGroup in use and associated channels
+#[portable]
+pub enum ControlGroupData {
 	Intensity(String),
 	RGBGroup { red: String, green: String, blue: String },
 	CMYKGroup { cyan: String, magenta: String, yellow: String, black: String },

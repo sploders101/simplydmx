@@ -1,17 +1,29 @@
 <script lang="ts" setup>
-	import { computed, reactive, ref, onMounted, nextTick, watch } from 'vue';
+	import { reactive, ref, computed, onMounted, nextTick, watch } from 'vue';
+	import { UnionToIntersection } from '@vue/shared';
 	import { usePatcherState } from "@/stores/patcher";
 	import { useLiveMixState } from "@/stores/live";
 	import { ActiveSelection, Canvas, Circle, Gradient, Object as FabricObject } from "fabric";
 	import { useElementBounding } from '@vueuse/core';
-	import { ControlGroup, exhaustiveMatch, FixtureInfo, FixtureMixerOutput, patcher } from '@/scripts/api/ipc';
+	import { type ControlGroup, exhaustiveMatch, patcher, ControlGroupData } from '@/scripts/api/ipc';
+	import { cmyk2rgb, normalizeChannel } from "@/scripts/conversions";
 
 	let patcherState = usePatcherState();
 	let liveMix = useLiveMixState();
+	let displayData = computed(() => {
+		return liveMix.value;
+	});
 
+	/** The canvas that fabric.js should render into */
 	const canvas = ref<HTMLCanvasElement | null>(null);
+
+	/** The fabric.js canvas controller */
 	const vis = ref<Canvas | null>(null);
+
+	/** The viewport element (the container the canvas should fill) */
 	const viewport = ref<HTMLDivElement | null>(null);
+
+	/** The reactive boundaries of the viewport (ie. the area the canvas should fill) */
 	const viewportBounds = useElementBounding(viewport);
 
 	/** Map of fixture IDs to fabric objects */
@@ -23,24 +35,27 @@
 	 */
 	const fixtureObjToId = new WeakMap<any, string>();
 
-	watch(liveMix, () => {
-		if (!liveMix.value) return;
+	watch(displayData, () => {
+		if (!displayData.value) return;
 
 		// Fixtures should be created/destroyed by patcher state
 		for (const fixtureId of fixtures.keys()) {
-			if (!liveMix.value[fixtureId]) continue;
+			if (!displayData.value[fixtureId]) continue;
 			updateLight(fixtureId);
 		}
 		if (vis.value) vis.value.requestRenderAll();
 	}, { immediate: true });
 
+	/**
+	 * Gets the active control groups of a given fixture based on its selected personality.
+	 */
 	function getActiveControlGroups(fixtureId: string): ControlGroup[] | null {
 		// Collect data and drop unsynchronized triggers
 		if (
 			!patcherState.value
 			|| !vis.value
 			|| !fixtures.has(fixtureId)
-			|| !liveMix.value
+			|| !displayData.value
 		) return null;
 
 		let fixtureInstance = patcherState.value.fixtures[fixtureId];
@@ -49,13 +64,13 @@
 		if (!fixtureTypeInfo) return null;
 		let fixturePersonalityInfo = fixtureTypeInfo.personalities[fixtureInstance.personality];
 		if (!fixturePersonalityInfo) return null;
-		let fixtureData = liveMix.value[fixtureId];
+		let fixtureData = displayData.value[fixtureId];
 		if (!fixtureData) return null;
 		let fixtureVis = fixtures.get(fixtureId);
 		if (!fixtureVis) return null;
 		let availableChannels = fixturePersonalityInfo.available_channels;
 
-		const activeControlGroups = fixtureTypeInfo.control_groups.filter((group) => exhaustiveMatch(group, {
+		const activeControlGroups = fixtureTypeInfo.control_groups.filter((group) => exhaustiveMatch(group.channels, {
 				"RGBGroup": ({ red, green, blue }) => includesAll(
 					availableChannels,
 					[red, green, blue],
@@ -77,37 +92,9 @@
 		return activeControlGroups;
 	}
 
+	/** Returns `true` if all items from `criteria` were found in `source` */
 	function includesAll<T>(source: T[], criteria: T[]) {
 		return !criteria.some((item) => !source.includes(item));
-	}
-
-	function cmyk2rgb(
-		cyan: number,
-		magenta: number,
-		yellow: number,
-		black: number,
-	): { red: number, green: number, blue: number } {
-		return {
-			red: 255 * (1 - cyan) * (1 - black),
-			green: 255 * (1 - magenta) * (1 - black),
-			blue: 255 * (1 - yellow) * (1 - black),
-		};
-	}
-
-	/**
-	 * Normalizes a channel into 8-bit precision
-	 */
-	function normalizeChannel(
-		profile: FixtureInfo,
-		fixtureData: FixtureMixerOutput,
-		channel: string,
-	) {
-		const channelValue = fixtureData[channel];
-		const channelInfo = profile.channels[channel];
-		return exhaustiveMatch(channelInfo.size, {
-			U8: () => channelValue,
-			U16: () => Math.floor(channelValue / 257), // Maps 65535 to 255
-		});
 	}
 
 	/**
@@ -122,7 +109,7 @@
 			!patcherState.value
 			|| !vis.value
 			|| !fixtures.has(fixtureId)
-			|| !liveMix.value
+			|| !displayData.value
 		) return;
 
 		let fixtureInstance = patcherState.value.fixtures[fixtureId];
@@ -131,7 +118,7 @@
 		if (!fixtureTypeInfo) return;
 		let fixturePersonalityInfo = fixtureTypeInfo.personalities[fixtureInstance.personality];
 		if (!fixturePersonalityInfo) return;
-		let fixtureData = liveMix.value[fixtureId];
+		let fixtureData = displayData.value[fixtureId];
 		if (!fixtureData) return;
 		let fixtureVis = fixtures.get(fixtureId);
 		if (!fixtureVis) return;
@@ -143,7 +130,7 @@
 		let blueValue = 0;
 		let controlGroups = getActiveControlGroups(fixtureId);
 
-		if (controlGroups) controlGroups.forEach((group) => exhaustiveMatch(group, {
+		if (controlGroups) controlGroups.forEach((group) => exhaustiveMatch(group.channels, {
 			CMYKGroup: ({ cyan, magenta, yellow, black }) => {
 				const normalCyan = normalizeChannel(fixtureTypeInfo, fixtureData, cyan);
 				const normalMagenta = normalizeChannel(fixtureTypeInfo, fixtureData, magenta);
@@ -175,6 +162,7 @@
 		fixtureVis.set("fill", createGradient(intensityValue, redValue, greenValue, blueValue));
 	}
 
+	// Keep fabric dimensions up-to-date with the container
 	watch([viewportBounds.height, viewportBounds.width], () => {
 		if (vis.value) {
 			vis.value.setDimensions({
@@ -251,6 +239,25 @@
 
 	const selected = ref<FabricObject[]>([]);
 
+	let activeControlGroups = computed(() => {
+		let addedStandardGroups: Array<keyof UnionToIntersection<ControlGroupData>> = [];
+		let controlGroups = [];
+		selected.value.forEach((fixtureObj) => {
+			let fixtureId = fixtureObjToId.get(fixtureObj);
+			if (fixtureId) {
+				let controlGroups = getActiveControlGroups(fixtureId);
+				if (!controlGroups) return;
+				controlGroups.forEach((group) => {
+					if (group.name === null) {
+						// Standard control. Add multi-output group.
+					} else {
+						// Non-standard control. Add fixture/personality-specific group
+					}
+				});
+			}
+		});
+	});
+
 	onMounted(() => nextTick(() => {
 		if (!canvas.value) return console.log("Canvas missing in visualizer");
 
@@ -281,15 +288,6 @@
 			});
 		});
 
-		// vis.value.add(new Circle({
-		// 	stroke: "#FFFFFF",
-		// 	radius: 15,
-		// 	strokeWidth: 1,
-		// 	fill: createGradient(1, 255, 100, 0),
-		// 	top: 0,
-		// 	left: 0,
-		// 	hasControls: false,
-		// }));
 		fixtures.forEach((fixtureObj) => vis.value!.add(fixtureObj));
 	}));
 

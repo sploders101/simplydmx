@@ -62,7 +62,15 @@ export type ChannelType = { Segmented: { segments: Segment[]; priority: Blending
 /**
  * Contains data about a group of channels that can be controlled using a special controller
  */
-export type ControlGroup = { Intensity: string } | { RGBGroup: { red: string; green: string; blue: string } } | { CMYKGroup: { cyan: string; magenta: string; yellow: string; black: string } } | { PanTilt: { pan: string; tilt: string } } | { Gobo: string } | { ColorWheel: string } | { Zoom: string } | { GenericInput: string };
+export interface ControlGroup {
+    name: string | null;
+    channels: ControlGroupData;
+}
+
+/**
+ * Specifies the type of ControlGroup in use and associated channels
+ */
+export type ControlGroupData = { Intensity: string } | { RGBGroup: { red: string; green: string; blue: string } } | { CMYKGroup: { cyan: string; magenta: string; yellow: string; black: string } } | { PanTilt: { pan: string; tilt: string } } | { Gobo: string } | { ColorWheel: string } | { Zoom: string } | { GenericInput: string };
 
 /**
  * An error that could occur when creating a fixture

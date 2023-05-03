@@ -71,12 +71,12 @@
 		},
 	});
 
-	async function importFixtureTest() {
+	async function importFixtureTest(id: string, name: string, shortName: string, color: boolean, panTilt: boolean) {
 		const importResponse = await rpc.patcher.import_fixture({
 			fixture_info: {
-				id: "c205635c-037a-4e5c-8a68-59a8a86dae8f",
-				name: "Generic RGBW Fixture",
-				short_name: "RGBW",
+				id,
+				name,
+				short_name: shortName,
 				manufacturer: "Generic",
 				family: "Generic",
 				metadata: {
@@ -84,46 +84,89 @@
 					manufacturer: null,
 				},
 				channels: {
-					intensity: {
-						intensity_emulation: ["red", "green", "blue", "white", "red16", "green16", "blue16", "white16"],
-						size: "U8",
-						ch_type: {
-							Linear: {
-								priority: "HTP",
+					...color ? {
+						intensity: {
+							intensity_emulation: ["red", "green", "blue", "white"],
+							size: "U8",
+							ch_type: {
+								Linear: {
+									priority: "HTP",
+								},
+							},
+						},
+						intensity16: {
+							intensity_emulation: ["red16", "green16", "blue16", "white16"],
+							size: "U16",
+							ch_type: {
+								Linear: {
+									priority: "HTP",
+								},
+							},
+						},
+						red: colorChannel("U8"),
+						green: colorChannel("U8"),
+						blue: colorChannel("U8"),
+						white: colorChannel("U8"),
+						red16: colorChannel("U16"),
+						green16: colorChannel("U16"),
+						blue16: colorChannel("U16"),
+						white16: colorChannel("U16"),
+					} : {
+						intensity: {
+							intensity_emulation: null,
+							size: "U8",
+							ch_type: {
+								Linear: {
+									priority: "HTP",
+								},
+							},
+						},
+						intensity16: {
+							intensity_emulation: null,
+							size: "U16",
+							ch_type: {
+								Linear: {
+									priority: "HTP",
+								},
 							},
 						},
 					},
-					red: colorChannel("U8"),
-					green: colorChannel("U8"),
-					blue: colorChannel("U8"),
-					white: colorChannel("U8"),
-					red16: colorChannel("U16"),
-					green16: colorChannel("U16"),
-					blue16: colorChannel("U16"),
-					white16: colorChannel("U16"),
+					...panTilt ? {
+						pan: colorChannel("U8"),
+						tilt: colorChannel("U8"),
+						pan16: colorChannel("U16"),
+						tilt16: colorChannel("U16"),
+					} : {},
 				},
 				personalities: {
 					"8-bit": {
-						available_channels: ["intensity", "red", "green", "blue", "white"],
+						available_channels: ["intensity", ...color ? ["red", "green", "blue", "white"] : [], ...panTilt ? ["pan", "tilt"] : []],
 					},
 					"16-bit": {
-						available_channels: ["intensity", "red16", "green16", "blue16", "white16"],
+						available_channels: ["intensity16", ...color ? ["red16", "green16", "blue16", "white16"] : [], ...panTilt ? ["pan16", "tilt16"] : []],
 					},
 				},
 				output_driver: "DMX",
 				control_groups: [
-					{ Intensity: "intensity" },
-					{ RGBGroup: { red: "red", green: "green", blue: "blue" } },
-					{ RGBGroup: { red: "red16", green: "green16", blue: "blue16" } },
+					{ name: null, channels: { Intensity: "intensity" } },
+					{ name: null, channels: { Intensity: "intensity16" } },
+					...color ? [
+						{ name: null, channels: { RGBGroup: { red: "red", green: "green", blue: "blue" } } },
+						{ name: null, channels: { RGBGroup: { red: "red16", green: "green16", blue: "blue16" } } },
+					] : [],
+					...panTilt ? [
+						{ name: null, channels: { PanTilt: { pan: "pan", tilt: "tilt" } } },
+						{ name: null, channels: { PanTilt: { pan: "pan16", tilt: "tilt16" } } },
+					] : [],
 				],
 			},
 			output_info: {
 				personalities: {
 					"8-bit": {
-						dmx_channel_order: ["intensity", "red", "green", "blue", "white"],
+						dmx_channel_order: [...color ? ["red", "green", "blue", "white"] : [], ...panTilt ? ["pan", "tilt"] : []],
 					},
 					"16-bit": {
-						dmx_channel_order: ["intensity", "red16", "green16", "blue16", "white16"],
+						dmx_channel_order: [...color ? ["red16", "green16", "blue16", "white16"] : [], ...panTilt ? ["pan16", "tilt16"] : []],
 					},
 				},
 			},
@@ -133,7 +176,10 @@
 	}
 
 	async function fullTestInvoked() {
-		await importFixtureTest();
+		await importFixtureTest("c205635c-037a-4e5c-8a68-59a8a86dae8f", "Generic RGBW Fixture", "RGBW", true, false);
+		await importFixtureTest("ce57c131-cc29-4088-84d2-1472b73f7d65", "Generic RGBWPT Fixture", "RGBWPT", true, true);
+		await importFixtureTest("bb5a93f8-4e26-422f-9ac8-5b9a15a9254d", "Generic Spotlight", "I", false, false);
+		await importFixtureTest("a93e6ba5-83ef-4faa-afd0-7b85dd12400b", "Generic Moving Spotlight", "IPT", false, true);
 
 		let universeId = await rpc.output_dmx.create_universe("Test universe");
 		unwrap(await rpc.output_dmx.link_universe(universeId, "e131", {
@@ -155,7 +201,7 @@
 			}
 		};
 		await rpc.mixer.set_layer_contents(submasterId, newContents);
-		await rpc.mixer.set_layer_opacity(submasterId, Math.floor(Math.random() * 65535), true);
+		await rpc.mixer.set_layer_opacity(submasterId, Math.floor(65535), true);
 	}
 
 	const typespec = useTypeSpecState("universes");

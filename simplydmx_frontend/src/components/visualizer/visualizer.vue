@@ -1,12 +1,12 @@
 <script lang="ts" setup>
-	import { reactive, ref, computed, onMounted, nextTick, watch } from 'vue';
-	import { UnionToIntersection } from '@vue/shared';
+	import { reactive, ref, computed, onMounted, nextTick, watch, toRaw } from 'vue';
 	import { usePatcherState } from "@/stores/patcher";
 	import { useLiveMixState } from "@/stores/live";
 	import { ActiveSelection, Canvas, Circle, Gradient, Object as FabricObject } from "fabric";
 	import { useElementBounding } from '@vueuse/core';
-	import { type ControlGroup, exhaustiveMatch, patcher, ControlGroupData } from '@/scripts/api/ipc';
+	import { type ControlGroup, exhaustiveMatch, patcher, FixtureInfo } from '@/scripts/api/ipc';
 	import { cmyk2rgb, normalizeChannel } from "@/scripts/conversions";
+	import { VisibleControlGroup } from "./types";
 
 	let patcherState = usePatcherState();
 	let liveMix = useLiveMixState();
@@ -45,6 +45,27 @@
 		}
 		if (vis.value) vis.value.requestRenderAll();
 	}, { immediate: true });
+
+	interface FixtureProfileIds {
+		profileId: string,
+		profile: FixtureInfo,
+		personalityId: string,
+	}
+
+	function getFixtureProfileIds(fixtureId: string): FixtureProfileIds | null {
+		if (!patcherState.value) return null;
+
+		let fixtureInstance = patcherState.value.fixtures[fixtureId];
+		if (!fixtureInstance) return null;
+		let fixtureTypeInfo = patcherState.value.library[fixtureInstance.fixture_id];
+		if (!fixtureTypeInfo) return null;
+
+		return {
+			profileId: fixtureInstance.fixture_id,
+			profile: fixtureTypeInfo,
+			personalityId: fixtureInstance.personality,
+		};
+	}
 
 	/**
 	 * Gets the active control groups of a given fixture based on its selected personality.
@@ -239,23 +260,126 @@
 
 	const selected = ref<FabricObject[]>([]);
 
-	let activeControlGroups = computed(() => {
-		let addedStandardGroups: Array<keyof UnionToIntersection<ControlGroupData>> = [];
-		let controlGroups = [];
+	const activeControlGroups = computed(() => {
+		const intensity: VisibleControlGroup<"fader"> = {
+			name: "Intensity",
+			type: "fader",
+			controls: [],
+		};
+		const colorGroup: VisibleControlGroup<"color"> = {
+			name: "Color",
+			type: "color",
+			controls: [],
+		};
+		const position: VisibleControlGroup<"position"> = {
+			name: "Position",
+			type: "position",
+			controls: [],
+		};
+		const zoom: VisibleControlGroup<"fader"> = {
+			name: "Zoom",
+			type: "fader",
+			controls: [],
+		};
+		/** Map of fixtureProfileId-cgIndex to `VisibleControlGroup` */
+		const other: Record<string, VisibleControlGroup> = {};
+
 		selected.value.forEach((fixtureObj) => {
-			let fixtureId = fixtureObjToId.get(fixtureObj);
-			if (fixtureId) {
-				let controlGroups = getActiveControlGroups(fixtureId);
-				if (!controlGroups) return;
-				controlGroups.forEach((group) => {
-					if (group.name === null) {
-						// Standard control. Add multi-output group.
-					} else {
-						// Non-standard control. Add fixture/personality-specific group
-					}
-				});
-			}
+			let fixtureId = fixtureObjToId.get(toRaw(fixtureObj));
+			if (!fixtureId) return;
+			let profile = getFixtureProfileIds(fixtureId);
+			if (!profile) return;
+			let controlGroups = getActiveControlGroups(fixtureId);
+			if (!controlGroups) return;
+
+			controlGroups.forEach((group) => {
+				const cgIndex = profile!.profile.control_groups.indexOf(group);
+				const otherKey = `${profile!.profileId}-${cgIndex}`;
+				if (group.name === null) {
+					// Standard control. Add multi-output group.
+					exhaustiveMatch(group.channels, {
+						Intensity: () => intensity,
+						RGBGroup: () => colorGroup,
+						CMYKGroup: () => colorGroup,
+						ColorWheel: () => {
+							const existingGroup = other[otherKey];
+							if (existingGroup) return existingGroup;
+							const group: VisibleControlGroup = {
+								name: "Color Wheel",
+								type: "selections",
+								controls: [],
+							};
+							other[otherKey] = group;
+							return group;
+						},
+						Gobo: () => {
+							const existingGroup = other[otherKey];
+							if (existingGroup) return existingGroup;
+							const group: VisibleControlGroup = {
+								name: "Gobo",
+								type: "selections",
+								controls: [],
+							};
+							other[otherKey] = group;
+							return group;
+						},
+						PanTilt: () => position,
+						Zoom: () => zoom,
+						GenericInput: () => {
+							const existingGroup = other[otherKey];
+							if (existingGroup) return existingGroup;
+							const group: VisibleControlGroup = {
+								name: "Generic Input",
+								type: "fader",
+								controls: [],
+							};
+							other[otherKey] = group;
+							return group;
+						},
+					}).controls.push({
+						instanceId: fixtureId!,
+						controlData: group.channels,
+					});
+				} else {
+					// Non-standard control. Add fixture/personality-specific group
+					const existingGroup = other[otherKey];
+					if (existingGroup) return existingGroup;
+					const visibleGroup: VisibleControlGroup = {
+						name: group.name!,
+						type: exhaustiveMatch(group.channels, {
+							Intensity: () => "fader" as const,
+							CMYKGroup: () => "color" as const,
+							RGBGroup: () => "color" as const,
+							ColorWheel: () => "selections" as const,
+							PanTilt: () => "position" as const,
+							Gobo: () => "selections" as const,
+							Zoom: () => "fader" as const,
+							GenericInput: () => "fader" as const,
+						}),
+						controls: [{
+							instanceId: fixtureId!,
+							controlData: group.channels,
+						}],
+					};
+					other[otherKey] = visibleGroup;
+					return visibleGroup;
+				}
+			});
 		});
+
+		// Add known groups
+		const groups: VisibleControlGroup[] = [];
+		[
+			intensity,
+			colorGroup,
+			position,
+			zoom,
+		].forEach((group) => group.controls.length && groups.push(group));
+
+		// Add unknown groups
+		Object.keys(other).sort().forEach((key) => groups.push(other[key]));
+
+		return groups;
 	});
 
 	onMounted(() => nextTick(() => {
@@ -270,7 +394,12 @@
 
 		// Keep selection object updated so we can update the control panel
 		vis.value.on("selection:created", (event) => selected.value = event.selected);
-		vis.value.on("selection:updated", (event) => selected.value = event.selected);
+		vis.value.on("selection:updated", (event) => {
+			event.selected.forEach((obj) => selected.value.push(obj));
+			if (event.deselected.length) selected.value = selected.value.filter((obj) => {
+				return !event.deselected.includes(toRaw(obj) as any);
+			});
+		});
 		vis.value.on("selection:cleared", () => selected.value = []);
 
 		vis.value.on("object:modified", (event) => {
@@ -301,6 +430,9 @@
 				/>
 		</div>
 		<div class="sdmx-visualizer__control-panel">
+			<div class="test-control" v-for="group in activeControlGroups">
+				{{ group.name }}
+			</div>
 		</div>
 	</div>
 </template>
@@ -325,6 +457,24 @@
 		.sdmx-visualizer__control-panel {
 			height: 15rem;
 			background-color: var(--visualizer-control-panel-background);
+
+			display: flex;
+			flex-flow: row nowrap;
+			overflow: auto;
+			align-items: stretch;
+
+			gap: 1rem;
+
+			.test-control {
+				background-color: red;
+				border: 2px solid black;
+				min-width: 5rem;
+
+				text-align: center;
+				display: flex;
+				flex-flow: column nowrap;
+				justify-content: center;
+			}
 		}
 	}
 </style>

@@ -22,3 +22,29 @@ future authors will have an easy, high-level API to work with that allows easy a
 feature with seamless integration with the rest of the program.
 
 More details to come.
+
+
+## Testing
+
+The default frontend for SimplyDMX is a Tauri app. Tauri is like Electron, but lighter, with a better
+build system, and a native Rust backend instead of a NodeJS engine. This allows me to write a consistent,
+cross-platform UI with significantly less effort and fewer compromises. I would like to create truly
+native UIs later on, but for now, Tauri is the best option for widest compatability with minimal effort.
+
+To get started, make sure you have NodeJS and a Rust toolchain installed.
+
+Then, install the Tauri CLI using:
+
+```bash
+cargo install tauri-cli
+```
+
+Now you can cd into the `simplydmx_frontend` directory, install JavaScript dependencies, and run
+the Tauri app. This will build the frontend, start a dev server, build the SimplyDMX library/backend,
+the Tauri frontend binary, then start SimplyDMX's web UI.
+
+```bash
+cd simplydmx_frontend
+npm install # or yarn, whichever you prefer
+cargo tauri dev
+```

@@ -29,11 +29,11 @@ export interface VisibleControlTypes extends Record<VisibleCGTypes, ControlGroup
 	selections: ControlGroupByName<"Gobo" | "ColorWheel">,
 }
 
-export interface VisibleControlGroup<ControlType extends VisibleCGTypes = VisibleCGTypes> {
+export type VisibleControlGroup<ControlType extends VisibleCGTypes = VisibleCGTypes> = ControlType extends VisibleCGTypes ? {
 	name: string,
 	type: ControlType,
 	controls: Array<{
 		instanceId: string,
 		controlData: VisibleControlTypes[ControlType],
 	}>,
-}
+} : never;

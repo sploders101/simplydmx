@@ -287,7 +287,7 @@ impl PatcherInterface {
 								personality,
 								name,
 								comments,
-								visualization_info: Default::default(),
+								visualization_info: fixture.visualization_info,
 							},
 						);
 						self.0

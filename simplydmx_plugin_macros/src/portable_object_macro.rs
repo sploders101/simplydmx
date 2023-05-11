@@ -51,6 +51,14 @@ pub fn portable_object(_attr: TokenStream, body: TokenStream) -> TokenStream {
 		if let Some(error) = edit_attributes(&mut input.attrs) { return error; }
 		let ident = input.ident.clone();
 		let docs = get_ts_docs(&input.attrs);
+		for variant in input.variants.iter_mut() {
+			variant.attrs.retain(|attr| {
+				if cfg!(not(feature = "tsify")) && attr.path.is_ident("tsify") {
+					return false;
+				}
+				return true;
+			});
+		}
 		(input.into_token_stream().into(), ident, docs)
 	} else if let Ok(input) = syn::parse::<syn::ItemType>(body.clone()) {
 		// These items cannot implement traits since they are just aliases, so create a transparent struct to implement on
@@ -100,6 +108,9 @@ fn edit_attributes(attrs: &mut Vec<syn::Attribute>) -> Option<TokenStream> {
 	let mut all_derived_traits = HashSet::<syn::Path>::new();
 	let mut derive_attributes = Vec::<syn::Attribute>::new();
 	attrs.retain(|attr| {
+		if cfg!(not(feature = "tsify")) && attr.path.is_ident("tsify") {
+			return false;
+		}
 		if !attr.path.is_ident("derive") {
 			return true;
 		}

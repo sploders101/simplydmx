@@ -2,17 +2,36 @@
 	import { reactive, ref, computed, onMounted, nextTick, watch, toRaw } from 'vue';
 	import { usePatcherState } from "@/stores/patcher";
 	import { useLiveMixState } from "@/stores/live";
-	import { ActiveSelection, Canvas, Circle, Gradient, Object as FabricObject } from "fabric";
+	import { ActiveSelection, Canvas, Circle, Object as FabricObject } from "fabric";
 	import { useElementBounding } from '@vueuse/core';
-	import { type ControlGroup, exhaustiveMatch, patcher, FixtureInfo } from '@/scripts/api/ipc';
+	import {
+		exhaustiveMatch,
+		exhaustiveMatchOriginal,
+		patcher,
+		ControlGroup,
+		FixtureInfo,
+		Personality,
+		SubmasterData,
+		FullMixerOutput,
+		FixtureMixerOutput,
+	} from '@/scripts/api/ipc';
 	import { cmyk2rgb, normalizeChannel } from "@/scripts/conversions";
 	import { VisibleControlGroup } from "./types";
+	import { createGradient } from "./helpers";
+	import FixtureControl from "./controls/FixtureControl.vue";
 
 	let patcherState = usePatcherState();
 	let liveMix = useLiveMixState();
-	let displayData = computed(() => {
+
+	let props = defineProps<{}>();
+	
+	let displayData = computed<FullMixerOutput | SubmasterData | null>(() => {
 		return liveMix.value;
 	});
+
+	async function applyDelta(delta: SubmasterData) {
+		console.log(delta);
+	}
 
 	/** The canvas that fabric.js should render into */
 	const canvas = ref<HTMLCanvasElement | null>(null);
@@ -118,6 +137,14 @@
 		return !criteria.some((item) => !source.includes(item));
 	}
 
+	function getDefaultFixtureValues(fixtureProfile: FixtureInfo, personality: Personality): FixtureMixerOutput {
+		let values: FixtureMixerOutput = {};
+		for (const channelId of personality.available_channels) {
+			values[channelId] = fixtureProfile.channels[channelId].default || 0;
+		}
+		return values;
+	}
+
 	/**
 	 * This function updates a light, pulling from registered stores to get the
 	 * needed information. If not all information is available, it will perform
@@ -139,8 +166,7 @@
 		if (!fixtureTypeInfo) return;
 		let fixturePersonalityInfo = fixtureTypeInfo.personalities[fixtureInstance.personality];
 		if (!fixturePersonalityInfo) return;
-		let fixtureData = displayData.value[fixtureId];
-		if (!fixtureData) return;
+		let fixtureData = displayData.value[fixtureId] || getDefaultFixtureValues(fixtureTypeInfo, fixturePersonalityInfo);
 		let fixtureVis = fixtures.get(fixtureId);
 		if (!fixtureVis) return;
 
@@ -236,28 +262,6 @@
 		if (vis.value) vis.value.requestRenderAll();
 	}, { immediate: true });
 
-	/**
-	 * Creates a fill gradient for a light's visualization
-	 *
-	 * Intensity is 0-1 floating-point.
-	 *
-	 * Red, green, and blue are 0-255.
-	 */
-	function createGradient(intensity: number, red: number, green: number, blue: number) {
-		const color = `rgb(${red}, ${green}, ${blue})`;
-		return new Gradient({
-			type: "radial",
-			gradientUnits: "pixels",
-			gradientTransform: [15, 0, 0, 15, 15, 15],
-			coords: { r1: 0, r2: 1, x1: 0, x2: 0, y1: 0, y2: 0 },
-			colorStops: [
-				{ offset: 0, color, opacity: 1 } as any,
-				{ offset: 0.5, color, opacity: 1 * intensity } as any,
-				{ offset: 0.9, color, opacity: 0 } as any,
-			],
-		});
-	}
-
 	const selected = ref<FabricObject[]>([]);
 
 	const activeControlGroups = computed(() => {
@@ -297,11 +301,20 @@
 				const otherKey = `${profile!.profileId}-${cgIndex}`;
 				if (group.name === null) {
 					// Standard control. Add multi-output group.
-					exhaustiveMatch(group.channels, {
-						Intensity: () => intensity,
-						RGBGroup: () => colorGroup,
-						CMYKGroup: () => colorGroup,
-						ColorWheel: () => {
+					exhaustiveMatchOriginal(group.channels, {
+						Intensity: (controlData) => intensity.controls.push({
+							instanceId: fixtureId!,
+							controlData,
+						}),
+						RGBGroup: (controlData) => colorGroup.controls.push({
+							instanceId: fixtureId!,
+							controlData,
+						}),
+						CMYKGroup: (controlData) => colorGroup.controls.push({
+							instanceId: fixtureId!,
+							controlData,
+						}),
+						ColorWheel: (controlData) => {
 							const existingGroup = other[otherKey];
 							if (existingGroup) return existingGroup;
 							const group: VisibleControlGroup = {
@@ -310,9 +323,12 @@
 								controls: [],
 							};
 							other[otherKey] = group;
-							return group;
+							group.controls.push({
+								instanceId: fixtureId!,
+								controlData,
+							});
 						},
-						Gobo: () => {
+						Gobo: (controlData) => {
 							const existingGroup = other[otherKey];
 							if (existingGroup) return existingGroup;
 							const group: VisibleControlGroup = {
@@ -321,11 +337,20 @@
 								controls: [],
 							};
 							other[otherKey] = group;
-							return group;
+							group.controls.push({
+								instanceId: fixtureId!,
+								controlData,
+							});
 						},
-						PanTilt: () => position,
-						Zoom: () => zoom,
-						GenericInput: () => {
+						PanTilt: (controlData) => position.controls.push({
+							instanceId: fixtureId!,
+							controlData,
+						}),
+						Zoom: (controlData) => zoom.controls.push({
+							instanceId: fixtureId!,
+							controlData,
+						}),
+						GenericInput: (controlData) => {
 							const existingGroup = other[otherKey];
 							if (existingGroup) return existingGroup;
 							const group: VisibleControlGroup = {
@@ -334,33 +359,58 @@
 								controls: [],
 							};
 							other[otherKey] = group;
-							return group;
+							group.controls.push({
+								instanceId: fixtureId!,
+								controlData,
+							});
 						},
-					}).controls.push({
-						instanceId: fixtureId!,
-						controlData: group.channels,
 					});
 				} else {
 					// Non-standard control. Add fixture/personality-specific group
 					const existingGroup = other[otherKey];
 					if (existingGroup) return existingGroup;
-					const visibleGroup: VisibleControlGroup = {
-						name: group.name!,
-						type: exhaustiveMatch(group.channels, {
-							Intensity: () => "fader" as const,
-							CMYKGroup: () => "color" as const,
-							RGBGroup: () => "color" as const,
-							ColorWheel: () => "selections" as const,
-							PanTilt: () => "position" as const,
-							Gobo: () => "selections" as const,
-							Zoom: () => "fader" as const,
-							GenericInput: () => "fader" as const,
-						}),
-						controls: [{
-							instanceId: fixtureId!,
-							controlData: group.channels,
-						}],
-					};
+					const visibleGroup: VisibleControlGroup = exhaustiveMatchOriginal(group.channels, {
+						Intensity: (controlData) => ({
+							name: group.name!,
+							type: "fader",
+							controls: [{ instanceId: fixtureId!, controlData }],
+						}) as const,
+						CMYKGroup: (controlData) => ({
+							name: group.name!,
+							type: "color",
+							controls: [{ instanceId: fixtureId!, controlData }],
+						}) as const,
+						RGBGroup: (controlData) => ({
+							name: group.name!,
+							type: "color",
+							controls: [{ instanceId: fixtureId!, controlData }],
+						}) as const,
+						ColorWheel: (controlData) => ({
+							name: group.name!,
+							type: "selections",
+							controls: [{ instanceId: fixtureId!, controlData }],
+						}) as const,
+						PanTilt: (controlData) => ({
+							name: group.name!,
+							type: "position",
+							controls: [{ instanceId: fixtureId!, controlData }],
+						}) as const,
+						Gobo: (controlData) => ({
+							name: group.name!,
+							type: "selections",
+							controls: [{ instanceId: fixtureId!, controlData }],
+						}) as const,
+						Zoom: (controlData) => ({
+							name: group.name!,
+							type: "fader",
+							controls: [{ instanceId: fixtureId!, controlData }],
+						}) as const,
+						GenericInput: (controlData) => ({
+							name: group.name!,
+							type: "fader",
+							controls: [{ instanceId: fixtureId!, controlData }],
+						}) as const,
+					});
 					other[otherKey] = visibleGroup;
 					return visibleGroup;
 				}
@@ -430,9 +480,11 @@
 				/>
 		</div>
 		<div class="sdmx-visualizer__control-panel">
-			<div class="test-control" v-for="group in activeControlGroups">
-				{{ group.name }}
-			</div>
+			<FixtureControl
+				:group="group"
+				@input="applyDelta($event)"
+				v-for="group in activeControlGroups"
+				/>
 		</div>
 	</div>
 </template>
@@ -463,18 +515,8 @@
 			overflow: auto;
 			align-items: stretch;
 
-			gap: 1rem;
-
-			.test-control {
-				background-color: red;
-				border: 2px solid black;
-				min-width: 5rem;
-
-				text-align: center;
-				display: flex;
-				flex-flow: column nowrap;
-				justify-content: center;
-			}
+			gap: 0.5rem;
+			padding: 0.5rem;
 		}
 	}
 </style>

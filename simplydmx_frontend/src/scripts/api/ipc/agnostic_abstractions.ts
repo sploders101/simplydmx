@@ -232,7 +232,11 @@ export type MatchArms<Enum extends RustEnum, ReturnType> =
 	UnionToIntersection<Enum extends string ? { [K in Enum]: () => ReturnType } : {
 		[K in keyof Enum]: ((arg: Enum[K]) => ReturnType) | null
 	}>;
-export type MatchReturn<Enum extends RustEnum, Cases extends MatchArms<Enum, any>> =
+export type MatchArmsOriginal<Enum extends RustEnum, ReturnType> =
+	UnionToIntersection<Enum extends string ? { [K in Enum]: () => ReturnType } : {
+		[K in keyof Enum]: ((arg: Enum) => ReturnType) | null
+	}>;
+export type MatchReturn<Enum extends RustEnum, Cases extends MatchArms<Enum, any> | MatchArmsOriginal<Enum, any>> =
 	Cases extends MatchArms<Enum, infer ReturnType>
 		? ReturnType
 		: never;
@@ -255,4 +259,18 @@ export function exhaustiveMatch<Enum extends RustEnum, Cases extends MatchArms<E
 	if (entries.length !== 1) throw new Error("Invalid Rust enum. This should have been checked at compile time.");
 
 	return (arms as any)[entries[0][0] as keyof Enum](entries[0][1]);
+}
+
+/**
+ * Dumbed-down version of Rust's match statement for use in TypeScript. This is intended to take an exported Rust enum type
+ * and create an exhaustive list of cases for each enum variant.
+ *
+ * This version of exhaustiveMatch passes the original enum as the argument rather than its value.
+ */
+export function exhaustiveMatchOriginal<Enum extends RustEnum, Cases extends MatchArmsOriginal<Enum, any>>(rustEnum: Enum, arms: Cases): MatchReturn<Enum, Cases> {
+	if (typeof rustEnum === "string") return (arms as any)[rustEnum]();
+	const keys = Object.keys(rustEnum);
+	if (keys.length !== 1) throw new Error("Invalid Rust enum. This should have been checked at compile time.");
+
+	return (arms as any)[keys[0] as keyof Enum](rustEnum);
 }

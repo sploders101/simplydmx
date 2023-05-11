@@ -1,4 +1,4 @@
-import { exhaustiveMatch, FixtureInfo, FixtureMixerOutput } from "@/scripts/api/ipc";
+import { AbstractLayerLight, BlenderValue, exhaustiveMatch, FixtureInfo, FixtureMixerOutput } from "@/scripts/api/ipc";
 
 /**
  * Converts 8-bit cmyk values to rgb values
@@ -16,16 +16,28 @@ export function cmyk2rgb(
 	};
 }
 
+function normalizeSubmasterValues(channelValue: number | BlenderValue, defaultValue: number | undefined): number {
+	if (typeof channelValue === "number") {
+		return channelValue;
+	} else {
+		return exhaustiveMatch(channelValue, {
+			None: () => defaultValue || 0,
+			Offset: (offset) => (defaultValue || 0) + offset,
+			Static: (value) => value,
+		});
+	}
+}
+
 /**
  * Normalizes a channel into 8-bit precision
  */
 export function normalizeChannel(
 	profile: FixtureInfo,
-	fixtureData: FixtureMixerOutput,
+	fixtureData: FixtureMixerOutput | AbstractLayerLight,
 	channel: string,
-) {
-	const channelValue = fixtureData[channel];
+): number {
 	const channelInfo = profile.channels[channel];
+	const channelValue = normalizeSubmasterValues(fixtureData[channel], channelInfo.default);
 	return exhaustiveMatch(channelInfo.size, {
 		U8: () => channelValue,
 		U16: () => Math.floor(channelValue / 257), // Maps 65535 to 255

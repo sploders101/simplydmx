@@ -182,10 +182,7 @@
 		await importFixtureTest("a93e6ba5-83ef-4faa-afd0-7b85dd12400b", "Generic Moving Spotlight", "IPT", false, true);
 
 		let universeId = await rpc.output_dmx.create_universe("Test universe");
-		unwrap(await rpc.output_dmx.link_universe(universeId, "e131", {
-			external_universe: 1,
-		}));
-		let fixtureId = unwrap(await rpc.patcher.create_fixture("c205635c-037a-4e5c-8a68-59a8a86dae8f", "8-bit", "Test Fixture", null, {
+		let fixtureId = unwrap(await rpc.patcher.create_fixture("c205635c-037a-4e5c-8a68-59a8a86dae8f", "8-bit", "RGBW", null, {
 			universe: universeId,
 			offset: 41,
 		} as rpc.DMXFixtureInstance));
@@ -201,7 +198,7 @@
 			}
 		};
 		await rpc.mixer.set_layer_contents(submasterId, newContents);
-		await rpc.mixer.set_layer_opacity(submasterId, Math.floor(65535), true);
+		await rpc.mixer.set_layer_opacity(submasterId, 65535, true);
 	}
 
 	const typespec = useTypeSpecState("universes");

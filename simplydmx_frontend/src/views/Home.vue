@@ -4,13 +4,16 @@
 	import * as rpc from "@/scripts/api/ipc";
 	import * as mixer from "@/scripts/api/mixer";
 	import * as patcher from "@/scripts/api/patcher";
-	import { SelectEvent } from "@/components/generic/largeselect.vue";
 	import { usePatcherState } from "@/stores/patcher";
-	import { Channel, ChannelSize } from "@/scripts/api/ipc";
+	import { Channel, ChannelSize, SubmasterData } from "@/scripts/api/ipc";
 	import { useTypeSpecState } from "@/stores/typespec";
 	import Visualizer from "@/components/visualizer/visualizer.vue";
+	import { useLiveMixState } from "@/stores/live";
 
+	const liveMix = useLiveMixState();
 	const patcherState = usePatcherState();
+
+	const log = console.log.bind(console);
 
 	const test = ref("Testing");
 	const testNumber = ref(5);
@@ -45,10 +48,6 @@
 
 	const dialogVisible = ref(false);
 	const selectValue = ref(1);
-
-	function log(event: SelectEvent) {
-		console.log("User clicked", event.value);
-	}
 
 	(window as any).rpc = rpc;
 	(window as any).mixer = mixer;
@@ -171,8 +170,6 @@
 				},
 			},
 		});
-
-		console.log(importResponse);
 	}
 
 	async function fullTestInvoked() {
@@ -187,7 +184,7 @@
 			offset: 41,
 		} as rpc.DMXFixtureInstance));
 
-		let submasterId = await rpc.mixer.create_layer();
+		let submasterId = await rpc.mixer.create_layer("Example submaster");
 		let newContents = {
 			[fixtureId]: {
 				intensity: blenderValue(255),
@@ -201,8 +198,17 @@
 		await rpc.mixer.set_layer_opacity(submasterId, 65535, true);
 	}
 
-	const typespec = useTypeSpecState("universes");
+	const typespec = useTypeSpecState("submasters");
 	const test3 = ref("");
+
+	function logVisualizerChanges(changes: SubmasterData) {
+		return new Promise<void>((res) => {
+			setTimeout(() => {
+				console.log(changes);
+				res();
+			}, 500);
+		});
+	}
 
 </script>
 
@@ -242,7 +248,7 @@
 			</LargeSelect>
 		</Tabitem>
 		<Tabitem tab="test4">
-			<Visualizer/>
+			<Visualizer :display-data="liveMix" :update-props="logVisualizerChanges"/>
 		</Tabitem>
 	</Tabs>
 

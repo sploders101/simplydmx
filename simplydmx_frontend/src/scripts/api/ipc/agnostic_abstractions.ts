@@ -86,13 +86,13 @@ rpc.connect((event) => {
 					listener(event as Event);
 				});
 				if (event.criteria.type === "String") {
-					listeners.string.get(event.name)?.forEach((listener) => {
+					listeners.string.get(event.criteria.data)?.forEach((listener) => {
 						if (calledListeners.has(listener)) return;
 						calledListeners.add(listener);
 						listener(event as Event);
 					});
 				} else if (event.criteria.type === "Uuid") {
-					listeners.uuid.get(event.name)?.forEach((listener) => {
+					listeners.uuid.get(event.criteria.data)?.forEach((listener) => {
 						if (calledListeners.has(listener)) return;
 						calledListeners.add(listener);
 						listener(event as Event);

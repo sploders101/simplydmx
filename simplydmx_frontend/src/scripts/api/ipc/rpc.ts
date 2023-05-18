@@ -363,6 +363,7 @@ export type MixerInitializationError = "UnrecognizedData";
 export interface MixingContext {
     layer_order: Uuid[];
     layer_opacities: Record<Uuid, number>;
+    user_submaster_order: Uuid[];
     user_submasters: Record<Uuid, StaticLayer>;
 }
 
@@ -475,6 +476,7 @@ export type SnapData = "NoSnap" | { SnapAt: number };
  * Defines a static submaster
  */
 export interface StaticLayer {
+    name: string;
     values: SubmasterData;
 }
 
@@ -515,12 +517,13 @@ export const core = {
 
 export const mixer = {
 	commit_blind(): Promise<void> { return callService("mixer", "commit_blind", []) },
-	create_layer(): Promise<Uuid> { return callService("mixer", "create_layer", []) },
+	create_layer(name: string): Promise<Uuid> { return callService("mixer", "create_layer", [name]) },
 	delete_layer(submaster_id: Uuid): Promise<boolean> { return callService("mixer", "delete_layer", [submaster_id]) },
 	enter_blind_mode(): Promise<void> { return callService("mixer", "enter_blind_mode", []) },
 	get_blind_opacity(): Promise<number | null> { return callService("mixer", "get_blind_opacity", []) },
 	get_layer_contents(submaster_id: Uuid): Promise<StaticLayer | null> { return callService("mixer", "get_layer_contents", [submaster_id]) },
 	get_layer_opacity(submaster_id: Uuid): Promise<number | null> { return callService("mixer", "get_layer_opacity", [submaster_id]) },
+	list_submasters(): Promise<[Uuid, string][]> { return callService("mixer", "list_submasters", []) },
 	request_blend(): Promise<void> { return callService("mixer", "request_blend", []) },
 	revert_blind(): Promise<void> { return callService("mixer", "revert_blind", []) },
 	set_blind_opacity(opacity: number): Promise<void> { return callService("mixer", "set_blind_opacity", [opacity]) },

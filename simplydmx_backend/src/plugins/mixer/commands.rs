@@ -102,6 +102,25 @@ impl CommitBlind {
 // └──────────────────────┘
 
 #[interpolate_service(
+	"list_submasters",
+	"List Submasters",
+	"Lists all user-created layers (submasters)",
+)]
+impl ListSubmasters {
+	#![inner_raw(MixerInterface)]
+	pub fn new(mixer_interface: MixerInterface) -> Self {
+		Self(mixer_interface)
+	}
+
+	#[service_main(
+		("Submasters", "An array of (id, name) tuples representing the submasters listed in the mixer"),
+	)]
+	async fn main(self) -> Vec<(Uuid, String)> {
+		return self.0.list_submasters_with_names().await;
+	}
+}
+
+#[interpolate_service(
 	"create_layer",
 	"Create Submaster",
 	"Creates a new submaster that can be used for blending"
@@ -113,10 +132,11 @@ impl CreateLayer {
 	}
 
 	#[service_main(
+		("Name", "The name to assign to the submaster"),
 		("Submaster ID", "UUID value that should be used from this point forward to identify the submaster", "mixer::layer_id"),
 	)]
-	async fn main(self) -> Uuid {
-		return self.0.create_layer().await;
+	async fn main(self, name: String) -> Uuid {
+		return self.0.create_layer(name).await;
 	}
 }
 

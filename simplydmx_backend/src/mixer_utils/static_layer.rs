@@ -19,14 +19,15 @@ use super::{
 #[portable]
 /// Defines a static submaster
 pub struct StaticLayer {
+	pub name: String,
 	pub values: SubmasterData,
 }
-
-impl Default for StaticLayer {
-	fn default() -> Self {
+impl StaticLayer {
+	pub fn new(name: String) -> StaticLayer {
 		return StaticLayer {
+			name,
 			values: FxHashMap::default(),
-		}
+		};
 	}
 }
 

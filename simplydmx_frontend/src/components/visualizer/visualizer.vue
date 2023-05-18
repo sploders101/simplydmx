@@ -1,7 +1,6 @@
 <script lang="ts" setup>
-	import { reactive, ref, computed, onMounted, nextTick, watch, toRaw } from 'vue';
+	import { reactive, ref, computed, onMounted, nextTick, watch, toRaw, PropType } from 'vue';
 	import { usePatcherState } from "@/stores/patcher";
-	import { useLiveMixState } from "@/stores/live";
 	import { ActiveSelection, Canvas, Circle, Object as FabricObject } from "fabric";
 	import { useElementBounding } from '@vueuse/core';
 	import {
@@ -21,17 +20,17 @@
 	import FixtureControl from "./controls/FixtureControl.vue";
 
 	let patcherState = usePatcherState();
-	let liveMix = useLiveMixState();
 
-	let props = defineProps<{}>();
-	
-	let displayData = computed<FullMixerOutput | SubmasterData | null>(() => {
-		return liveMix.value;
+	let props = defineProps({
+		displayData: {
+			required: true,
+			type: Object as PropType<FullMixerOutput | SubmasterData | null>,
+		},
+		updateProps: {
+			required: true,
+			type: Function as PropType<(props: SubmasterData) => Promise<void>>,
+		},
 	});
-
-	async function applyDelta(delta: SubmasterData) {
-		console.log(delta);
-	}
 
 	/** The canvas that fabric.js should render into */
 	const canvas = ref<HTMLCanvasElement | null>(null);
@@ -54,16 +53,18 @@
 	 */
 	const fixtureObjToId = new WeakMap<any, string>();
 
-	watch(displayData, () => {
-		if (!displayData.value) return;
+	// Update light values when displayData changes, but delay 1 tick
+	// to give the patcher watcher a chance to update first
+	watch(() => [props.displayData, ...fixtures.keys()], () => {
+		if (!props.displayData) return;
 
 		// Fixtures should be created/destroyed by patcher state
 		for (const fixtureId of fixtures.keys()) {
-			if (!displayData.value[fixtureId]) continue;
+			if (!props.displayData[fixtureId]) continue;
 			updateLight(fixtureId);
 		}
 		if (vis.value) vis.value.requestRenderAll();
-	}, { immediate: true });
+	}, { immediate: true, deep: true });
 
 	interface FixtureProfileIds {
 		profileId: string,
@@ -93,9 +94,8 @@
 		// Collect data and drop unsynchronized triggers
 		if (
 			!patcherState.value
-			|| !vis.value
 			|| !fixtures.has(fixtureId)
-			|| !displayData.value
+			|| !props.displayData
 		) return null;
 
 		let fixtureInstance = patcherState.value.fixtures[fixtureId];
@@ -104,7 +104,7 @@
 		if (!fixtureTypeInfo) return null;
 		let fixturePersonalityInfo = fixtureTypeInfo.personalities[fixtureInstance.personality];
 		if (!fixturePersonalityInfo) return null;
-		let fixtureData = displayData.value[fixtureId];
+		let fixtureData = props.displayData[fixtureId];
 		if (!fixtureData) return null;
 		let fixtureVis = fixtures.get(fixtureId);
 		if (!fixtureVis) return null;
@@ -151,13 +151,13 @@
 	 * an early return. This function should be called individually for all types
 	 * of updates so the data has a chance to synchronize.
 	 */
-	function updateLight(fixtureId: string) {
+	async function updateLight(fixtureId: string) {
+		// await new Promise((res) => setTimeout(res, 1000));
 		// Collect data and drop unsynchronized triggers
 		if (
 			!patcherState.value
-			|| !vis.value
 			|| !fixtures.has(fixtureId)
-			|| !displayData.value
+			|| !props.displayData
 		) return;
 
 		let fixtureInstance = patcherState.value.fixtures[fixtureId];
@@ -166,9 +166,10 @@
 		if (!fixtureTypeInfo) return;
 		let fixturePersonalityInfo = fixtureTypeInfo.personalities[fixtureInstance.personality];
 		if (!fixturePersonalityInfo) return;
-		let fixtureData = displayData.value[fixtureId] || getDefaultFixtureValues(fixtureTypeInfo, fixturePersonalityInfo);
+		let fixtureData = props.displayData[fixtureId] || getDefaultFixtureValues(fixtureTypeInfo, fixturePersonalityInfo);
 		let fixtureVis = fixtures.get(fixtureId);
 		if (!fixtureVis) return;
+
 
 		// Get data bounds
 		let intensityValue = 0;
@@ -217,7 +218,7 @@
 				height: viewportBounds.height.value,
 			}, {});
 		}
-	});
+	}, { immediate: true });
 
 	// Update the circles when the patch changes
 	watch(() => patcherState.value?.fixtures, () => {
@@ -470,6 +471,45 @@
 		fixtures.forEach((fixtureObj) => vis.value!.add(fixtureObj));
 	}));
 
+	let pushInProgress = false;
+	let batchedData: SubmasterData | null = null;
+
+	function handleBatchedProps() {
+		if (batchedData === null) {
+			pushInProgress = false;
+		} else {
+			const myBatchedData = batchedData;
+			batchedData = null;
+			props.updateProps(myBatchedData)
+				.then(() => handleBatchedProps());
+		}
+	}
+
+	function handleUpdatedProps(data: SubmasterData) {
+		if (pushInProgress) {
+			// Merge data
+			if (batchedData === null) {
+				batchedData = data;
+			} else {
+				for (const [fixtureId, values] of Object.entries(data)) {
+					const fixtureData = batchedData[fixtureId];
+					if (fixtureData) {
+						// Merge data
+						for (const [channelId, value] of Object.entries(values)) {
+							fixtureData[channelId] = value;
+						}
+					} else {
+						batchedData[fixtureId] = values;
+					}
+				}
+			}
+		} else {
+			pushInProgress = true;
+			props.updateProps(data)
+				.then(() => handleBatchedProps());
+		}
+	}
+
 </script>
 
 <template>
@@ -479,10 +519,11 @@
 				ref="canvas"
 				/>
 		</div>
-		<div class="sdmx-visualizer__control-panel">
+		<div class="sdmx-visualizer__control-panel" v-if="props.displayData">
 			<FixtureControl
 				:group="group"
-				@input="applyDelta($event)"
+				:display-data="props.displayData"
+				@update-props="handleUpdatedProps($event)"
 				v-for="group in activeControlGroups"
 				/>
 		</div>

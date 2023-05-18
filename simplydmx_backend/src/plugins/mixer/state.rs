@@ -62,6 +62,7 @@ impl MixerContext {
 pub struct MixingContext {
 	pub layer_order: Vec<Uuid>,
 	pub layer_opacities: HashMap<Uuid, u16>,
+	pub user_submaster_order: Vec<Uuid>,
 	pub user_submasters: HashMap<Uuid, StaticLayer>,
 }
 impl Default for MixingContext {
@@ -69,6 +70,7 @@ impl Default for MixingContext {
 		return MixingContext {
 			layer_order: Vec::new(),
 			layer_opacities: HashMap::new(),
+			user_submaster_order: Vec::new(),
 			user_submasters: HashMap::new(),
 		};
 	}

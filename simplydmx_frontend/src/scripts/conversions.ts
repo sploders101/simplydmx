@@ -35,11 +35,25 @@ export function normalizeChannel(
 	profile: FixtureInfo,
 	fixtureData: FixtureMixerOutput | AbstractLayerLight,
 	channel: string,
+	desiredScale: "U8" | "U16" | "percentage" = "U8",
 ): number {
 	const channelInfo = profile.channels[channel];
 	const channelValue = normalizeSubmasterValues(fixtureData[channel], channelInfo.default);
-	return exhaustiveMatch(channelInfo.size, {
-		U8: () => channelValue,
-		U16: () => Math.floor(channelValue / 257), // Maps 65535 to 255
-	});
+	switch (desiredScale) {
+		case "U8":
+			return exhaustiveMatch(channelInfo.size, {
+				U8: () => channelValue,
+				U16: () => Math.floor(channelValue / 257), // Maps 65535 to 255
+			});
+		case "U16":
+			return exhaustiveMatch(channelInfo.size, {
+				U8: () => channelValue * 257, // Maps 255 to 65535
+				U16: () => channelValue,
+			});
+		case "percentage":
+			return exhaustiveMatch(channelInfo.size, {
+				U8: () => channelValue / 255,
+				U16: () => channelValue / 65535,
+			});
+	}
 }

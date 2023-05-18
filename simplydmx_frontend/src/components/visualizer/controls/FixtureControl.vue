@@ -1,28 +1,25 @@
 <script lang="ts" setup>
-	import { ref } from "vue";
 	import { VisibleControlGroup } from "../types";
 	import Fader from "./Fader.vue";
 	import Debug from "./Debug.vue";
+	import { FullMixerOutput, SubmasterData } from "@/scripts/api/ipc";
 
 	const props = defineProps<{
+		displayData: FullMixerOutput | SubmasterData,
 		group: VisibleControlGroup,
 	}>();
+	const emit = defineEmits<{
+		(event: "update-props", props: SubmasterData): void,
+	}>();
 
-	const faderValue = ref(0.5);
-	function updateModelValue(event: number) {
-		setTimeout(() => {
-			console.log("Setting value to " + event);
-			faderValue.value = event;
-		}, 1000);
-	}
 </script>
 
 <template>
 	<Fader
 		v-if="props.group.type === 'fader'"
-		:modelValue="faderValue"
-		@update:modelValue="updateModelValue($event)"
-		label="Intensity"
+		:display-data="props.displayData"
+		:group="props.group"
+		@update-props="emit('update-props', $event)"
 		/>
 	<Debug v-else :group="props.group" />
 </template>

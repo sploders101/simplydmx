@@ -28,9 +28,10 @@
 
 	let scrollTimeout: number | null = null;
 	function handleScroll(event: WheelEvent) {
+		const beforeValue = visibleValue.value;
 		intermediateValue.value += event.deltaY / 350;
 		intermediateValue.value = visibleValue.value;
-		emit("update:modelValue", visibleValue.value);
+		if (visibleValue.value !== beforeValue) emit("update:modelValue", visibleValue.value);
 		if (scrollTimeout !== null) clearTimeout(scrollTimeout);
 		scrollTimeout = setTimeout(() => {
 			intermediateValue.value = props.modelValue;
@@ -54,8 +55,9 @@
 			let delta = mouseY - event.screenY;
 			mouseY = event.screenY;
 			if (delta !== 0) {
+				const beforeValue = visibleValue.value;
 				intermediateValue.value += delta / faderBounds.height.value;
-				emit("update:modelValue", visibleValue.value);
+				if (visibleValue.value !== beforeValue) emit("update:modelValue", visibleValue.value);
 			}
 		}
 	}
@@ -105,8 +107,9 @@
 			let delta = touchY - touch.screenY;
 			touchY = touch.screenY;
 			if (delta !== 0) {
+				const beforeValue = visibleValue.value;
 				intermediateValue.value += delta / faderBounds.height.value;
-				emit("update:modelValue", visibleValue.value);
+				if (visibleValue.value !== beforeValue) emit("update:modelValue", visibleValue.value);
 			}
 		}
 	}

@@ -1,5 +1,11 @@
 import { Gradient } from "fabric";
 
+function clip(value: number) {
+	if (value > 1) return 1;
+	if (value < 0) return 0;
+	return value;
+}
+
 /**
  * Creates a fill gradient for a light's visualization
  *
@@ -15,8 +21,8 @@ export function createGradient(intensity: number, red: number, green: number, bl
 		gradientTransform: [15, 0, 0, 15, 15, 15],
 		coords: { r1: 0, r2: 1, x1: 0, x2: 0, y1: 0, y2: 0 },
 		colorStops: [
-			{ offset: 0, color, opacity: 1 } as any,
-			{ offset: 0.5, color, opacity: 1 * intensity } as any,
+			{ offset: 0, color, opacity: clip(1.5 * intensity) } as any,
+			{ offset: 0.5 * intensity, color, opacity: 1 * intensity } as any,
 			{ offset: 0.9, color, opacity: 0 } as any,
 		],
 	});

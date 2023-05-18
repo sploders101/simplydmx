@@ -32,11 +32,9 @@
 				</Tooltip>
 			</template>
 		</LargeSelect>
-		<div class="patcher-universe-prefs">
+		<div class="submaster-editor__visualizer">
 			<Visualizer v-if="submasterData" :display-data="submasterData" :update-props="updateSubmaster"/>
-			<!--UniverseEditor v-if="selectedSubmaster" :selectedUniverse="selectedSubmaster" /-->
 		</div>
-		<!--CreateUniverseDialog v-model:visible="addSubmasterDialog" /-->
 	</div>
 </template>
 

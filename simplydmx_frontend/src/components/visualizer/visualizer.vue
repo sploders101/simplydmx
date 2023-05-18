@@ -195,7 +195,7 @@
 			GenericInput: (_channel) => {},
 			Gobo: (_gobo) => {},
 			Intensity: (intensity) => {
-				intensityValue = normalizeChannel(fixtureTypeInfo, fixtureData, intensity);
+				intensityValue = normalizeChannel(fixtureTypeInfo, fixtureData, intensity, "percentage");
 			},
 			PanTilt: ({ pan, tilt }) => {},
 			RGBGroup: ({ red, green, blue }) => {

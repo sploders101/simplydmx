@@ -2,7 +2,6 @@
 	import { ref } from "vue";
 	import { unwrap } from "@/scripts/helpers";
 	import * as rpc from "@/scripts/api/ipc";
-	import * as mixer from "@/scripts/api/mixer";
 	import * as patcher from "@/scripts/api/patcher";
 	import { usePatcherState } from "@/stores/patcher";
 	import { Channel, ChannelSize, SubmasterData } from "@/scripts/api/ipc";
@@ -50,7 +49,6 @@
 	const selectValue = ref(1);
 
 	(window as any).rpc = rpc;
-	(window as any).mixer = mixer;
 	(window as any).patcher = patcher;
 
 	function blenderValue(value: number): rpc.BlenderValue {

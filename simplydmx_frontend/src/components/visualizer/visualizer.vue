@@ -104,8 +104,6 @@
 		if (!fixtureTypeInfo) return null;
 		let fixturePersonalityInfo = fixtureTypeInfo.personalities[fixtureInstance.personality];
 		if (!fixturePersonalityInfo) return null;
-		let fixtureData = props.displayData[fixtureId];
-		if (!fixtureData) return null;
 		let fixtureVis = fixtures.get(fixtureId);
 		if (!fixtureVis) return null;
 		let availableChannels = fixturePersonalityInfo.available_channels;
@@ -173,9 +171,9 @@
 
 		// Get data bounds
 		let intensityValue = 0;
-		let redValue = 0;
-		let greenValue = 0;
-		let blueValue = 0;
+		let redValue = 255;
+		let greenValue = 255;
+		let blueValue = 255;
 		let controlGroups = getActiveControlGroups(fixtureId);
 
 		if (controlGroups) controlGroups.forEach((group) => exhaustiveMatch(group.channels, {
@@ -444,7 +442,13 @@
 		});
 
 		// Keep selection object updated so we can update the control panel
-		vis.value.on("selection:created", (event) => selected.value = event.selected);
+		vis.value.on("selection:created", (event) => {
+			selected.value = event.selected;
+			const selectionObj = vis.value?.getActiveSelection();
+			if (selectionObj instanceof ActiveSelection) {
+				selectionObj.hasControls = false;
+			}
+		});
 		vis.value.on("selection:updated", (event) => {
 			event.selected.forEach((obj) => selected.value.push(obj));
 			if (event.deselected.length) selected.value = selected.value.filter((obj) => {

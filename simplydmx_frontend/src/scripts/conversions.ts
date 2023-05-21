@@ -71,17 +71,33 @@ export function formatColorString(red: number, green: number, blue: number): str
 	}).join("");
 }
 
+export function getChannelValue(
+	profile: FixtureInfo,
+	fixtureData: FixtureMixerOutput | AbstractLayerLight | null | undefined,
+	channel: string,
+): number | BlenderValue {
+	if (
+		fixtureData === undefined
+		|| fixtureData === null
+		|| fixtureData[channel] === undefined
+		|| fixtureData[channel] === null
+	) {
+		return profile.channels[channel].default || 0;
+	}
+	return fixtureData[channel];
+}
+
 /**
  * Normalizes a channel into 8-bit precision
  */
 export function normalizeChannel(
 	profile: FixtureInfo,
-	fixtureData: FixtureMixerOutput | AbstractLayerLight,
+	fixtureData: FixtureMixerOutput | AbstractLayerLight | undefined,
 	channel: string,
 	desiredScale: "U8" | "U16" | "percentage" = "U8",
 ): number {
 	const channelInfo = profile.channels[channel];
-	const channelValue = normalizeSubmasterValues(fixtureData[channel], channelInfo.default);
+	const channelValue = normalizeSubmasterValues(getChannelValue(profile, fixtureData, channel), channelInfo.default);
 	switch (desiredScale) {
 		case "U8":
 			return exhaustiveMatch(channelInfo.size, {

@@ -41,12 +41,11 @@
 				},
 			});
 		});
-		const test = formatColorString(
-			summed[0] / props.group.controls.length,
-			summed[1] / props.group.controls.length,
-			summed[2] / props.group.controls.length,
+		return formatColorString(
+			Math.floor(summed[0] / props.group.controls.length),
+			Math.floor(summed[1] / props.group.controls.length),
+			Math.floor(summed[2] / props.group.controls.length),
 		);
-		return test;
 	});
 
 	const empty = Symbol();

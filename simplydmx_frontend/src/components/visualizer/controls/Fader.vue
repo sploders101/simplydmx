@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-	import { computed, ref, watchEffect } from "vue";
+	import { computed } from "vue";
 	import { VisibleControlGroup } from "../types";
 	import Fader from "@/components/generic/Fader.vue";
 	import { exhaustiveMatch, FullMixerOutput, SubmasterData } from "@/scripts/api/ipc";

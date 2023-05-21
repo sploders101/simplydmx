@@ -181,7 +181,7 @@
 		.sdmx-control-fader__contents {
 			z-index: 1;
 			color: #555;
-			// text-shadow: #FFF 0 0 3px;
+			text-shadow: #00000055 0 0 5px;
 			pointer-events: none;
 			-webkit-pointer-events: none;
 			user-select: none;

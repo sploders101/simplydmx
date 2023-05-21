@@ -16,7 +16,31 @@ export function cmyk2rgb(
 	};
 }
 
-function normalizeSubmasterValues(channelValue: number | BlenderValue, defaultValue: number | undefined): number {
+/**
+ * Converts rgb values to cmyk
+ */
+export function rgb2cmyk(red: number, green: number, blue: number, scale: number = 255) {
+	let cyan = scale - red;
+	let magenta = scale - green;
+	let yellow = scale - blue;
+	let black = 0;
+
+	let minCMY = Math.min(cyan, magenta, yellow);
+
+	cyan = (cyan - minCMY) / (scale - minCMY) ;
+	magenta = (magenta - minCMY) / (scale - minCMY) ;
+	yellow = (yellow - minCMY) / (scale - minCMY) ;
+	black = minCMY;
+
+	return {
+		cyan: cyan * scale,
+		magenta: magenta * scale,
+		yellow: yellow * scale,
+		black: black * scale,
+	};
+}
+
+export function normalizeSubmasterValues(channelValue: number | BlenderValue, defaultValue: number | undefined): number {
 	if (typeof channelValue === "number") {
 		return channelValue;
 	} else {
@@ -26,6 +50,25 @@ function normalizeSubmasterValues(channelValue: number | BlenderValue, defaultVa
 			Static: (value) => value,
 		});
 	}
+}
+
+export function parseColorString(color: string): [number, number, number] {
+	return [
+		parseInt(color.substring(1, 3), 16),
+		parseInt(color.substring(3, 5), 16),
+		parseInt(color.substring(5, 7), 16),
+	];
+}
+
+export function formatColorString(red: number, green: number, blue: number): string {
+	return "#" + [red, green, blue].map((value) => {
+		const hex = value.toString(16);
+		if (hex.length === 1) {
+			return "0" + hex;
+		} else {
+			return hex;
+		}
+	}).join("");
 }
 
 /**

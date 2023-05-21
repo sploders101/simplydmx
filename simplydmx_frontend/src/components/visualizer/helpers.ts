@@ -21,9 +21,9 @@ export function createGradient(intensity: number, red: number, green: number, bl
 		gradientTransform: [15, 0, 0, 15, 15, 15],
 		coords: { r1: 0, r2: 1, x1: 0, x2: 0, y1: 0, y2: 0 },
 		colorStops: [
-			{ offset: 0, color, opacity: clip(1.5 * intensity) } as any,
-			{ offset: 0.5 * intensity, color, opacity: 1 * intensity } as any,
-			{ offset: 0.9, color, opacity: 0 } as any,
+			{ offset: 0, color, opacity: clip(1.5 * intensity) },
+			{ offset: 0.5 * intensity, color, opacity: 1 * intensity },
+			{ offset: 0.9 * clip(intensity + 0.2), color, opacity: 0 },
 		],
 	});
 }

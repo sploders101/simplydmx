@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 	import { VisibleControlGroup } from "../types";
 	import Fader from "./Fader.vue";
+	import ColorPicker from "./ColorPicker.vue";
 	import Debug from "./Debug.vue";
 	import { FullMixerOutput, SubmasterData } from "@/scripts/api/ipc";
 
@@ -17,6 +18,12 @@
 <template>
 	<Fader
 		v-if="props.group.type === 'fader'"
+		:display-data="props.displayData"
+		:group="props.group"
+		@update-props="emit('update-props', $event)"
+		/>
+	<ColorPicker
+		v-else-if="props.group.type === 'color'"
 		:display-data="props.displayData"
 		:group="props.group"
 		@update-props="emit('update-props', $event)"

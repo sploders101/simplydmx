@@ -27,7 +27,7 @@
 			enable-search
 			>
 			<template #header-right>
-				<Tooltip text="Add Universe">
+				<Tooltip text="Create Submaster">
 					<Button @click="addSubmasterDialog = true" icon subtle><Icon i="plus"/></Button>
 				</Tooltip>
 			</template>

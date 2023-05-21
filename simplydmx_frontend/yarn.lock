@@ -655,10 +655,10 @@ execa@^5.0.0:
     signal-exit "^3.0.3"
     strip-final-newline "^2.0.0"
 
-fabric@^6.0.0-beta3:
-  version "6.0.0-beta3"
-  resolved "https://registry.yarnpkg.com/fabric/-/fabric-6.0.0-beta3.tgz#57dd6b961a6845734ecbb2aa5dd31baf9a98808c"
-  integrity sha512-gI4+oQAoFUlTT5PaXop1/CpFPo9H5Zn8g77k2UhmxHML1TizavWCc6q8g27DyutOO+Kn+lcNHk6CxGUjABh/bw==
+fabric@^6.0.0-beta6:
+  version "6.0.0-beta6"
+  resolved "https://registry.yarnpkg.com/fabric/-/fabric-6.0.0-beta6.tgz#0dbf184553fedd9a02b0ef3bfb9e767bc29b9751"
+  integrity sha512-mDOzr/09anDRLjJGYAw2DKtTKWA4NuPUhaZFtJ7n+KfVBbjxWys9uDBneIWo/Q6y1j+9VEp9CybHruFIdH4hag==
   optionalDependencies:
     canvas "^2.8.0"
     jsdom "^20.0.1"

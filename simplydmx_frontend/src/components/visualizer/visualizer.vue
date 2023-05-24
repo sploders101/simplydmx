@@ -466,8 +466,8 @@
 				let coords = fixtureObject.getCoords(true)[0];
 				if (fixtureId) patcher.edit_fixture_placement(
 					fixtureId,
-					coords.x,
-					coords.y,
+					Math.round(coords.x),
+					Math.round(coords.y),
 				);
 			});
 		});

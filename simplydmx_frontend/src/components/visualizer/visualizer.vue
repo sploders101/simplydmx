@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 	import { reactive, ref, computed, onMounted, nextTick, watch, toRaw, PropType } from 'vue';
 	import { usePatcherState } from "@/stores/patcher";
-	import { ActiveSelection, Canvas, Circle, Object as FabricObject } from "fabric";
+	import { ActiveSelection, Canvas, Circle, Object as FabricObject, Text as TextObject } from "fabric";
 	import { useElementBounding } from '@vueuse/core';
 	import {
 		exhaustiveMatch,
@@ -241,11 +241,40 @@
 					top: fixture.visualization_info.y,
 					hasControls: false,
 				});
+				const label = new TextObject("", {});
+				label.evented = false;
+				label.hasBorders = false;
+				label.selectable = false;
+				label.fontSize = 15;
+				label.fill = "#FFF";
+				label.textBackgroundColor = "#000";
+				label.padding = 3;
+				label.lineHeight = 2;
+				label.height = label.calcTextHeight();
+				fixtureObj.on("mouseover", () => {
+					label.set("text", patcherState.value?.fixtures[fixture.id]?.name || "");
+					label.setX(fixtureObj.getX() + 35);
+					label.setY(fixtureObj.getY() + 7);
+					if (vis.value) {
+						vis.value.add(label);
+						vis.value.requestRenderAll();
+					}
+				});
+				fixtureObj.on("moving", (event) => {
+					label.setX(fixtureObj.getX() + 35);
+					label.setY(fixtureObj.getY() + 7);
+				});
+				fixtureObj.on("mouseout", () => {
+					if (vis.value) vis.value.remove(label);
+				});
 				fixtures.set(fixture.id, fixtureObj);
 				fixtureObjToId.set(fixtureObj, fixture.id);
 				foundFixtures.push(fixture.id);
 				updateLight(fixture.id);
-				if (vis.value) vis.value.add(fixtureObj);
+				if (vis.value) {
+					vis.value.add(fixtureObj);
+					vis.value.requestRenderAll();
+				}
 			}
 		});
 		let toRemove: string[] = [];

@@ -117,6 +117,8 @@ pub async fn start_blender(
 									broken_link = true;
 								}
 
+								while let Ok(_) = receiver.try_recv() {}
+
 							}
 						}.fuse() => {},
 					}

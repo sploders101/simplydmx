@@ -63,6 +63,7 @@ pub async fn initialize_controller(plugin_context: PluginContext) -> ControllerC
 					previous_universes = current_universes;
 				}
 			}
+			drop(unlocked_cache);
 
 			let sleep_duration = Duration::from_millis(18).saturating_sub(started_loop.elapsed());
 			if !sleep_duration.is_zero() {

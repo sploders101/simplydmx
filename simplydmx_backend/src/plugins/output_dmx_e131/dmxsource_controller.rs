@@ -45,7 +45,9 @@ pub async fn initialize_controller(plugin_context: PluginContext) -> ControllerC
 				if unlocked_cache.len() > 0 && controller.is_none() {
 					controller = DmxSource::with_cid("SimplyDMX", uuid!("7725e1df-53cf-4365-b530-ce1705ca1860")).ok();
 					if controller.is_none() {
+						drop(unlocked_cache);
 						thread::sleep(Duration::from_secs(5));
+						continue;
 					}
 				} else if unlocked_cache.len() == 0 && controller.is_some() {
 					controller = None;

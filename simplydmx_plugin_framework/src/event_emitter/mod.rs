@@ -8,10 +8,10 @@ use std::{
 	any::TypeId,
 };
 
-use async_std::channel::{
-	self,
-	Sender,
-	Receiver,
+use tokio::sync::mpsc::{
+	unbounded_channel,
+	UnboundedSender,
+	UnboundedReceiver,
 };
 
 use uuid::Uuid;
@@ -85,7 +85,7 @@ impl<T: Sync + Send> Clone for PortableEventGeneric<T> {
 /// derives for your convenience.
 pub struct EventEmitter {
 	listeners: HashMap<String, ListenerInfo>,
-	shutdown_listeners: Vec<Sender<()>>,
+	shutdown_listeners: Vec<UnboundedSender<()>>,
 }
 
 impl EventEmitter {
@@ -106,7 +106,7 @@ impl EventEmitter {
 		// Clear out shutdown listeners
 		let mut i = 0;
 		while i < self.shutdown_listeners.len() {
-			if self.shutdown_listeners[i].receiver_count() == 0 {
+			if self.shutdown_listeners[i].is_closed() {
 				self.shutdown_listeners.remove(i);
 			} else {
 				i += 1;
@@ -121,7 +121,7 @@ impl EventEmitter {
 			i = 0;
 			let listeners = &mut listener_info.listeners;
 			while i < listeners.len() {
-				if listeners[i].1.receiver_count() == 0 {
+				if listeners[i].1.is_closed() {
 					listeners.remove(i);
 				} else {
 					i += 1;
@@ -132,7 +132,7 @@ impl EventEmitter {
 			i = 0;
 			let json_listeners = &mut listener_info.json_listeners;
 			while i < json_listeners.len() {
-				if json_listeners[i].1.receiver_count() == 0 {
+				if json_listeners[i].1.is_closed() {
 					json_listeners.remove(i);
 				} else {
 					i += 1;
@@ -143,7 +143,7 @@ impl EventEmitter {
 			i = 0;
 			let cbor_listeners = &mut listener_info.cbor_listeners;
 			while i < cbor_listeners.len() {
-				if cbor_listeners[i].1.receiver_count() == 0 {
+				if cbor_listeners[i].1.is_closed() {
 					cbor_listeners.remove(i);
 				} else {
 					i += 1;
@@ -222,7 +222,7 @@ impl EventEmitter {
 			}
 		}
 
-		let (sender, receiver) = channel::unbounded();
+		let (sender, receiver) = unbounded_channel();
 
 		listener_info.listeners.push((filter, sender));
 		return Ok(EventReceiver::new(event_name, receiver));
@@ -272,7 +272,7 @@ impl EventEmitter {
 	}
 
 	/// Registers a listener on the event bus that receives pre-encoded JSON events
-	pub fn listen_json(&mut self, event_name: String, filter: FilterCriteria) -> Result<Receiver<PortableJSONEvent>, RegisterEncodedListenerError> {
+	pub fn listen_json(&mut self, event_name: String, filter: FilterCriteria) -> Result<UnboundedReceiver<PortableJSONEvent>, RegisterEncodedListenerError> {
 		self.gc();
 
 		if !self.listeners.contains_key(&event_name) {
@@ -281,13 +281,13 @@ impl EventEmitter {
 
 		let listener_info = self.listeners.get_mut(&event_name).unwrap();
 
-		let (sender, receiver) = channel::unbounded();
+		let (sender, receiver) = unbounded_channel();
 		listener_info.json_listeners.push((filter, sender));
 		return Ok(receiver);
 	}
 
 	/// Registers a listener on the bus that receives pre-encoded CBOR events
-	pub fn on_cbor(&mut self, event_name: String, filter: FilterCriteria) -> Result<Receiver<PortableCborEvent>, RegisterEncodedListenerError> {
+	pub fn on_cbor(&mut self, event_name: String, filter: FilterCriteria) -> Result<UnboundedReceiver<PortableCborEvent>, RegisterEncodedListenerError> {
 		self.gc();
 
 		if !self.listeners.contains_key(&event_name) {
@@ -296,15 +296,15 @@ impl EventEmitter {
 
 		let listener_info = self.listeners.get_mut(&event_name).unwrap();
 
-		let (sender, receiver) = channel::unbounded();
+		let (sender, receiver) = unbounded_channel();
 		listener_info.cbor_listeners.push((filter, sender));
 		return Ok(receiver);
 	}
 
-	pub fn on_shutdown(&mut self) -> Receiver<()> {
+	pub fn on_shutdown(&mut self) -> UnboundedReceiver<()> {
 		self.gc();
 
-		let (sender, receiver) = channel::unbounded();
+		let (sender, receiver) = unbounded_channel();
 		self.shutdown_listeners.push(sender);
 		return receiver;
 	}
@@ -446,7 +446,7 @@ impl EventEmitter {
 		self.gc();
 
 		for shutdown_listener in self.shutdown_listeners.iter() {
-			shutdown_listener.send(()).await.ok();
+			shutdown_listener.send(()).ok();
 		}
 		for listener_group in self.listeners.values() {
 			send_shutdown(&listener_group.listeners).await;
@@ -463,7 +463,7 @@ impl EventEmitter {
 pub struct ListenerInfo {
 	pub evt_info: Option<EventInfo>,
 	pub persistent: bool,
-	pub listeners: Vec<(FilterCriteria, Sender<PortableEvent>)>,
+	pub listeners: Vec<(FilterCriteria, UnboundedSender<PortableEvent>)>,
 	pub closure_listeners: BTreeMap<
 		Uuid,
 		(
@@ -471,8 +471,8 @@ pub struct ListenerInfo {
 			Box<dyn FnMut(Arc<Box<dyn PortableMessage>>, Arc<FilterCriteria>) -> () + Sync + Send + 'static>,
 		),
 	>,
-	pub json_listeners: Vec<(FilterCriteria, Sender<PortableJSONEvent>)>,
-	pub cbor_listeners: Vec<(FilterCriteria, Sender<PortableCborEvent>)>,
+	pub json_listeners: Vec<(FilterCriteria, UnboundedSender<PortableJSONEvent>)>,
+	pub cbor_listeners: Vec<(FilterCriteria, UnboundedSender<PortableCborEvent>)>,
 }
 
 pub struct EventInfo {
@@ -513,7 +513,7 @@ impl ListenerInfo {
 	}
 }
 
-fn relevant_listener<T: Sync + Send>(filter: &FilterCriteria, listeners: &[(FilterCriteria, Sender<PortableEventGeneric<T>>)]) -> bool {
+fn relevant_listener<T: Sync + Send>(filter: &FilterCriteria, listeners: &[(FilterCriteria, UnboundedSender<PortableEventGeneric<T>>)]) -> bool {
 	for listener in listeners {
 		match listener.0 {
 			FilterCriteria::None => { return true; },
@@ -527,14 +527,14 @@ fn relevant_listener<T: Sync + Send>(filter: &FilterCriteria, listeners: &[(Filt
 	return false;
 }
 
-fn send_filtered<T: Sync + Send + 'static>(filter: &FilterCriteria, message: PortableEventGeneric<T>, listeners: &[(FilterCriteria, Sender<PortableEventGeneric<T>>)]) {
+fn send_filtered<T: Sync + Send + 'static>(filter: &FilterCriteria, message: PortableEventGeneric<T>, listeners: &[(FilterCriteria, UnboundedSender<PortableEventGeneric<T>>)]) {
 	for listener in listeners {
 		if let FilterCriteria::None = listener.0 {
 			let cloned_message = message.clone();
-			listener.1.try_send(cloned_message).ok();
+			listener.1.send(cloned_message).ok();
 		} else if listener.0 == *filter {
 			let cloned_message = message.clone();
-			listener.1.try_send(cloned_message).ok();
+			listener.1.send(cloned_message).ok();
 		}
 	}
 }
@@ -566,9 +566,9 @@ fn send_filtered_closures(
 }
 
 
-async fn send_shutdown<T: Send + Sync>(listeners: &[(FilterCriteria, Sender<PortableEventGeneric<T>>)]) {
+async fn send_shutdown<T: Send + Sync>(listeners: &[(FilterCriteria, UnboundedSender<PortableEventGeneric<T>>)]) {
 	for listener in listeners {
-		listener.1.send(PortableEventGeneric::Shutdown).await.ok();
+		listener.1.send(PortableEventGeneric::Shutdown).ok();
 	}
 }
 

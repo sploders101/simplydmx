@@ -12,9 +12,10 @@ use self::{
 	state::{PatcherContext, VisualizationInfo},
 };
 use super::saver::SaverInterface;
-use async_std::sync::{Arc, RwLock};
 pub use interface::PatcherInterface;
 use simplydmx_plugin_framework::*;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
 pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface) -> Result<PatcherInterface, PatcherInitializationError> {

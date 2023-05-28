@@ -1,14 +1,8 @@
 mod events;
 use events::EventJuggler;
 
-use async_std::{
-	channel,
-};
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
-use futures::{
-	select,
-	FutureExt,
-};
 use simplydmx_plugin_framework::*;
 
 #[portable]
@@ -92,21 +86,21 @@ pub enum JSONCallServiceError {
 	ResponseSerializationFailed,
 }
 
-pub async fn spawn_api_facet_controller(plugin_context: PluginContext, receiver: channel::Receiver<JSONCommand>, sender: channel::Sender<JSONResponse>) {
+pub async fn spawn_api_facet_controller(plugin_context: PluginContext, mut receiver: UnboundedReceiver<JSONCommand>, sender: UnboundedSender<JSONResponse>) {
 	// Receiver
-	let shutdown_receiver = plugin_context.on_shutdown().await;
+	let mut shutdown_receiver = plugin_context.on_shutdown().await;
 	plugin_context.clone().spawn_volatile("API Facet Controller", async move {
 		let juggler = EventJuggler::new(plugin_context.clone(), sender.clone());
 		loop {
-			select! {
-				command = receiver.recv().fuse() => {
-					if let Ok(command) = command {
+			tokio::select! {
+				command = receiver.recv() => {
+					if let Some(command) = command {
 						handle_command(plugin_context.clone(), command, juggler.clone(), sender.clone()).await;
 					} else {
 						break;
 					}
 				},
-				_ = shutdown_receiver.recv().fuse() => break,
+				_ = shutdown_receiver.recv() => break,
 			}
 		}
 
@@ -114,7 +108,7 @@ pub async fn spawn_api_facet_controller(plugin_context: PluginContext, receiver:
 	}).await;
 }
 
-async fn handle_command(plugin_context: PluginContext, command: JSONCommand, juggler: EventJuggler, sender: channel::Sender<JSONResponse>) {
+async fn handle_command(plugin_context: PluginContext, command: JSONCommand, juggler: EventJuggler, sender: UnboundedSender<JSONResponse>) {
 	plugin_context.clone().spawn_volatile("API Command Runner", async move {
 		match command {
 
@@ -127,7 +121,7 @@ async fn handle_command(plugin_context: PluginContext, command: JSONCommand, jug
 								sender.send(JSONResponse::CallServiceResponse {
 									message_id,
 									result,
-								}).await.ok();
+								}).ok();
 							},
 							Err(error) => {
 								sender.send(JSONResponse::CallServiceError {
@@ -136,7 +130,7 @@ async fn handle_command(plugin_context: PluginContext, command: JSONCommand, jug
 										CallServiceRPCError::DeserializationFailed => JSONCallServiceError::ArgDeserializationFailed,
 										CallServiceRPCError::SerializationFailed => JSONCallServiceError::ResponseSerializationFailed,
 									},
-								}).await.ok();
+								}).ok();
 							},
 						}
 					},
@@ -144,7 +138,7 @@ async fn handle_command(plugin_context: PluginContext, command: JSONCommand, jug
 						sender.send(JSONResponse::CallServiceError {
 							message_id,
 							error: JSONCallServiceError::ServiceNotFound,
-						}).await.ok();
+						}).ok();
 					}
 				}
 			},
@@ -153,14 +147,14 @@ async fn handle_command(plugin_context: PluginContext, command: JSONCommand, jug
 				sender.send(JSONResponse::ServiceList {
 					message_id,
 					list: plugin_context.list_services().await,
-				}).await.ok();
+				}).ok();
 			},
 
 			JSONCommand::GetOptions { message_id, provider_id } => {
 				sender.send(JSONResponse::OptionsList {
 					message_id,
 					list: plugin_context.get_service_type_options_json(&provider_id).await,
-				}).await.ok();
+				}).ok();
 			},
 
 			JSONCommand::SendEvent { name, criteria, data } => {

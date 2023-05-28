@@ -1,10 +1,8 @@
-use std::{collections::HashMap, sync::Arc};
-
-use async_std::sync::RwLock;
+use self::types::ShowFile;
 use async_trait::async_trait;
 pub use simplydmx_plugin_framework::*;
-
-use self::types::ShowFile;
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::RwLock;
 
 mod services;
 mod types;

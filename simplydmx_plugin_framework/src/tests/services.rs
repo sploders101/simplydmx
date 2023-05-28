@@ -4,9 +4,8 @@ use std::{
 };
 
 use serde_json::json;
-use async_std::{
-	test,
-	task::sleep,
+use tokio::{
+	time::sleep,
 };
 
 // Create an alias for macro output to use since this is an internal function
@@ -42,7 +41,7 @@ impl TestService {
 	}
 }
 
-#[test]
+#[tokio::test]
 async fn smoke_test() {
 
 	// Create an instance of TestService

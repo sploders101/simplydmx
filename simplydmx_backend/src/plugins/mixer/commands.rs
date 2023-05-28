@@ -257,7 +257,7 @@ impl RequestBlend {
 	}
 
 	#[service_main()]
-	async fn main(self) {
-		return self.0.request_blend().await;
+	fn main(self) {
+		return self.0.request_blend();
 	}
 }

@@ -81,12 +81,12 @@ pub async fn async_main(plugin_manager: &PluginManager, data: Option<Vec<u8>>) {
 
 #[cfg(feature = "export-services")]
 pub mod exporter {
-	use async_std::task::block_on;
 	use linkme::distributed_slice;
 	use simplydmx_plugin_framework::{
 		DropdownOptionJSON, FilterCriteria, PluginManager, ServiceArgumentOwned,
 		ServiceDescription, TypeSpecifierRetrievalError,
 	};
+	use tokio::runtime::Runtime;
 	use std::{cmp::Ordering, collections::HashMap, fs::File, io::Write};
 	use tsify::Tsify;
 
@@ -94,11 +94,14 @@ pub mod exporter {
 	pub static PORTABLETYPE: [(&'static str, &'static str, &'static Option<&'static str>)] = [..];
 
 	pub fn rpc_coverage() {
+		let runtime = Runtime::new().expect("Couldn't start tokio runtime");
+		let _runtime_guard = runtime.enter();
+
 		// Create plugin manager
 		let plugin_manager = PluginManager::new();
 
 		// Initialize plugins
-		block_on(super::async_main(&plugin_manager, None));
+		runtime.block_on(super::async_main(&plugin_manager, None));
 
 		// Sort types to enable deterministic exports for git tracking
 		let mut types: Vec<(&'static str, &'static str, &'static Option<&'static str>)> = vec![
@@ -169,7 +172,7 @@ pub mod exporter {
 		});
 
 		// Export services
-		let mut value = block_on(plugin_manager.list_services());
+		let mut value = runtime.block_on(plugin_manager.list_services());
 		value.sort_by(|a, b| {
 			if a.plugin_id > b.plugin_id {
 				return Ordering::Greater;

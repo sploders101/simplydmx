@@ -10,13 +10,13 @@ use crate::mixer_utils::{
 	state::{BlenderValue, FullMixerOutput, SubmasterData},
 	static_layer::StaticLayer,
 };
-use async_std::{channel::Sender, sync::RwLock};
 use async_trait::async_trait;
+use rustc_hash::FxHashMap;
 use simplydmx_plugin_framework::*;
 use state::MixerContext;
 use std::sync::Arc;
-use rustc_hash::FxHashMap;
 use thiserror::Error;
+use tokio::sync::{RwLock, Notify};
 use uuid::Uuid;
 
 pub async fn initialize_mixer(
@@ -155,12 +155,12 @@ pub async fn initialize_mixer(
 }
 
 #[derive(Clone)]
-pub struct MixerInterface(PluginContext, Arc<RwLock<MixerContext>>, Sender<()>);
+pub struct MixerInterface(PluginContext, Arc<RwLock<MixerContext>>, Arc<Notify>);
 impl MixerInterface {
 	pub fn new(
 		plugin_context: PluginContext,
 		mixer_context: Arc<RwLock<MixerContext>>,
-		update_sender: Sender<()>,
+		update_sender: Arc<Notify>,
 	) -> Self {
 		return Self(plugin_context, mixer_context, update_sender);
 	}
@@ -189,7 +189,7 @@ impl MixerInterface {
 
 		if ctx.frozen_context.is_some() {
 			ctx.blind_opacity = opacity;
-			self.2.send(()).await.ok();
+			self.2.notify_one();
 		}
 	}
 
@@ -214,7 +214,7 @@ impl MixerInterface {
 		if let Some(mixing_context) = ctx.frozen_context.take() {
 			ctx.default_context = mixing_context;
 			ctx.blind_opacity = 0;
-			self.2.send(()).await.ok();
+			self.2.notify_one();
 		}
 	}
 
@@ -227,7 +227,7 @@ impl MixerInterface {
 		if ctx.frozen_context.is_some() {
 			ctx.frozen_context = None;
 			ctx.blind_opacity = 0;
-			self.2.send(()).await.ok();
+			self.2.notify_one();
 		}
 	}
 
@@ -316,7 +316,7 @@ impl MixerInterface {
 
 			if let Some(opacity) = ctx.default_context.layer_opacities.get(&submaster_id) {
 				if *opacity > 0 {
-					self.2.send(()).await.ok();
+					self.2.notify_one();
 				}
 			}
 			return true;
@@ -361,7 +361,7 @@ impl MixerInterface {
 				}
 			}
 			// TODO: Send this event only if the opacity *changes*
-			self.2.send(()).await.ok();
+			self.2.notify_one();
 			return true;
 		} else {
 			return false;
@@ -400,12 +400,12 @@ impl MixerInterface {
 		ctx.default_context.user_submaster_order.retain(|item| item != &submaster_id);
 
 		// Signal to update everything and return
-		self.2.send(()).await.ok();
+		self.2.notify_one();
 		return was_removed;
 	}
 
-	pub async fn request_blend(&self) {
-		self.2.send(()).await.ok();
+	pub fn request_blend(&self) {
+		self.2.notify_one();
 	}
 }
 

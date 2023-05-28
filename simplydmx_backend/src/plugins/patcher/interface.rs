@@ -1,23 +1,21 @@
-use async_std::sync::{Arc, RwLock};
-use async_trait::async_trait;
-use futures::{future::join_all, FutureExt};
-use simplydmx_plugin_framework::*;
-use rustc_hash::FxHashMap;
-use thiserror::Error;
-use uuid::Uuid;
-
+use super::{
+	driver_plugin_api::{self, FixtureBundle, FixtureInstance, OutputDriver, SharableStateWrapper},
+	fixture_types::{ChannelSize, ChannelType, Segment},
+	state::{PatcherContext, VisualizationInfo},
+};
 use crate::{
 	impl_anyhow,
 	mixer_utils::state::{BlendingData, FullMixerBlendingData, FullMixerOutput, SnapData},
 	plugins::saver::Savable,
 	utilities::{forms::FormDescriptor, serialized_data::SerializedData},
 };
-
-use super::{
-	driver_plugin_api::{self, FixtureBundle, FixtureInstance, OutputDriver, SharableStateWrapper},
-	fixture_types::{ChannelSize, ChannelType, Segment},
-	state::{PatcherContext, VisualizationInfo},
-};
+use async_trait::async_trait;
+use rustc_hash::FxHashMap;
+use simplydmx_plugin_framework::*;
+use std::sync::Arc;
+use thiserror::Error;
+use tokio::{sync::RwLock, task::JoinSet};
+use uuid::Uuid;
 
 macro_rules! unwrap_continue {
 	($opt:expr) => {
@@ -400,16 +398,21 @@ impl PatcherInterface {
 
 		let data = Self::apply_virtual_intensities(&data, &ctx);
 
-		let mut futures = Vec::new();
+		let mut futures = JoinSet::new();
 		for driver in ctx.output_drivers.values().cloned() {
-			let state = self.get_sharable_state().await;
+			let owned_self_ref = self.clone();
 			let data = Arc::clone(&data);
-			futures.push(async move {
-				driver.send_updates(&state, data).fuse().await;
+			futures.spawn(async move {
+				let state = owned_self_ref.get_sharable_state().await;
+				driver.send_updates(&state, data).await;
 			});
 		}
 		drop(ctx);
-		join_all(futures).await;
+		while let Some(result) = futures.join_next().await {
+			// Bubble panics into this thread. Panics mean UB has been reached,
+			// and the entire system is compromised.
+			result.unwrap();
+		}
 	}
 
 	pub async fn get_sharable_state<'a>(&'a self) -> SharableStateWrapper<'a> {

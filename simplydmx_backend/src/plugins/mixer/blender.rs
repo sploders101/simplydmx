@@ -1,12 +1,17 @@
 use super::state::MixerContext;
-use async_std::{
-	channel::{self, Sender},
-	sync::{Arc, RwLock},
-	task,
-};
-use futures::{select, FutureExt};
 use simplydmx_plugin_framework::*;
-use std::time::{Duration, Instant};
+use std::{
+	sync::Arc,
+	time::{Duration, Instant},
+};
+use tokio::{
+	sync::{
+		RwLock,
+		Notify,
+	},
+	time,
+	select,
+};
 
 use crate::{
 	mixer_utils::{
@@ -24,8 +29,9 @@ pub async fn start_blender(
 	plugin_context: PluginContext,
 	ctx: Arc<RwLock<MixerContext>>,
 	patcher_interface: PatcherInterface,
-) -> Sender<()> {
-	let (sender, receiver) = channel::unbounded();
+) -> Arc<Notify> {
+	let notifier = Arc::new(Notify::new());
+	let notifier_inner = Arc::clone(&notifier);
 
 	// Spawn the blender task when its dependencies have been satisfied.
 	let plugin_context_blender = plugin_context.clone();
@@ -41,8 +47,7 @@ pub async fn start_blender(
 
 		// Set up patch updated listener
 		match plugin_context.listen::<()>(String::from("patcher.patch_updated"), FilterCriteria::None).await {
-			Ok(listener) => {
-				let mut broken_link = false;
+			Ok(mut listener) => {
 				loop {
 					let start = Instant::now();
 
@@ -82,7 +87,7 @@ pub async fn start_blender(
 					select! {
 
 						// Patcher updates and shutdown requests can interrupt rate-limiting
-						msg = listener.receive().fuse() => match msg {
+						msg = listener.receive() => match msg {
 							Event::Msg { .. } => {
 								let patcher_data: (FullMixerOutput, FullMixerBlendingData) = patcher_interface.get_base_layer().await;
 								ctx.write().await.cleanup(&patcher_data).await;
@@ -94,39 +99,14 @@ pub async fn start_blender(
 
 						// Rate limiting
 						_ = async {
-							if animated {
-								loop {
-									select! {
+							// Space updates out at 18 ms per
+							time::sleep(Duration::from_millis(18).saturating_sub(start.elapsed())).await;
 
-										// We're running in an animated loop, so keep the queue empty.
-										// This allows interrupting the sleep method to discard messages
-										_ = receiver.recv().fuse() => {},
-
-										// Wait for the timeout to complete, then break out of the loop
-										_ = task::sleep(Duration::from_millis(18).saturating_sub(start.elapsed())).fuse() => break,
-
-									}
-								}
-							} else {
-
-								// Space updates out at 18+ ms per
-								task::sleep(Duration::from_millis(18).saturating_sub(start.elapsed())).await;
-
-								// Wait for an update to come in, and indicate if the update link is broken
-								if let Err(_) = receiver.recv().await {
-									broken_link = true;
-								}
-
-								while let Ok(_) = receiver.try_recv() {}
-
+							// Wait for an update to come in if no layers are animated
+							if !animated {
+								notifier_inner.notified().await;
 							}
-						}.fuse() => {},
-					}
-
-					// Broken link indicates we can't receive updates anymore. This is a critical error. The receiving end should drop first in the event of a successful shutdown.
-					if broken_link {
-						log_error!(plugin_context, "[CRITICAL] SimplyDMX has dropped all references to the mixer's update sender. This is a critical error; please report this to the devs!");
-						break;
+						} => {},
 					}
 				}
 			},
@@ -136,5 +116,5 @@ pub async fn start_blender(
 		}
 	}).await;
 
-	return sender;
+	return notifier;
 }

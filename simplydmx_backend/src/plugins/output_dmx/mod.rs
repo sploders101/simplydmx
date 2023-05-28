@@ -4,13 +4,10 @@ pub mod interface;
 pub mod services;
 pub mod state;
 
-use async_std::task;
+use self::interface::DMXInterface;
+use super::{mixer::MixerInterface, patcher::PatcherInterface, saver::SaverInterface};
 use async_trait::async_trait;
 use simplydmx_plugin_framework::*;
-
-use self::interface::DMXInterface;
-
-use super::{patcher::PatcherInterface, saver::SaverInterface, mixer::MixerInterface};
 
 pub async fn initialize(
 	plugin_context: PluginContext,
@@ -145,9 +142,7 @@ pub async fn initialize(
 	let mixer_interface_universe_linked = mixer_interface.clone();
 	plugin_context.on::<()>("dmx.universe_linked", FilterCriteria::None, move |_, _| {
 		let mixer_interface = mixer_interface_universe_linked.clone();
-		task::spawn(async move {
-			mixer_interface.request_blend().await;
-		});
+		mixer_interface.request_blend();
 	}).await.unwrap().drop();
 
 	return Ok(output_context);

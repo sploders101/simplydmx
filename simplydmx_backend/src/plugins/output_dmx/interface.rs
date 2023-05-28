@@ -12,11 +12,10 @@ use crate::{
 	},
 };
 use anyhow::{anyhow, Context};
-use async_std::sync::{Arc, RwLock};
 use async_trait::async_trait;
-use futures::{future::join_all, FutureExt};
 use simplydmx_plugin_framework::*;
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
+use tokio::{sync::RwLock, task::JoinSet};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -496,19 +495,21 @@ impl OutputDriver for DMXInterface {
 		}
 
 		// Spawn a task for each controller, sending it relevant DMX data
-		let mut futures = Vec::new();
+		let mut futures = JoinSet::new();
+		// let mut futures = Vec::new();
 		for (controller_id, universes) in sorted_universes {
 			if let Some(controller) = ctx.drivers.get(&controller_id) {
 				let controller = Arc::clone(controller);
-				futures.push(
-					async move {
-						controller.send_dmx(universes).await;
-					}
-					.fuse(),
-				);
+				futures.spawn(async move {
+					controller.send_dmx(universes).await;
+				});
 			}
 		}
-		join_all(futures).await;
+		while let Some(result) = futures.join_next().await {
+			// Panics should only be used in show-stopping catastrophic failures, so bubble
+			// them into the main thread.
+			result.unwrap();
+		}
 	}
 }
 

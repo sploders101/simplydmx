@@ -1,8 +1,6 @@
-use std::sync::Arc;
-
-use async_std::sync::RwLock;
-
 use super::state::{FullMixerBlendingData, FullMixerOutput};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
 pub struct LayerDataSources {
 	pub base_layer: RwLock<Arc<FullMixerOutput>>,

@@ -7,12 +7,12 @@ use std::{
 	future::Future,
 };
 use uuid::Uuid;
-use async_std::{
-	sync::RwLock,
-	channel::{
-		self,
-		Sender,
-		Receiver,
+use tokio::sync::{
+	RwLock,
+	mpsc::{
+		unbounded_channel,
+		UnboundedSender,
+		UnboundedReceiver,
 	},
 };
 use simplydmx_plugin_macros::portable;
@@ -61,7 +61,7 @@ pub struct Plugin {
 
 pub struct PluginRegistry {
 	discoverable_services: RwLock<HashMap<String, HashMap<String, ServiceDescription>>>,
-	init_bus: RwLock<HashMap<Uuid, Sender<Arc<Dependency>>>>,
+	init_bus: RwLock<HashMap<Uuid, UnboundedSender<Arc<Dependency>>>>,
 	evt_bus: RwLock<EventEmitter>,
 	keep_alive: RwLock<KeepAlive>,
 	type_specifiers: RwLock<HashMap<String, Box<dyn TypeSpecifier + Sync + Send>>>,
@@ -88,7 +88,7 @@ impl PluginManager {
 		}));
 	}
 
-	pub async fn on_shutdown(&self) -> Receiver<()> {
+	pub async fn on_shutdown(&self) -> UnboundedReceiver<()> {
 		return self.0.evt_bus.write().await.on_shutdown();
 	}
 
@@ -209,7 +209,7 @@ impl PluginContext {
 		self.signal_dep(dependency).await;
 	}
 
-	pub async fn on_shutdown(&self) -> Receiver<()> {
+	pub async fn on_shutdown(&self) -> UnboundedReceiver<()> {
 		return self.0.evt_bus.write().await.on_shutdown();
 	}
 
@@ -495,7 +495,7 @@ impl PluginContext {
 		&self,
 		event_name: String,
 		filter: FilterCriteria,
-	) -> Result<Receiver<PortableJSONEvent>, RegisterEncodedListenerError> {
+	) -> Result<UnboundedReceiver<PortableJSONEvent>, RegisterEncodedListenerError> {
 		return self.0.evt_bus.write().await.listen_json(event_name, filter);
 	}
 
@@ -504,14 +504,14 @@ impl PluginContext {
 		&self,
 		event_name: String,
 		filter: FilterCriteria,
-	) -> Result<Receiver<PortableCborEvent>, RegisterEncodedListenerError> {
+	) -> Result<UnboundedReceiver<PortableCborEvent>, RegisterEncodedListenerError> {
 		return self.0.evt_bus.write().await.on_cbor(event_name, filter);
 	}
 
 	/// Spawn the specified task when the set of dependencies has finished.
 	pub async fn spawn_when<'a, F>(
 		&self,
-		name: impl Into<String>,
+		name: &'static str,
 		mut dependencies: Vec<Dependency>,
 		blocker: F,
 	) -> Result<(), KeepAliveRegistrationError>
@@ -549,7 +549,7 @@ impl PluginContext {
 		}
 
 		// Set up listener channel
-		let (sender, receiver) = channel::unbounded::<Arc<Dependency>>();
+		let (sender, mut receiver) = unbounded_channel::<Arc<Dependency>>();
 		let uuid = Uuid::new_v4();
 		self.0.init_bus.write().await.insert(uuid.clone(), sender);
 
@@ -597,7 +597,7 @@ impl PluginContext {
 			.spawn(name, async move {
 				// Wait for dependencies to be resolved
 				while dependencies.len() > 0 {
-					if let Ok(next_dep) = receiver.recv().await {
+					if let Some(next_dep) = receiver.recv().await {
 						dependencies.retain(|dependency| *dependency != *next_dep);
 					} else {
 						// The sender may be destroyed during shutdown, so
@@ -615,7 +615,7 @@ impl PluginContext {
 	/// Ignore errors resulting from imminent shutdown
 	pub async fn spawn_when_volatile<'a, F>(
 		&self,
-		name: impl Into<String>,
+		name: &'static str,
 		dependencies: Vec<Dependency>,
 		blocker: F,
 	) -> ()
@@ -636,7 +636,7 @@ impl PluginContext {
 	/// `blocker`: The future to let finish before shutting down
 	pub async fn spawn<F>(
 		&self,
-		name: impl Into<String>,
+		name: &'static str,
 		blocker: F,
 	) -> Result<(), KeepAliveRegistrationError>
 	where
@@ -651,7 +651,7 @@ impl PluginContext {
 	/// `blocker`: The future to let finish before shutting down
 	///
 	/// Ignore errors resulting from imminent shutdown
-	pub async fn spawn_volatile<F>(&self, name: impl Into<String>, blocker: F) -> ()
+	pub async fn spawn_volatile<F>(&self, name: &'static str, blocker: F) -> ()
 	where
 		F: Future<Output = ()> + Send + 'static,
 	{
@@ -670,7 +670,7 @@ impl PluginContext {
 	/// `finisher`: The future to drive during shutdown
 	pub async fn register_finisher<F>(
 		&self,
-		name: impl Into<String>,
+		name: &'static str,
 		finisher: F,
 	) -> Result<Uuid, KeepAliveRegistrationError>
 	where
@@ -770,7 +770,7 @@ impl PluginContext {
 		let listeners = self.0.init_bus.read().await;
 		let dependency = Arc::new(dep);
 		for listener in listeners.values() {
-			listener.send(Arc::clone(&dependency)).await.ok();
+			listener.send(Arc::clone(&dependency)).ok();
 		}
 	}
 }

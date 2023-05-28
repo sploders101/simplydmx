@@ -3,8 +3,8 @@ use std::{
 	marker::PhantomData,
 };
 
-use async_std::channel::{
-	Receiver,
+use tokio::sync::mpsc::{
+	UnboundedReceiver,
 };
 
 use crate::FilterCriteria;
@@ -20,7 +20,7 @@ use super::{
 /// while maintaining ownership of the `Arc` to avoid deallocation.
 pub struct EventReceiver<T: BidirectionalPortable> {
 	event_name: String,
-	receiver: Receiver<PortableEvent>,
+	receiver: UnboundedReceiver<PortableEvent>,
 	_phantom: PhantomData<T>,
 }
 
@@ -40,7 +40,7 @@ impl<T: BidirectionalPortable> EventReceiver<T> {
 	/// When the wrapped receiver returns an event with valid data, the data will be returned
 	/// through an ArcPortable struct. This struct maintains ownership of the arc while allowing a
 	/// dereference to typed data. Type ID is checked on creation to prevent downcast issues.
-	pub fn new(event_name: String, receiver: Receiver<PortableEvent>) -> EventReceiver<T> {
+	pub fn new(event_name: String, receiver: UnboundedReceiver<PortableEvent>) -> EventReceiver<T> {
 		return EventReceiver::<T> {
 			event_name,
 			receiver,
@@ -54,7 +54,7 @@ impl<T: BidirectionalPortable> EventReceiver<T> {
 
 	/// Receives a single message of the desired type, wrapping it in an `ArcPortable<T>` for ease
 	/// of use.
-	pub async fn receive(&self) -> Event<T> {
+	pub async fn receive(&mut self) -> Event<T> {
 		loop {
 			// Unwrapped because it *should* be impossible for the sender to be disconnected
 			let msg = self.receiver.recv().await.unwrap();

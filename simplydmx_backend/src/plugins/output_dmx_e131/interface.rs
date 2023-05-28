@@ -1,21 +1,17 @@
-use std::collections::HashMap;
-
-use async_std::sync::{Arc, RwLock};
-
-use async_trait::async_trait;
-use crate::utilities::forms::NumberValidation;
-use uuid::Uuid;
-
-use crate::{
-	plugins::{output_dmx::driver_types::*, patcher::driver_plugin_api::*, saver::Savable},
-	utilities::serialized_data::SerializedData,
-};
-use simplydmx_plugin_framework::*;
-
 use super::{
 	dmxsource_controller::initialize_controller,
 	state::{E131State, E131Universe},
 };
+use crate::utilities::forms::NumberValidation;
+use crate::{
+	plugins::{output_dmx::driver_types::*, patcher::driver_plugin_api::*, saver::Savable},
+	utilities::serialized_data::SerializedData,
+};
+use async_trait::async_trait;
+use simplydmx_plugin_framework::*;
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::RwLock;
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct E131DMXDriver(PluginContext, Arc<RwLock<E131State>>);

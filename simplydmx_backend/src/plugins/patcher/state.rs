@@ -1,10 +1,7 @@
-use async_std::sync::Arc;
-use std::collections::HashMap;
-use uuid::Uuid;
-
 use super::{driver_plugin_api::OutputDriver, fixture_types::FixtureInfo};
-
 use simplydmx_plugin_framework::*;
+use std::{collections::HashMap, sync::Arc};
+use uuid::Uuid;
 
 pub struct PatcherContext {
 	pub output_drivers: HashMap<String, Arc<Box<dyn OutputDriver>>>,

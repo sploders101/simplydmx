@@ -7,14 +7,7 @@ pub use mobile::*;
 
 use std::sync::Arc;
 
-use async_std::{
-	channel,
-	sync::RwLock,
-};
-use futures::{
-	select,
-	FutureExt,
-};
+use tokio::sync::{RwLock, mpsc::{unbounded_channel, UnboundedSender}};
 use tauri::{
 	Manager,
 	AppHandle,
@@ -35,7 +28,7 @@ pub type SetupHook = Box<dyn FnOnce(&mut App) -> Result<(), Box<dyn std::error::
 /// Holds the state of the application in a data structure that can be swapped out when the system is reloaded
 struct ApplicationState {
 	plugin_manager: PluginManager,
-	api_sender: channel::Sender<JSONCommand>,
+	api_sender: UnboundedSender<JSONCommand>,
 }
 impl ApplicationState {
 	async fn start_plugins(app: AppHandle, file: Option<Vec<u8>>) -> Self {
@@ -46,23 +39,23 @@ impl ApplicationState {
 		async_main(&manager, file).await;
 
 		// API Setup
-		let (request_sender, request_receiver) = channel::unbounded();
-		let (response_sender, response_receiver) = channel::unbounded();
+		let (request_sender, request_receiver) = unbounded_channel();
+		let (response_sender, mut response_receiver) = unbounded_channel();
 		spawn_api_facet_controller(plugin.clone(), request_receiver, response_sender).await;
 
 		// Response channel setup
-		let shutdown_receiver = plugin.on_shutdown().await;
+		let mut shutdown_receiver = plugin.on_shutdown().await;
 		plugin.spawn_volatile("GUI API Responder", async move {
 			loop {
-				select! {
-					msg = response_receiver.recv().fuse() => {
-						if let Ok(msg) = msg {
+				tokio::select! {
+					msg = response_receiver.recv() => {
+						if let Some(msg) = msg {
 							app.emit_all("sdmx", msg).ok();
 						} else {
 							break;
 						}
 					},
-					_ = shutdown_receiver.recv().fuse() => break,
+					_ = shutdown_receiver.recv() => break,
 				}
 			}
 		}).await;
@@ -77,7 +70,7 @@ impl ApplicationState {
 #[tauri::command]
 async fn sdmx(state: tauri::State<'_, Arc<RwLock<Option<ApplicationState>>>>, message: String) -> Result<(), String> {
 	if let Some(ref app_state) = *state.read().await {
-		match app_state.api_sender.send(serde_json::from_str(&message).map_err(|err| err.to_string())?).await {
+		match app_state.api_sender.send(serde_json::from_str(&message).map_err(|err| err.to_string())?) {
 			Ok(_) => { return Ok(()); },
 			Err(_) => {
 				return Err("Could not communicate with SimplyDMX API.".into());
@@ -136,6 +129,8 @@ impl AppBuilder {
 			.manage(application_state)
 			.invoke_handler(tauri::generate_handler![sdmx, load_file])
 			.setup(move |app| {
+				#[cfg(all(debug_assertions, tokio_unstable))]
+				console_subscriber::init();
 				let app_ref = app.app_handle();
 				let mut application_state = block_on(application_state_setup.write());
 				*application_state = Some(block_on(ApplicationState::start_plugins(app_ref, None)));

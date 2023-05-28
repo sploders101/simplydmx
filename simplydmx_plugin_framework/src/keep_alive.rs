@@ -5,7 +5,7 @@ use std::{
 	sync::Arc,
 };
 
-use async_std::{
+use tokio::{
 	task::{
 		self,
 		JoinHandle,
@@ -80,7 +80,7 @@ impl KeepAlive {
 	/// Anything that should not be interrupted should be run through this function. If the
 	/// application is already shutting down, any call to this function will fail with
 	/// `KeepAliveRegistrationError::ShuttingDown`.
-	pub async fn register_blocker<F>(&self, _name: impl Into<String>, blocker: F) -> Result<(), KeepAliveRegistrationError>
+	pub async fn register_blocker<F>(&self, _name: &'static str, blocker: F) -> Result<(), KeepAliveRegistrationError>
 	where
 		F: Future<Output = ()> + Send + 'static,
 	{
@@ -91,6 +91,16 @@ impl KeepAlive {
 
 			// Clone internal data so it can be used in an async function
 			let internal_data = Arc::clone(&self.internal_data);
+			#[cfg(all(tokio_unstable, debug_assertions))] // Remove expect call if this is moved to prod
+			let future = task::Builder::new()
+				.name(_name)
+				.spawn(async move {
+					blocker.await;
+					if !*internal_data.shutting_down.read().await {
+						internal_data.blockers.lock().await.remove(&uuid);
+					}
+				}).expect("Failed to spawn blocker task");
+			#[cfg(not(all(tokio_unstable, debug_assertions)))]
 			let future = task::spawn(async move {
 				blocker.await;
 				if !*internal_data.shutting_down.read().await {
@@ -109,7 +119,7 @@ impl KeepAlive {
 	/// Registers a finisher function and returns a UUID representing it.
 	/// Finisher functions are run before application exit, and allow for
 	/// things like saving data quickly before exiting.
-	pub async fn register_finisher<F>(&mut self, _name: impl Into<String>, finisher: F) -> Result<Uuid, KeepAliveRegistrationError>
+	pub async fn register_finisher<F>(&mut self, _name: &'static str, finisher: F) -> Result<Uuid, KeepAliveRegistrationError>
 	where
 		F: Future<Output = ()> + Send + 'static,
 	{
@@ -150,7 +160,7 @@ impl KeepAlive {
 			// using task::spawn(...)
 			#[cfg(feature = "shutdown-debug")]
 			println!("Waiting on {}", handle.name);
-			handle.data.await;
+			handle.data.await.expect("Blocker task panicked");
 		}
 
 		// Run all finishers in parallel
@@ -163,7 +173,7 @@ impl KeepAlive {
 
 		// Wait for all finishers to complete
 		for handle in finisher_tasks {
-			handle.await;
+			handle.await.expect("Finisher task panicked");
 		}
 	}
 

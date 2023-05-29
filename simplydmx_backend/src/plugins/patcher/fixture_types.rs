@@ -1,6 +1,6 @@
 use crate::{mixer_utils::state::SnapData, utilities::serialized_data::SerializedData};
+use rustc_hash::FxHashMap;
 use simplydmx_plugin_framework::*;
-use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::mixer_utils::state::BlendingScheme;
@@ -40,10 +40,10 @@ pub struct FixtureInfo {
 	pub metadata: FixtureMeta,
 
 	/// Pool of channels for a personality to choose from
-	pub channels: HashMap<String, Channel>,
+	pub channels: FxHashMap<String, Channel>,
 
 	/// Personalities, or modes, available on a light. They can contain alternative channel layouts.
-	pub personalities: HashMap<String, Personality>,
+	pub personalities: FxHashMap<String, Personality>,
 
 	/// Contains a string referencing the output driver associated with the fixture.
 	pub output_driver: String,

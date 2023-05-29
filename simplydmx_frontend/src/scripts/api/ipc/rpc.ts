@@ -203,8 +203,8 @@ export interface FixtureInfo {
     manufacturer: string | null;
     family: string | null;
     metadata: FixtureMeta;
-    channels: Record<string, Channel>;
-    personalities: Record<string, Personality>;
+    channels: FxHashMap<string, Channel>;
+    personalities: FxHashMap<string, Personality>;
     output_driver: string;
     control_groups: ControlGroup[];
 }
@@ -463,9 +463,9 @@ export interface ServiceDescription {
  * information about registered fixtures
  */
 export interface SharablePatcherState {
-    library: Record<Uuid, FixtureInfo>;
+    library: FxHashMap<Uuid, FixtureInfo>;
     fixture_order: Uuid[];
-    fixtures: Record<Uuid, FixtureInstance>;
+    fixtures: FxHashMap<Uuid, FixtureInstance>;
 }
 
 /**

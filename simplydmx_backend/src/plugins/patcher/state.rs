@@ -1,26 +1,27 @@
 use super::{driver_plugin_api::OutputDriver, fixture_types::FixtureInfo};
+use rustc_hash::FxHashMap;
 use simplydmx_plugin_framework::*;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use uuid::Uuid;
 
 pub struct PatcherContext {
-	pub output_drivers: HashMap<String, Arc<Box<dyn OutputDriver>>>,
+	pub output_drivers: FxHashMap<String, Arc<Box<dyn OutputDriver>>>,
 	pub sharable: SharablePatcherState,
 }
 impl PatcherContext {
 	pub fn new() -> Self {
 		return PatcherContext {
-			output_drivers: HashMap::new(),
+			output_drivers: FxHashMap::default(),
 			sharable: SharablePatcherState {
-				library: HashMap::new(),
-				fixture_order: Vec::new(),
-				fixtures: HashMap::new(),
+				library: FxHashMap::default(),
+				fixture_order: Vec::default(),
+				fixtures: FxHashMap::default(),
 			},
 		};
 	}
 	pub fn from_file(file: SharablePatcherState) -> Self {
 		return PatcherContext {
-			output_drivers: HashMap::new(),
+			output_drivers: FxHashMap::default(),
 			sharable: file,
 		};
 	}
@@ -30,9 +31,9 @@ impl PatcherContext {
 /// Sharable (and serializable) component of the patcher state containing
 /// information about registered fixtures
 pub struct SharablePatcherState {
-	pub library: HashMap<Uuid, FixtureInfo>,
+	pub library: FxHashMap<Uuid, FixtureInfo>,
 	pub fixture_order: Vec<Uuid>,
-	pub fixtures: HashMap<Uuid, FixtureInstance>,
+	pub fixtures: FxHashMap<Uuid, FixtureInstance>,
 }
 
 /// Identifies an individual instance of a fixture

@@ -7,8 +7,8 @@ impl LogService {
 		("Message", "The message to log"),
 	)]
 	pub async fn log(self, msg: String) {
-		#[cfg(feature = "stdout-logging")]
-		println!("{}", &msg);
+		#[cfg(feature = "stderr-logging")]
+		eprintln!("{}", &msg);
 
 		self.0
 			.emit::<String>("log".into(), FilterCriteria::None, msg)
@@ -23,8 +23,8 @@ impl LogErrorService {
 		("Message", "The message to log"),
 	)]
 	pub async fn log(self, msg: String) {
-		#[cfg(feature = "stdout-logging")]
-		println!("{}", &msg);
+		#[cfg(feature = "stderr-logging")]
+		eprintln!("{}", &msg);
 
 		self.0
 			.emit::<String>("log_error".into(), FilterCriteria::None, msg)

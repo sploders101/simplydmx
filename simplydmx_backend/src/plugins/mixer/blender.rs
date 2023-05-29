@@ -74,7 +74,7 @@ pub async fn start_blender(
 						}
 					}
 					#[cfg(feature = "blender-benchmark")]
-					println!("Blender took {:?}", start_bench.elapsed());
+					eprintln!("Blender took {:?}", start_bench.elapsed());
 
 					let result = Arc::new(cumulative_layer);
 					// TODO: These events don't need to be so frequent

@@ -160,10 +160,10 @@
 			output_info: {
 				personalities: {
 					"8-bit": {
-						dmx_channel_order: [...color ? ["red", "green", "blue", "white"] : [], ...panTilt ? ["pan", "tilt"] : []],
+						dmx_channel_order: [...color ? ["red", "green", "blue", "white"] : ["intensity"], ...panTilt ? ["pan", "tilt"] : []],
 					},
 					"16-bit": {
-						dmx_channel_order: [...color ? ["red16", "green16", "blue16", "white16"] : [], ...panTilt ? ["pan16", "tilt16"] : []],
+						dmx_channel_order: [...color ? ["red16", "green16", "blue16", "white16"] : ["intensity"], ...panTilt ? ["pan16", "tilt16"] : []],
 					},
 				},
 			},

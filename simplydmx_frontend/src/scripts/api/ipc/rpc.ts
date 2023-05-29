@@ -534,6 +534,7 @@ export const mixer = {
 	get_layer_contents(submaster_id: Uuid): Promise<StaticLayer | null> { return callService("mixer", "get_layer_contents", [submaster_id]) },
 	get_layer_opacity(submaster_id: Uuid): Promise<number | null> { return callService("mixer", "get_layer_opacity", [submaster_id]) },
 	list_submasters(): Promise<[Uuid, string][]> { return callService("mixer", "list_submasters", []) },
+	rename_layer(submaster_id: Uuid, new_name: string): Promise<void> { return callService("mixer", "rename_layer", [submaster_id, new_name]) },
 	request_blend(): Promise<void> { return callService("mixer", "request_blend", []) },
 	revert_blind(): Promise<void> { return callService("mixer", "revert_blind", []) },
 	set_blind_opacity(opacity: number): Promise<void> { return callService("mixer", "set_blind_opacity", [opacity]) },

@@ -56,6 +56,14 @@ pub async fn initialize_mixer(
 		.unwrap();
 
 	plugin_context
+		.declare_event::<()>(
+			"mixer.submaster_renamed".into(),
+			Some("Emitted when a submaster is renamed".into()),
+		)
+		.await
+		.unwrap();
+
+	plugin_context
 		.declare_event::<SubmasterData>(
 			"mixer.submaster_updated".into(),
 			Some("Emitted when a submaster is changed. Filter is a UUID of the submaster that was changed".into()),
@@ -105,6 +113,10 @@ pub async fn initialize_mixer(
 		.unwrap();
 	plugin_context
 		.register_service(true, commands::CreateLayer::new(interface.clone()))
+		.await
+		.unwrap();
+	plugin_context
+		.register_service(true, commands::RenameLayer::new(interface.clone()))
 		.await
 		.unwrap();
 	plugin_context
@@ -278,6 +290,28 @@ impl MixerInterface {
 			.await;
 
 		return submaster_id;
+	}
+
+	/// Renames a layer in the mixer
+	pub async fn rename_layer(&self, submaster_id: Uuid, new_name: String) -> () {
+		let mut ctx = self.1.write().await;
+
+		if let Some(ref mut blind_context) = ctx.frozen_context {
+			if let Some(submaster) = blind_context.user_submasters.get_mut(&submaster_id) {
+				submaster.name = new_name.clone();
+			}
+		}
+		if let Some(submaster) = ctx.default_context.user_submasters.get_mut(&submaster_id) {
+			submaster.name = new_name;
+		}
+
+		self.0
+			.emit(
+				"mixer.submaster_renamed".into(),
+				FilterCriteria::None,
+				submaster_id.clone(),
+			)
+			.await;
 	}
 
 	/// Adds or removes content in a layer

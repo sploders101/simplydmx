@@ -141,6 +141,26 @@ impl CreateLayer {
 }
 
 #[interpolate_service(
+	"rename_layer",
+	"Rename Layer",
+	"Renames a submaster"
+)]
+impl RenameLayer {
+	#![inner_raw(MixerInterface)]
+	pub fn new(mixer_interface: MixerInterface) -> Self {
+		Self(mixer_interface)
+	}
+
+	#[service_main(
+		("Submaster ID", "The UUID of the submaster to rename"),
+		("Name", "The new name for the submaster"),
+	)]
+	async fn main(self, submaster_id: Uuid, new_name: String) -> () {
+		self.0.rename_layer(submaster_id, new_name).await;
+	}
+}
+
+#[interpolate_service(
 	"set_layer_contents",
 	"Set Layer Contents",
 	"Adds or removes content in a layer"

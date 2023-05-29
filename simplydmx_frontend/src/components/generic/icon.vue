@@ -10,6 +10,7 @@
 		mdiArrowDownLeft,
 		mdiLayers,
 		mdiTrashCanOutline,
+		mdiCursorText,
 	} from "@mdi/js";
 
 	const paths = {
@@ -24,6 +25,7 @@
 		arrowDownLeft: mdiArrowDownLeft,
 		layers: mdiLayers,
 		trashCan: mdiTrashCanOutline,
+		textCursor: mdiCursorText,
 	} as const;
 
 	export type IconPath = keyof typeof paths;

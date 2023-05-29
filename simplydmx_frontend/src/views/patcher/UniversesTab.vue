@@ -25,9 +25,9 @@
 </script>
 
 <template>
-	<div class="patcher-add">
+	<div class="patcher-universes">
 		<LargeSelect
-			class="patcher-left-sidebar"
+			class="patcher-universes-left-sidebar"
 			v-model="selectedUniverse"
 			:options="universeOptions || []"
 			enable-search
@@ -48,7 +48,7 @@
 				</div>
 			</template>
 		</LargeSelect>
-		<div class="patcher-universe-prefs">
+		<div class="patcher-universes-prefs">
 			<UniverseEditor v-if="selectedUniverse" :selectedUniverse="selectedUniverse" />
 		</div>
 		<CreateUniverseDialog v-model:visible="addUniverseDialog" />
@@ -72,14 +72,14 @@
 </template>
 
 <style lang="scss">
-	.patcher-add {
+	.patcher-universes {
 		width: 100%;
 		height: 100%;
 		
 		display: flex;
 		flex-flow: row nowrap;
 
-		.patcher-left-sidebar {
+		.patcher-universes-left-sidebar {
 		    height: 100%;
 		    max-width: 20rem;
 		    min-width: 15rem;
@@ -94,7 +94,7 @@
 			}
 		}
 
-		.patcher-universe-prefs {
+		.patcher-universes-prefs {
 			flex-grow: 1;
 
 			display: flex;

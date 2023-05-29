@@ -94,6 +94,14 @@
 		    max-width: 20rem;
 		    min-width: 15rem;
 		    width: 25%;
+
+			.delete-button {
+				margin-left: auto;
+
+				.delete-icon {
+					fill: #AA0000;
+				}
+			}
 		}
 
 		.patcher-fixture-prefs {

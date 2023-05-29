@@ -58,6 +58,7 @@
 
 			display: flex;
 			flex-flow: column nowrap;
+			overflow: auto;
 		}
 	}
 </style>

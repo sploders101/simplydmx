@@ -41,11 +41,26 @@
 	/** The viewport element (the container the canvas should fill) */
 	const viewport = ref<HTMLDivElement | null>(null);
 
-	/** The reactive boundaries of the viewport (ie. the area the canvas should fill) */
-	const viewportBounds = useElementBounding(viewport);
-
 	/** Map of fixture IDs to fabric objects */
 	const fixtures = reactive(new Map<string, Circle>());
+
+	/** The reactive boundaries of the viewport (ie. the area the canvas should fill) */
+	const viewportBounds = useElementBounding(viewport);
+	const canvasBounds = computed(() => {
+		let maxXRight = 0;
+		let maxYBottom = 0;
+
+		fixtures.forEach((light) => {
+			const br = light.getCoords(true)[2];
+			maxXRight = Math.max(maxXRight, br.x);
+			maxYBottom = Math.max(maxYBottom, br.y);
+		});
+
+		return {
+			height: Math.max(maxYBottom, viewportBounds.height.value),
+			width: Math.max(maxXRight, viewportBounds.width.value),
+		};
+	});
 
 	/**
 	 * Map of fabric objects to fixture IDs.
@@ -209,11 +224,11 @@
 	}
 
 	// Keep fabric dimensions up-to-date with the container
-	watch([viewportBounds.height, viewportBounds.width], () => {
+	watch(canvasBounds, () => {
 		if (vis.value) {
 			vis.value.setDimensions({
-				width: viewportBounds.width.value,
-				height: viewportBounds.height.value,
+				width: canvasBounds.value.width,
+				height: canvasBounds.value.height,
 			}, {});
 		}
 	}, { immediate: true });
@@ -465,8 +480,8 @@
 
 		vis.value = new Canvas(canvas.value, {
 			enableRetinaScaling: true,
-			width: viewportBounds.width.value,
-			height: viewportBounds.height.value,
+			width: canvasBounds.value.width,
+			height: canvasBounds.value.height,
 			uniformScaling: true,
 		});
 
@@ -487,6 +502,9 @@
 		vis.value.on("selection:cleared", () => selected.value = []);
 
 		vis.value.on("object:modified", (event) => {
+			if (canvasBounds.effect.scheduler) {
+				canvasBounds.effect.scheduler();
+			}
 			let objects = event.target instanceof ActiveSelection
 				? event.target.getObjects()
 				: [event.target];

@@ -247,6 +247,40 @@ impl PatcherInterface {
 		}
 	}
 
+	pub async fn delete_fixture(&self, fixture_id: &Uuid) -> Result<(), DeleteFixtureError> {
+		let mut ctx = self.1.write().await;
+
+		let (instance_id, fixture) = ctx.sharable.fixtures
+			.remove_entry(fixture_id)
+			.ok_or(DeleteFixtureError::FixtureMissing)?;
+		let fixture_type_info = match ctx.sharable.library.get(&fixture.fixture_id) {
+			Some(fixture_type_info) => fixture_type_info,
+			None => {
+				ctx.sharable.fixtures.insert(instance_id, fixture);
+				return Err(DeleteFixtureError::FixtureTypeMissing);
+			},
+		};
+		let controller = match ctx.output_drivers.get(&fixture_type_info.output_driver) {
+			Some(controller) => controller,
+			None => {
+				ctx.sharable.fixtures.insert(instance_id, fixture);
+				return Err(DeleteFixtureError::ControllerMissing);
+			},
+		};
+
+		if let Err(controller_err) = controller.remove_fixture_instance(fixture_id).await {
+			// Put the fixture back since the controller refused to remove it
+			ctx.sharable.fixtures.insert(instance_id, fixture);
+			return Err(DeleteFixtureError::ErrorFromController(controller_err.to_string()));
+		} else {
+			ctx.sharable.fixture_order.retain(|fixture| fixture != fixture_id);
+			self.0
+				.emit("patcher.patch_updated".into(), FilterCriteria::None, ())
+				.await;
+			return Ok(());
+		}
+	}
+
 	/// Edit a fixture
 	pub async fn edit_fixture(
 		&self,
@@ -256,55 +290,57 @@ impl PatcherInterface {
 		comments: Option<String>,
 		form_data: SerializedData,
 	) -> Result<(), EditFixtureError> {
+		// Need to take ownership in order to mutate fixtures due to lifetime constraints. Make sure it gets put back.
 		let mut ctx = self.1.write().await;
 
-		// Need to take ownership in order to mutate ctx. Make sure it gets put back.
-		if let Some((instance_id, fixture)) = ctx.sharable.fixtures.remove_entry(instance_id) {
-			if let Some(fixture_type_info) = ctx.sharable.library.get(&fixture.fixture_id) {
-				if let Some(controller) = ctx.output_drivers.get(&fixture_type_info.output_driver) {
-					if let Err(controller_err) = controller
-						.edit_fixture_instance(
-							&ctx.sharable,
-							&instance_id,
-							fixture_type_info,
-							&personality,
-							form_data,
-						)
-						.await
-					{
-						// Put the fixture back since we're not replacing it
-						ctx.sharable.fixtures.insert(instance_id, fixture);
-						return Err(EditFixtureError::ErrorFromController(controller_err));
-					} else {
-						// Insert the new fixture
-						ctx.sharable.fixtures.insert(
-							fixture.id,
-							FixtureInstance {
-								id: instance_id,
-								fixture_id: fixture.fixture_id,
-								personality,
-								name,
-								comments,
-								visualization_info: fixture.visualization_info,
-							},
-						);
-						self.0
-							.emit("patcher.patch_updated".into(), FilterCriteria::None, ())
-							.await;
-						return Ok(());
-					}
-				} else {
-					// Put the fixture back since we can't edit
-					ctx.sharable.fixtures.insert(instance_id.clone(), fixture);
-					return Err(EditFixtureError::ControllerMissing);
-				}
-			} else {
-				// Put the fixture back since we can't edit
-				ctx.sharable.fixtures.insert(instance_id.clone(), fixture);
+		let (instance_id, fixture) = ctx.sharable.fixtures
+			.remove_entry(instance_id)
+			.ok_or(EditFixtureError::FixtureMissing)?;
+		let fixture_type_info = match ctx.sharable.library.get(&fixture.fixture_id) {
+			Some(fixture_type_info) => fixture_type_info,
+			None => {
+				ctx.sharable.fixtures.insert(instance_id, fixture);
 				return Err(EditFixtureError::FixtureTypeMissing);
-			}
+			},
+		};
+		let controller = match ctx.output_drivers.get(&fixture_type_info.output_driver) {
+			Some(controller) => controller,
+			None => {
+				ctx.sharable.fixtures.insert(instance_id, fixture);
+				return Err(EditFixtureError::ControllerMissing);
+			},
+		};
+
+		if let Err(controller_err) = controller
+			.edit_fixture_instance(
+				&ctx.sharable,
+				&instance_id,
+				fixture_type_info,
+				&personality,
+				form_data,
+			)
+			.await
+		{
+			// Put the fixture back since we're not replacing it
+			ctx.sharable.fixtures.insert(instance_id, fixture);
+			return Err(EditFixtureError::ErrorFromController(controller_err));
 		} else {
-			return Err(EditFixtureError::FixtureMissing);
+			// Insert the new fixture
+			ctx.sharable.fixtures.insert(
+				fixture.id,
+				FixtureInstance {
+					id: instance_id,
+					fixture_id: fixture.fixture_id,
+					personality,
+					name,
+					comments,
+					visualization_info: fixture.visualization_info,
+				},
+			);
+			self.0
+				.emit("patcher.patch_updated".into(), FilterCriteria::None, ())
+				.await;
+			return Ok(());
 		}
 	}
 
@@ -524,10 +560,24 @@ impl From<anyhow::Error> for GetEditFormError {
 pub enum EditFixtureError {
 	#[error("This fixture does not exist")]
 	FixtureMissing,
-	#[error("The fixture definition is missing for the requested fixture type")]
+	#[error("[Internal state error]: The fixture definition is missing for the requested fixture type")]
 	FixtureTypeMissing,
-	#[error("The controller responsible for this fixture is missing")]
+	#[error("[Internal state error]: The controller responsible for this fixture is missing")]
 	ControllerMissing,
 	#[error("The controller reported an error while creating an instance of the fixture:\n{0:?}")]
 	ErrorFromController(driver_plugin_api::EditInstanceError),
+}
+
+#[portable]
+#[derive(Error)]
+/// An error that could occur when removing a fixture
+pub enum DeleteFixtureError {
+	#[error("This fixture does not exist")]
+	FixtureMissing,
+	#[error("[Internal state error]: The fixture definition is missing for the requested fixture type.")]
+	FixtureTypeMissing,
+	#[error("[Internal state error]: The controller responsible for this fixture is missing")]
+	ControllerMissing,
+	#[error("The controller reported an error while creating an instance of the fixture:\n{0}")]
+	ErrorFromController(String),
 }

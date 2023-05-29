@@ -6,8 +6,8 @@ mod state;
 
 use self::{
 	services::{
-		CreateFixture, EditFixture, EditFixturePlacement, GetCreationForm, GetEditForm,
-		GetPatcherState, ImportFixtureDefinition,
+		CreateFixture, DeleteFixture, EditFixture, EditFixturePlacement, GetCreationForm,
+		GetEditForm, GetPatcherState, ImportFixtureDefinition,
 	},
 	state::{PatcherContext, VisualizationInfo},
 };
@@ -47,6 +47,7 @@ pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface) ->
 
 	plugin_context.register_service(true, ImportFixtureDefinition::new(patcher_interface.clone())).await.unwrap();
 	plugin_context.register_service(true, CreateFixture::new(patcher_interface.clone())).await.unwrap();
+	plugin_context.register_service(true, DeleteFixture::new(patcher_interface.clone())).await.unwrap();
 	plugin_context.register_service(true, GetCreationForm::new(patcher_interface.clone())).await.unwrap();
 	plugin_context.register_service(true, GetPatcherState::new(patcher_interface.clone())).await.unwrap();
 	plugin_context.register_service(true, GetEditForm::new(patcher_interface.clone())).await.unwrap();

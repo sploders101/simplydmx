@@ -6,7 +6,7 @@ use super::{
 	driver_plugin_api::{FixtureBundle, SharablePatcherState},
 	interface::{
 		CreateFixtureError, EditFixtureError, GetCreationFormError, GetEditFormError,
-		ImportFixtureError,
+		ImportFixtureError, DeleteFixtureError,
 	},
 	PatcherInterface,
 };
@@ -35,13 +35,13 @@ impl ImportFixtureDefinition {
 #[interpolate_service(
 	"create_fixture",
 	"Create Fixture",
-	"Creates a new fixture for use in the application"
+	"Creates a new fixture in the patcher"
 )]
 impl CreateFixture {
 	#![inner_raw(PatcherInterface)]
 
 	pub fn new(patcher_interface: PatcherInterface) -> Self {
-		Self(patcher_interface)
+		return Self(patcher_interface);
 	}
 
 	#[service_main(
@@ -50,7 +50,7 @@ impl CreateFixture {
 		("Name", "The optional user-specified name of the fixture"),
 		("Comments", "Any additional comments the user would like to leave on this fixture instance"),
 		("Form Data", "Data from the user in the format specified by the fixture controller's creation form"),
-		("Result: Uuid", "Result containing the UUID of hte new fixture or an error"),
+		("Result: Uuid", "Result containing the UUID of the new fixture or an error"),
 	)]
 	async fn main(
 		self,
@@ -64,6 +64,27 @@ impl CreateFixture {
 			.0
 			.create_fixture(fixture_type, personality, name, comments, form_data)
 			.await;
+	}
+}
+
+#[interpolate_service(
+	"delete_fixture",
+	"Delete Fixture",
+	"Deletes a fixture from the patcher",
+)]
+impl DeleteFixture {
+	#![inner_raw(PatcherInterface)]
+
+	pub fn new(patcher_interface: PatcherInterface) -> Self {
+		return Self(patcher_interface);
+	}
+
+	#[service_main(
+		("Fixture ID", "The UUID of the fixture instance to be deleted"),
+		("Result: Uuid", "Result indicating whether or not the fixture was successfully deleted")
+	)]
+	async fn main(self, fixture_id: Uuid) -> Result<(), DeleteFixtureError> {
+		return self.0.delete_fixture(&fixture_id).await;
 	}
 }
 

@@ -132,6 +132,11 @@ export interface DMXShowSave {
 }
 
 /**
+ * An error that could occur when removing a fixture
+ */
+export type DeleteFixtureError = "FixtureMissing" | "FixtureTypeMissing" | "ControllerMissing" | { ErrorFromController: string };
+
+/**
  * Minified representation of a DMX driver for display
  */
 export interface DisplayableDMXDriver {
@@ -373,6 +378,11 @@ export interface MixingContext {
 export type NumberValidation = "None" | { Not: NumberValidation } | { And: NumberValidation[] } | { Or: NumberValidation[] } | { Between: [number, number] } | { DivisibleBy: number };
 
 /**
+ * An error that could occur while initializing the E131 plugin
+ */
+export type OpenDMXInitializationError = "UnrecognizedData";
+
+/**
  * An error that could occur while initializing the patcher plugin
  */
 export type PatcherInitializationError = "UnrecognizedData";
@@ -545,6 +555,7 @@ export const output_dmx = {
 
 export const patcher = {
 	create_fixture(fixture_type: Uuid, personality: string, name: string | null, comments: string | null, form_data: SerializedData): Promise<{ Ok: Uuid } | { Err: CreateFixtureError }> { return callService("patcher", "create_fixture", [fixture_type, personality, name, comments, form_data]) },
+	delete_fixture(fixture_id: Uuid): Promise<{ Ok: null } | { Err: DeleteFixtureError }> { return callService("patcher", "delete_fixture", [fixture_id]) },
 	edit_fixture(instance_id: Uuid, personality: string, name: string | null, comments: string | null, form_data: SerializedData): Promise<{ Ok: null } | { Err: EditFixtureError }> { return callService("patcher", "edit_fixture", [instance_id, personality, name, comments, form_data]) },
 	edit_fixture_placement(fixture_id: Uuid, x: number, y: number): Promise<void> { return callService("patcher", "edit_fixture_placement", [fixture_id, x, y]) },
 	get_creation_form(fixture_type: Uuid): Promise<{ Ok: FormDescriptor } | { Err: GetCreationFormError }> { return callService("patcher", "get_creation_form", [fixture_type]) },

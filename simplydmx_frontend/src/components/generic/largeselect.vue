@@ -10,7 +10,7 @@
 </script>
 
 <script lang="ts" setup>
-	import { ref, computed, type PropType } from "vue";
+	import { ref, computed, type PropType, watch } from "vue";
 
 	const props = defineProps({
 		options: {
@@ -29,6 +29,13 @@
 		(e: "select", event: SelectEvent): void,
 	}>();
 
+	watch(() => props.options, () => {
+		// If the currently-selected option is not in the new list, deselect.
+		if (!props.options.find((item) => item.value === props.modelValue)) {
+			emit("update:modelValue", null);
+		}
+	})
+
 	const search = ref("");
 	const filteredOptions = computed(() => {
 		if (!props.enableSearch) return props.options;
@@ -44,10 +51,20 @@
 <template>
 	<div class="sdmx-largeselect">
 		<div class="largeselect-header spaced">
-			<Textbox v-if="props.enableSearch" v-model="search" hint="Search" class="largeselect-search" />
+			<Textbox
+				v-if="props.enableSearch"
+				v-model="search"
+				hint="Search"
+				class="largeselect-search"
+				/>
 			<slot name="header-right" />
 		</div>
-		<div v-for="option in filteredOptions" class="largeselect-option" :class="{ active: option.value === props.modelValue }" @click="dispatchSelect(option.value, $event)">
+		<div
+			v-for="option in filteredOptions"
+			class="largeselect-option"
+			:class="{ active: option.value === props.modelValue }"
+			@click="dispatchSelect(option.value, $event)"
+			>
 			<slot name="option" :option="option">
 				{{ option.name }}
 			</slot>

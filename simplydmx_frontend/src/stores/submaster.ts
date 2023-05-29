@@ -81,8 +81,9 @@ export function useSubmasterData(submasterId: () => ipc.Uuid | null) {
 		if (submasterIdValue) teardown(submasterIdValue);
 	});
 	watch([submasterId, mounted], ([newSubmasterId, newMounted], [oldSubmasterId, oldMounted]) => {
-		if (newSubmasterId === null && typeof oldSubmasterId === "string" && oldMounted && newMounted) teardown(oldSubmasterId);
-		if (newMounted) {
+		if (newSubmasterId === null && typeof oldSubmasterId === "string" && oldMounted && newMounted) {
+			teardown(oldSubmasterId);
+		} else if (newMounted) {
 			if (!oldMounted) {
 				if (newSubmasterId) setup(newSubmasterId);
 			} else if (newSubmasterId !== oldSubmasterId) {

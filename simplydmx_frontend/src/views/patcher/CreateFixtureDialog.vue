@@ -162,7 +162,7 @@
 			:form="{ VerticalStack: addFixtureForm[0] }"
 			:formData="addFixtureForm[1]"
 			/>
-		
+
 		<template #footer>
 			<Button @click="cancelAddingFixture()" subtle class="spaced">
 				Cancel

@@ -9,7 +9,7 @@ edition = "2021"
 serde = "1.0.136"
 serde_json = "1.0.74"
 simplydmx_plugin_framework = { path = "../simplydmx_plugin_framework" }
-sacn = { path = "../sacn", optional = true }
+sacn = { path = "../sacn" }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 async-trait = "0.1.57"
 ciborium = "0.2.0"
@@ -19,6 +19,8 @@ anyhow = "1.0.68"
 thiserror = "1.0.38"
 rustc-hash = "1.1.0"
 tokio = { version = "1.28.1", features = ["full"] }
+enttecopendmx = "0.1.1"
+thread-priority = "0.13.1"
 
 [lib]
 path = "src/lib.rs"
@@ -34,16 +36,10 @@ default = ["default-plugins"]
 # This is meant to be run stand-alone, similar to tests. It generates the rpc.ts file that the frontend runs on
 export-services = ["linkme", "tsify", "simplydmx_plugin_framework/tsify", "stdout-logging", "default-plugins"]
 
-default-plugins = ["output-dmx-e131", "blender", "api"]
+default-plugins = []
 
-stdout-logging = [] # Log service in core
+stdout-logging = []
 
-output-dmx = []
-output-dmx-e131 = ["output-dmx", "sacn"]
-
-blender = []
-blender-benchmark = ["blender"]
+blender-benchmark = []
 
 startup-benchmark = []
-
-api = []

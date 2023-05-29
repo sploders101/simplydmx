@@ -11,6 +11,7 @@ use uuid::uuid;
 pub type ControllerCache = Arc<Mutex<Option<HashMap<u16, [u8; 512]>>>>;
 
 // TODO: Refactor sacn with async I/O. It should be fast enough though not to cause any noticable issue in the meantime
+//       This task should also shut down or sit idle when not needed. Currently, the loop still runs without data.
 pub async fn initialize_controller(plugin_context: PluginContext) -> ControllerCache {
 	let cache = Arc::new(Mutex::new(Some(HashMap::<u16, [u8; 512]>::new())));
 	let e131_cache = Arc::clone(&cache);

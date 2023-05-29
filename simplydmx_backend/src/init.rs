@@ -46,10 +46,9 @@ pub async fn async_main(plugin_manager: &PluginManager, data: Option<Vec<u8>>) {
 	.await
 	.unwrap();
 
-	#[cfg(feature = "output-dmx")]
 	let dmx_interface = plugins::output_dmx::initialize(
 		plugin_manager
-			.register_plugin("output_dmx", "E1.31/sACN DMX Output")
+			.register_plugin("output_dmx", "DMX Universe Renderer")
 			.await
 			.unwrap(),
 		saver.clone(),
@@ -59,10 +58,20 @@ pub async fn async_main(plugin_manager: &PluginManager, data: Option<Vec<u8>>) {
 	.await
 	.unwrap();
 
-	#[cfg(feature = "output-dmx-e131")]
 	plugins::output_dmx_e131::initialize(
 		plugin_manager
 			.register_plugin("output_dmx_e131", "E1.31/sACN DMX Output")
+			.await
+			.unwrap(),
+		saver.clone(),
+		dmx_interface.clone(),
+	)
+	.await
+	.unwrap();
+
+	plugins::output_dmx_enttecopendmx::initialize(
+		plugin_manager
+			.register_plugin("output_dmx_enttecopendmx", "Enttec OpenDMX Output")
 			.await
 			.unwrap(),
 		saver.clone(),

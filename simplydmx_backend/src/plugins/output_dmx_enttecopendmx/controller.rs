@@ -6,6 +6,10 @@ use std::{
 use thread_priority::{set_current_thread_priority, ThreadPriority};
 use tokio::{sync::Mutex, task::JoinHandle};
 
+/// This controls an OpenDMX interface and allows intermittent
+/// updates by spawning a separate thread to control the interface.
+///
+/// This thread will attempt to escalate its priority, ignoring errors.
 pub struct OpenDMXController {
 	shutdown_trigger: Arc<AtomicBool>,
 	channels: Arc<Mutex<Option<[u8; 512]>>>,
@@ -50,16 +54,19 @@ impl OpenDMXController {
 
 impl Drop for OpenDMXController {
 	fn drop(&mut self) {
+		#[cfg(debug_assertions)]
 		if !self.shutdown_trigger.load(std::sync::atomic::Ordering::Relaxed) {
-			#[cfg(debug_assertions)]
 			eprintln!("OpenDMXController was inappropriately dropped!");
-			self.shutdown_trigger.store(true, std::sync::atomic::Ordering::Relaxed);
 		}
+		self.shutdown_trigger.store(true, std::sync::atomic::Ordering::Relaxed);
 	}
 }
 
 fn thread_loop(shutdown_trigger: Arc<AtomicBool>, channels: Arc<Mutex<Option<[u8; 512]>>>) {
-	set_current_thread_priority(ThreadPriority::Max).ok();
+	if let Err(err) = set_current_thread_priority(ThreadPriority::Max) {
+		#[cfg(debug_assertions)]
+		eprintln!("Failed to set OpenDMX controller thread priority: {:?}", err);
+	}
 	let mut last_retry = Instant::now();
 	let mut port = EnttecOpenDMX::new().and_then(|mut port| {
 		port.open()?;
@@ -88,17 +95,22 @@ fn thread_loop(shutdown_trigger: Arc<AtomicBool>, channels: Arc<Mutex<Option<[u8
 					inner_port.close().ok();
 					port = Err(err);
 				}
+
+				// Sleep to trigger a break in the DMX packet.
+				// This helps prevent flickering caused by running DMX packets too close together
 				std::thread::sleep(Duration::from_millis(2));
 			},
 			Err(_) => {
 				// Keep sleep durations small so we can check if we need to shut down frequently.
 				// Other tasks may be waiting on us to quit before they can continue.
-				while last_retry.elapsed() < Duration::from_secs(2) {
+				while last_retry.elapsed() < Duration::from_secs(1) {
 					std::thread::sleep(Duration::from_millis(10));
 					if shutdown_trigger.load(std::sync::atomic::Ordering::Relaxed) {
 						break;
 					}
 				}
+				#[cfg(debug_assertions)]
+				eprintln!("Trying again to open OpenDMX interface.");
 				last_retry = Instant::now();
 				port = EnttecOpenDMX::new().and_then(|mut port| {
 					port.open()?;

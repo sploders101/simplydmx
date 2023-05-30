@@ -48,3 +48,8 @@ cd simplydmx_frontend
 npm install # or yarn, whichever you prefer
 cargo tauri dev
 ```
+
+## Current Progress
+
+For progress updates, check out the wiki:
+https://github.com/sploders101/simplydmx/wiki

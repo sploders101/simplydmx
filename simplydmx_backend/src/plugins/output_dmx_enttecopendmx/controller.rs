@@ -98,7 +98,7 @@ fn thread_loop(shutdown_trigger: Arc<AtomicBool>, channels: Arc<Mutex<Option<[u8
 
 				// Sleep to trigger a break in the DMX packet.
 				// This helps prevent flickering caused by running DMX packets too close together
-				std::thread::sleep(Duration::from_millis(2));
+				std::thread::sleep(Duration::from_millis(5));
 			},
 			Err(_) => {
 				// Keep sleep durations small so we can check if we need to shut down frequently.

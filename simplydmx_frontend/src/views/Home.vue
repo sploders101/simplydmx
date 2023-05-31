@@ -177,22 +177,26 @@
 		await importFixtureTest("a93e6ba5-83ef-4faa-afd0-7b85dd12400b", "Generic Moving Spotlight", "IPT", false, true);
 
 		let universeId = await rpc.output_dmx.create_universe("Test universe");
-		let fixtureId = unwrap(await rpc.patcher.create_fixture("c205635c-037a-4e5c-8a68-59a8a86dae8f", "8-bit", "RGBW", null, {
-			universe: universeId,
-			offset: 41,
-		} as rpc.DMXFixtureInstance));
-
 		let submasterId = await rpc.mixer.create_layer("Example submaster");
-		let newContents = {
-			[fixtureId]: {
-				intensity: blenderValue(255),
-				red: blenderValue(255),
-				green: blenderValue(30),
-				blue: blenderValue(0),
-				white: blenderValue(0),
-			}
-		};
-		await rpc.mixer.set_layer_contents(submasterId, newContents);
+		for (let i = 0; i < 17; i++) {
+			let fixtureId = unwrap(await rpc.patcher.create_fixture("c205635c-037a-4e5c-8a68-59a8a86dae8f", "8-bit", `LED ${i+1}`, null, {
+				universe: universeId,
+				offset: 41 + (i*4),
+			} as rpc.DMXFixtureInstance))
+			rpc.patcher.edit_fixture_placement(fixtureId, i*35, 0)
+
+			let newContents = {
+				[fixtureId]: {
+					intensity: blenderValue(255),
+					red: blenderValue(255),
+					green: blenderValue(30),
+					blue: blenderValue(0),
+					white: blenderValue(0),
+				}
+			};
+			await rpc.mixer.set_layer_contents(submasterId, newContents);
+		}
+
 		await rpc.mixer.set_layer_opacity(submasterId, 65535, true);
 	}
 

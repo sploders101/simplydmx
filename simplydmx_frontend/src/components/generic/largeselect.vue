@@ -59,15 +59,17 @@
 				/>
 			<slot name="header-right" />
 		</div>
-		<div
-			v-for="option in filteredOptions"
-			class="largeselect-option"
-			:class="{ active: option.value === props.modelValue }"
-			@click="dispatchSelect(option.value, $event)"
-			>
-			<slot name="option" :option="option">
-				{{ option.name }}
-			</slot>
+		<div class="options-container">
+			<div
+				v-for="option in filteredOptions"
+				class="largeselect-option"
+				:class="{ active: option.value === props.modelValue }"
+				@click="dispatchSelect(option.value, $event)"
+				>
+				<slot name="option" :option="option">
+					{{ option.name }}
+				</slot>
+			</div>
 		</div>
 	</div>
 </template>
@@ -79,6 +81,7 @@
 		justify-content: flex-start;
 		align-items: stretch;
 		background: var(--largeselect-background);
+		overflow: auto;
 		
 		& > .largeselect-header {
 			display: flex;
@@ -93,25 +96,33 @@
 			}
 		}
 
-		& > .largeselect-option {
-			height: 3rem;
-			cursor: pointer;
-			user-select: none;
-			-webkit-user-select: none;
-
-			&.active {
-				background: var(--largeselect-focused-background);
-			}
-			&:hover:not(.active) {
-				background: var(--largeselect-hover-background);
-			}
-
+		& > .options-container {
+			flex: 1 1 0;
 			display: flex;
-			flex-flow: row nowrap;
-			align-items: center;
-			padding: 0.5rem;
+			flex-flow: column nowrap;
+			overflow: auto;
 
-			font-size: 1.125rem;
+			& > .largeselect-option {
+				height: 3rem;
+				flex: 0 0 auto;
+				cursor: pointer;
+				user-select: none;
+				-webkit-user-select: none;
+
+				&.active {
+					background: var(--largeselect-focused-background);
+				}
+				&:hover:not(.active) {
+					background: var(--largeselect-hover-background);
+				}
+
+				display: flex;
+				flex-flow: row nowrap;
+				align-items: center;
+				padding: 0.5rem;
+
+				font-size: 1.125rem;
+			}
 		}
 	}
 </style>

@@ -95,7 +95,8 @@
 		}
 
 		.patcher-universes-prefs {
-			flex-grow: 1;
+			flex: 1 1 0;
+			overflow: auto;
 
 			display: flex;
 			flex-flow: column nowrap;

@@ -117,7 +117,8 @@
 			}
 		}
 		& > .tab-contents {
-			flex-grow: 1;
+			flex: 1 1 0;
+			overflow: auto;
 		}
 	}
 </style>

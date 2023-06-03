@@ -34,12 +34,21 @@ required-features = ["export-services"]
 default = ["default-plugins"]
 
 # This is meant to be run stand-alone, similar to tests. It generates the rpc.ts file that the frontend runs on
-export-services = ["linkme", "tsify", "simplydmx_plugin_framework/tsify", "stderr-logging", "default-plugins"]
+# Plugins should be specified manually. For example, to use the default plugin set, use `-F export-services,default-plugins`.
+export-services = ["linkme", "tsify", "simplydmx_plugin_framework/tsify", "stderr-logging"]
 
-default-plugins = []
+default-plugins = [
+	"output-dmx",
+	"output-dmx-e131",
+	"output-dmx-enttecopendmx",
+]
 
+# Optional plugins
+output-dmx = []
+output-dmx-e131 = ["output-dmx"]
+output-dmx-enttecopendmx = ["output-dmx"]
+
+# Debugging utilities
 stderr-logging = []
-
 blender-benchmark = []
-
 startup-benchmark = []

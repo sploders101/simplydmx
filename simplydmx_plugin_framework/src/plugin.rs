@@ -19,7 +19,6 @@ use simplydmx_plugin_macros::portable;
 use crate::{
 	event_emitter::{
 		EventEmitter,
-		EventReceiver,
 		FilterCriteria,
 		BidirectionalPortable,
 		RegisterListenerError,
@@ -186,13 +185,7 @@ impl PluginContext {
 			)
 			.await;
 
-		// Create plugin context
-		let plugin_context = PluginContext(Arc::clone(&registry), plugin);
-		plugin_context
-			.signal_dep(Dependency::Plugin { plugin_id: id })
-			.await;
-
-		return Ok(plugin_context);
+		return Ok(PluginContext(Arc::clone(&registry), plugin));
 	}
 
 	/// Set init flag to notify dependents of an initialization step
@@ -302,12 +295,6 @@ impl PluginContext {
 				String::from(&self.1.id) + "." + &id,
 			)
 			.await;
-
-		self.signal_dep(Dependency::Service {
-			plugin_id: self.1.id.clone(),
-			service_id: id,
-		})
-		.await;
 
 		return Ok(());
 	}
@@ -478,18 +465,6 @@ impl PluginContext {
 		return self.0.evt_bus.write().await.off(event_handle);
 	}
 
-	/// Registers an event listener on the bus of the given type. Returns
-	/// an instance of `EventReceiver<T>` which filters for the desired type
-	/// and wraps resulting values in `ArcPortable<T>` to make usage of the data
-	/// simpler.
-	pub async fn listen<T: BidirectionalPortable>(
-		&self,
-		event_name: String,
-		filter: FilterCriteria,
-	) -> Result<EventReceiver<T>, RegisterListenerError> {
-		return self.0.evt_bus.write().await.listen::<T>(event_name, filter);
-	}
-
 	/// Registers a listener on the event bus that receives pre-encoded JSON events
 	pub async fn listen_json(
 		&self,
@@ -530,21 +505,6 @@ impl PluginContext {
 						.flags
 						.push(flag_id);
 				}
-				Dependency::Plugin { plugin_id } => {
-					ensure_deplist(&mut needed_resources, plugin_id);
-					needed_resources.get_mut(plugin_id).unwrap().plugin = true;
-				}
-				Dependency::Service {
-					plugin_id,
-					service_id,
-				} => {
-					ensure_deplist(&mut needed_resources, plugin_id);
-					needed_resources
-						.get_mut(plugin_id)
-						.unwrap()
-						.services
-						.push(service_id);
-				}
 			}
 		}
 
@@ -559,22 +519,6 @@ impl PluginContext {
 		for (plugin_id, deps) in needed_resources {
 			let plugin = plugins.get(plugin_id);
 			if let Some(plugin) = plugin {
-				if deps.plugin {
-					known_dependencies.push(Dependency::Plugin {
-						plugin_id: plugin_id.clone(),
-					});
-				}
-				if deps.services.len() > 0 {
-					let services = plugin.services.read().await;
-					for service_id in deps.services {
-						if services.contains_key(service_id) {
-							known_dependencies.push(Dependency::Service {
-								plugin_id: plugin_id.clone(),
-								service_id: service_id.clone(),
-							});
-						}
-					}
-				}
 				if deps.flags.len() > 0 {
 					let flags = plugin.init_flags.read().await;
 					for flag_id in deps.flags {
@@ -818,19 +762,9 @@ pub enum GetServiceError {
 #[derive(PartialEq, Hash)]
 #[serde(tag = "type")]
 pub enum Dependency {
-
 	/// Represents a dependency on a flag posted by a service, which can represent
 	/// any part of the initialization process, like event handlers, for example.
 	Flag{ plugin_id: String, flag_id: String },
-
-	/// Represents a service dependency
-	Service{ plugin_id: String, service_id: String },
-
-	/// This dependency type is discouraged due to its ambiguous nature.
-	/// It only represents a plugin being loaded, and does not garauntee that it
-	/// has been properly initialized. It is better to use a `Flag` or `Service`
-	/// for this purpose
-	Plugin{ plugin_id: String },
 }
 
 impl Dependency {
@@ -840,31 +774,16 @@ impl Dependency {
 			flag_id: String::from(flag_id),
 		};
 	}
-	pub fn service(plugin_id: &str, service_id: &str) -> Dependency {
-		return Dependency::Service {
-			plugin_id: String::from(plugin_id),
-			service_id: String::from(service_id),
-		};
-	}
-	pub fn plugin(plugin_id: &str) -> Dependency {
-		return Dependency::Plugin {
-			plugin_id: String::from(plugin_id),
-		};
-	}
 }
 
 struct ConsolidatedDependencies<'a> {
-	plugin: bool,
 	flags: Vec<&'a String>,
-	services: Vec<&'a String>,
 }
 
 fn ensure_deplist<'a>(deps: &mut HashMap<&'a String, ConsolidatedDependencies>, plugin_id: &'a String) {
 	if !deps.contains_key(plugin_id) {
 		deps.insert(plugin_id, ConsolidatedDependencies {
-			plugin: false,
 			flags: Vec::new(),
-			services: Vec::new(),
 		});
 	}
 }

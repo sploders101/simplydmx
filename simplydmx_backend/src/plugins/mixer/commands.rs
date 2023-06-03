@@ -37,7 +37,7 @@ impl SetBlindOpacity {
 	}
 
 	#[service_main(
-		("Opacity", "The desired opacity of the layer bin"),
+		("The desired opacity of the layer bin"),
 	)]
 	async fn main(self, opacity: u16) {
 		return self.0.set_blind_opacity(opacity).await;
@@ -56,7 +56,7 @@ impl GetBlindOpacity {
 	}
 
 	#[service_main(
-		("Blind Opacity", "The opacity of the blind layer bin. This will be None or null if blind mode is inactive"),
+		("The opacity of the blind layer bin. This will be None or null if blind mode is inactive"),
 	)]
 	async fn main(self) -> Option<u16> {
 		return self.0.get_blind_opacity().await;
@@ -113,7 +113,7 @@ impl ListSubmasters {
 	}
 
 	#[service_main(
-		("Submasters", "An array of (id, name) tuples representing the submasters listed in the mixer"),
+		("An array of (id, name) tuples representing the submasters listed in the mixer"),
 	)]
 	async fn main(self) -> Vec<(Uuid, String)> {
 		return self.0.list_submasters_with_names().await;
@@ -132,8 +132,8 @@ impl CreateLayer {
 	}
 
 	#[service_main(
-		("Name", "The name to assign to the submaster"),
-		("Submaster ID", "UUID value that should be used from this point forward to identify the submaster", "mixer::layer_id"),
+		("The name to assign to the submaster"),
+		("UUID value that should be used from this point forward to identify the submaster", "mixer::layer_id"),
 	)]
 	async fn main(self, name: String) -> Uuid {
 		return self.0.create_layer(name).await;
@@ -152,8 +152,8 @@ impl RenameLayer {
 	}
 
 	#[service_main(
-		("Submaster ID", "The UUID of the submaster to rename"),
-		("Name", "The new name for the submaster"),
+		("The UUID of the submaster to rename"),
+		("The new name for the submaster"),
 	)]
 	async fn main(self, submaster_id: Uuid, new_name: String) -> () {
 		self.0.rename_layer(submaster_id, new_name).await;
@@ -172,9 +172,9 @@ impl SetLayerContents {
 	}
 
 	#[service_main(
-		("Submaster ID", "UUID value to identify the submaster", "mixer::layer_id"),
-		("Submaster Data", "Collection of values to merge with the existing submaster data"),
-		("Success", "Boolean indicating whether or not the set was successful"),
+		("UUID value to identify the submaster", "mixer::layer_id"),
+		("Collection of values to merge with the existing submaster data"),
+		("Boolean indicating whether or not the set was successful"),
 	)]
 	async fn main(self, submaster_id: Uuid, submaster_delta: SubmasterData) -> bool {
 		return self
@@ -196,8 +196,8 @@ impl GetLayerContents {
 	}
 
 	#[service_main(
-		("Submaster ID", "The UUID that identifies the submaster in question", "mixer::layer_id"),
-		("Submaster Data", "The submaster's visible contents"),
+		("The UUID that identifies the submaster in question", "mixer::layer_id"),
+		("The submaster's visible contents"),
 	)]
 	async fn main(self, submaster_id: Uuid) -> Option<StaticLayer> {
 		return self.0.get_layer_contents(submaster_id).await;
@@ -216,10 +216,10 @@ impl SetLayerOpacity {
 	}
 
 	#[service_main(
-		("Submaster ID", "The UUID that identifies the submaster to be changed", "mixer::layer_id"),
-		("Opacity", "The desired opacity, from 0 to 65535"),
-		("Automatic insertion", "Automatically insert if necessary when opacity > 0, and remove when opacity == 0"),
-		("Success", "A boolean indicating if the opacity setting was successfully applied."),
+		("The UUID that identifies the submaster to be changed", "mixer::layer_id"),
+		("The desired opacity, from 0 to 65535"),
+		("Automatically insert if necessary when opacity > 0, and remove when opacity == 0"),
+		("A boolean indicating if the opacity setting was successfully applied."),
 	)]
 	async fn main(self, submaster_id: Uuid, opacity: u16, auto_insert: bool) -> bool {
 		return self
@@ -241,8 +241,8 @@ impl GetLayerOpacity {
 	}
 
 	#[service_main(
-		("Submaster ID", "The UUID that identifies the submaster to be changed", "mixer::layer_id"),
-		("Layer Opacity", "The opacity if the layer from 0 to 65535. None or null if the submaster is not currently in the stack. (effective 0)"),
+		("The UUID that identifies the submaster to be changed", "mixer::layer_id"),
+		("The opacity if the layer from 0 to 65535. None or null if the submaster is not currently in the stack. (effective 0)"),
 	)]
 	async fn main(self, submaster_id: Uuid) -> Option<u16> {
 		return self.0.get_layer_opacity(submaster_id).await;
@@ -257,8 +257,8 @@ impl DeleteLayer {
 	}
 
 	#[service_main(
-		("Submaster ID", "The ID of the submaster you would like to delete", "mixer::layer_id"),
-		("Existed", "Whether or not the layer existed"),
+		("The ID of the submaster you would like to delete", "mixer::layer_id"),
+		("Whether or not the layer existed"),
 	)]
 	async fn main(self, submaster_id: Uuid) -> bool {
 		return self.0.delete_layer(submaster_id).await;

@@ -11,7 +11,6 @@ use simplydmx_plugin_macros::portable;
 #[portable]
 pub struct ServiceArgument<'a> {
 	pub id: &'a str,
-	pub name: &'a str,
 	pub description: &'a str,
 	pub val_type: &'a str,
 
@@ -28,7 +27,6 @@ pub struct ServiceArgument<'a> {
 #[derive(Hash)]
 pub struct ServiceArgumentOwned {
 	pub id: String,
-	pub name: String,
 	pub description: String,
 	pub val_type: String,
 	pub val_type_hint: Option<String>,
@@ -37,7 +35,6 @@ impl From<ServiceArgument<'_>> for ServiceArgumentOwned {
 	fn from(arg: ServiceArgument<'_>) -> Self {
 		ServiceArgumentOwned {
 			id: String::from(arg.id),
-			name: String::from(arg.name),
 			description: String::from(arg.description),
 			val_type: String::from(arg.val_type),
 			val_type_hint: if let Some(hint) = arg.val_type_hint { Some(String::from(hint)) } else { None },

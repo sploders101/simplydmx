@@ -4,7 +4,7 @@ use simplydmx_plugin_framework::*;
 impl LogService {
 	#![inner_raw(PluginContext)]
 	#[service_main(
-		("Message", "The message to log"),
+		("The message to log"),
 	)]
 	pub async fn log(self, msg: String) {
 		#[cfg(feature = "stderr-logging")]
@@ -20,7 +20,7 @@ impl LogService {
 impl LogErrorService {
 	#![inner_raw(PluginContext)]
 	#[service_main(
-		("Message", "The message to log"),
+		("The message to log"),
 	)]
 	pub async fn log(self, msg: String) {
 		#[cfg(feature = "stderr-logging")]

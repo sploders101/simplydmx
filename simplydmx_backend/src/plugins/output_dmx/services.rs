@@ -19,8 +19,8 @@ impl CreateUniverse {
 	}
 
 	#[service_main(
-		("Name", "An arbitrary name to give the new universe"),
-		("New universe ID", "Returns the UUID of the new universe", "DMX::universe-id"),
+		("An arbitrary name to give the new universe"),
+		("Returns the UUID of the new universe", "DMX::universe-id"),
 	)]
 	async fn main(self, name: String) -> Uuid {
 		return self.0.create_universe(name).await;
@@ -39,7 +39,7 @@ impl DeleteUniverse {
 	}
 
 	#[service_main(
-		("Universe ID", "The ID of the universe you would like to delete"),
+		("The ID of the universe you would like to delete"),
 	)]
 	async fn main(self, universe_id: Uuid) -> () {
 		return self.0.delete_universe(&universe_id).await;
@@ -58,10 +58,10 @@ impl LinkUniverse {
 	}
 
 	#[service_main(
-		("Universe ID", "The ID of the universe you would like to link"),
-		("Driver ID", "The ID of the driver you would like to link the universe to"),
-		("Form Data", "The form data, as described by `get_link_form()`"),
-		("Result", "Result describing the error, if one occurred"),
+		("The ID of the universe you would like to link"),
+		("The ID of the driver you would like to link the universe to"),
+		("The form data, as described by `get_link_form()`"),
+		("Result describing the error, if one occurred"),
 	)]
 	async fn main(
 		self,
@@ -85,7 +85,7 @@ impl UnlinkUniverse {
 	}
 
 	#[service_main(
-		("Universe ID", "The ID of the universe you would like to unlink"),
+		("The ID of the universe you would like to unlink"),
 	)]
 	async fn main(self, universe_id: Uuid) {
 		return self.0.unlink_universe(&universe_id).await;
@@ -104,7 +104,7 @@ impl ListUniverses {
 	}
 
 	#[service_main(
-		("Universes", "An array of all universes registered with the DMX output driver"),
+		("An array of all universes registered with the DMX output driver"),
 	)]
 	async fn main(self) -> Vec<(Uuid, String)> {
 		return self.0.list_universes().await;
@@ -123,7 +123,7 @@ impl ListDrivers {
 	}
 
 	#[service_main(
-		("Drivers", "An array of all driver descriptions"),
+		("An array of all driver descriptions"),
 	)]
 	async fn main(self) -> Vec<DMXDriverDescription> {
 		return self.0.list_drivers().await;
@@ -142,8 +142,8 @@ impl GetLinkedController {
 	}
 
 	#[service_main(
-		("Universe ID", "The ID of the universe in question"),
-		("Controller ID", "The ID of the controller associated with the universe"),
+		("The ID of the universe in question"),
+		("The ID of the controller associated with the universe"),
 	)]
 	async fn main(self, universe_id: Uuid) -> Option<String> {
 		return self.0.get_linked_controller(&universe_id).await;
@@ -162,9 +162,9 @@ impl GetLinkUniverseForm {
 	}
 
 	#[service_main(
-		("Driver ID", "The ID of the driver to link the universe against"),
-		("Universe ID", "Optional universe ID whose data the form should be pre-filled with"),
-		("Form Descriptor", "A data object indicating how the 'link universe' form should be laid out")
+		("The ID of the driver to link the universe against"),
+		("Optional universe ID whose data the form should be pre-filled with"),
+		("A data object indicating how the 'link universe' form should be laid out")
 	)]
 	async fn main(
 		self,
@@ -191,8 +191,8 @@ impl RenameUniverse {
 	}
 
 	#[service_main(
-		("Universe ID", "ID of the universe to rename"),
-		("New Name", "The new name to give the universe")
+		("ID of the universe to rename"),
+		("The new name to give the universe")
 	)]
 	async fn main(
 		self,

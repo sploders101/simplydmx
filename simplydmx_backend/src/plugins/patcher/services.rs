@@ -24,8 +24,8 @@ impl ImportFixtureDefinition {
 	}
 
 	#[service_main(
-		("Fixture Bundle", "The fixture bundle you would like to import"),
-		("Result", "Whether or not the import succeeded"),
+		("The fixture bundle you would like to import"),
+		("Whether or not the import succeeded"),
 	)]
 	async fn main(self, fixture_bundle: FixtureBundle) -> Result<(), ImportFixtureError> {
 		return self.0.import_fixture(fixture_bundle).await;
@@ -45,12 +45,12 @@ impl CreateFixture {
 	}
 
 	#[service_main(
-		("Fixture Type", "The UUID of the fixture description from the library that this new fixture should be based on"),
-		("Personality", "The personality that this fixture should be based on."),
-		("Name", "The optional user-specified name of the fixture"),
-		("Comments", "Any additional comments the user would like to leave on this fixture instance"),
-		("Form Data", "Data from the user in the format specified by the fixture controller's creation form"),
-		("Result: Uuid", "Result containing the UUID of the new fixture or an error"),
+		("The UUID of the fixture description from the library that this new fixture should be based on"),
+		("The personality that this fixture should be based on."),
+		("The optional user-specified name of the fixture"),
+		("Any additional comments the user would like to leave on this fixture instance"),
+		("Data from the user in the format specified by the fixture controller's creation form"),
+		("Result containing the UUID of the new fixture or an error"),
 	)]
 	async fn main(
 		self,
@@ -80,8 +80,8 @@ impl DeleteFixture {
 	}
 
 	#[service_main(
-		("Fixture ID", "The UUID of the fixture instance to be deleted"),
-		("Result: Uuid", "Result indicating whether or not the fixture was successfully deleted")
+		("The UUID of the fixture instance to be deleted"),
+		("Result indicating whether or not the fixture was successfully deleted")
 	)]
 	async fn main(self, fixture_id: Uuid) -> Result<(), DeleteFixtureError> {
 		return self.0.delete_fixture(&fixture_id).await;
@@ -101,7 +101,7 @@ impl GetPatcherState {
 	}
 
 	#[service_main(
-		("Patcher State", "The sharable state of the patcher"),
+		("The sharable state of the patcher"),
 	)]
 	async fn main(self) -> SharablePatcherState {
 		let state = self.0.get_sharable_state().await;
@@ -122,8 +122,8 @@ impl GetCreationForm {
 	}
 
 	#[service_main(
-		("Fixture Type", "The UUID of the fixture within the fixture library that you would like to create an instance of", "fixture-type-uuid"),
-		("Form Descriptor", "A dynamic form descriptor that can be used to build visual elements for the user to input the required data"),
+		("The UUID of the fixture within the fixture library that you would like to create an instance of", "fixture-type-uuid"),
+		("A dynamic form descriptor that can be used to build visual elements for the user to input the required data"),
 	)]
 	async fn main(self, fixture_type: Uuid) -> Result<FormDescriptor, GetCreationFormError> {
 		return self.0.get_creation_form(&fixture_type).await;
@@ -143,8 +143,8 @@ impl GetEditForm {
 	}
 
 	#[service_main(
-		("Fixture ID", "The UUID of the particular fixture instance you would like to edit"),
-		("Form Descriptor", "A result containing either a FormDescriptor object or an error"),
+		("The UUID of the particular fixture instance you would like to edit"),
+		("A result containing either a FormDescriptor object or an error"),
 	)]
 	async fn main(self, fixture_id: Uuid) -> Result<FormDescriptor, GetEditFormError> {
 		return self.0.get_edit_form(&fixture_id).await;
@@ -164,12 +164,12 @@ impl EditFixture {
 	}
 
 	#[service_main(
-		("Fixture Instance ID", "The UUID of the particular fixture instance you would like to edit"),
-		("Personality ID", "The UUID of the personality you would like to use for the fixture"),
-		("Name", "An arbitrary name"),
-		("Comments", "Arbitrary comments"),
-		("Form Data", "Form data as given by the dynamic form from `get_edit_form`"),
-		("Form Descriptor", "A result containing either a FormDescriptor object or an error"),
+		("The UUID of the particular fixture instance you would like to edit"),
+		("The UUID of the personality you would like to use for the fixture"),
+		("An arbitrary name"),
+		("Arbitrary comments"),
+		("Form data as given by the dynamic form from `get_edit_form`"),
+		("A result containing either a FormDescriptor object or an error"),
 	)]
 	async fn main(
 		self,
@@ -196,9 +196,9 @@ impl EditFixturePlacement {
 	}
 
 	#[service_main(
-		("Fixture ID", "The UUID of the particular fixture instance you would like to edit"),
-		("X Coordinate", "The fixture's new X coordinate"),
-		("Y Coordinate", "The fixture's new Y coordinate")
+		("The UUID of the particular fixture instance you would like to edit"),
+		("The fixture's new X coordinate"),
+		("The fixture's new Y coordinate")
 	)]
 	async fn main(self, fixture_id: Uuid, x: u16, y: u16) {
 		return self.0.edit_fixture_placement(&fixture_id, x, y).await;

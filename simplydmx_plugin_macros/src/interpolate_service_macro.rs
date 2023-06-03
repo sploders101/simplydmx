@@ -1,27 +1,13 @@
 use proc_macro::TokenStream;
-use quote::{
-	quote,
-	ToTokens,
-};
+use quote::{quote, ToTokens};
 use syn::{
-	FnArg,
-	punctuated::Punctuated,
-	parse::Parser,
-	Expr,
-	Token,
-	Pat,
-	Type,
-	ReturnType,
-	ItemImpl,
-	ImplItem,
-	Attribute,
-	ExprTuple,
-	ImplItemMethod,
+	parse::Parser, punctuated::Punctuated, Attribute, Expr, ExprLit, ExprParen, ExprTuple, FnArg,
+	ImplItem, ImplItemMethod, ItemImpl, Lit, Pat, ReturnType, Token, Type,
 };
 
 use super::parsing_helpers::get_comma_delimited_strings;
 
-static ARGERR: &str = "interpolate_service expects comma-separated list of description strings or (\"name\", \"description\", \"type-id\") tuples.";
+static ARGERR: &str = "interpolate_service expects comma-separated list of description strings or (\"description\", \"type-id\") tuples.";
 
 pub fn interpolate_service(attr: TokenStream, body: TokenStream) -> TokenStream {
 	// Output aliases
@@ -257,42 +243,48 @@ fn interpolate_service_main(outer_type: Type, attr: TokenStream, body: ImplItemM
 
 	// Iterate through the descriptions and build documentation about the function in code
 	for (i, description) in descriptions.enumerate() {
-		if let Expr::Tuple(description) = description {
-			let desc_length = description.elems.len();
-			if desc_length == 2 || desc_length == 3 {
-				let id = argument_names.get(i).expect("Couldn't find argument name");
-				let desc_elements = get_comma_delimited_strings(&description.elems, ARGERR);
-				let name = desc_elements.get(0).expect("Couldn't find human-readable name");
-				let description = desc_elements.get(1).expect("Couldn't find the description");
-				// let val_type = Type::clone(internal_argument_types.get(i).as_ref().expect("Couldn't find the internal argument type")).into_token_stream().to_string();
-				let val_type = Type::clone(internal_argument_types.get(i).as_ref().expect("Couldn't find the internal argument type"));
-				let val_type_str = val_type.to_token_stream().to_string();
-				let type_id: Box<dyn ToTokens> = if let Some(type_id) = desc_elements.get(2) { Box::new(quote!{Some(#type_id)}) } else { Box::new(quote!{None}) };
-				// let type_id: Box<dyn ToTokens> = Box::new(desc_elements.get(2).unwrap_or(quote!{None}));
-				input_tokens.push(Box::new(quote! {
-					simplydmx_plugin_framework::ServiceArgument {
-						id: #id,
-						name: #name,
-						description: #description,
-						#[cfg(feature = "export-services")]
-						val_type: {
-							// Add the value of the alias here
-							#[allow(nonstandard_style)]
-							#[derive(tsify::Tsify)]
-							#[serde(transparent)]
-							struct FunctionArgument (#val_type);
-							// This is not ideal. We want to use DECL[31..], but the compiler doesn't realize it's a static value
-							// and throws an error. For some reason Box::leak doesn't work either.
-							<FunctionArgument as tsify::Tsify>::DECL
-						},
-						#[cfg(not(feature = "export-services"))]
-						val_type: #val_type_str,
-						val_type_hint: #type_id,
-					}
-				}));
-			} else {
-				panic!("{}", ARGERR);
-			}
+		let desc_elements = match description {
+			&Expr::Lit(ExprLit { lit: Lit::Str(ref str_lit), .. }) => vec![str_lit.clone()],
+			&Expr::Paren(ExprParen { ref expr, .. }) => {
+				if let &Expr::Lit(ExprLit { lit: Lit::Str(ref str_lit), .. }) = expr.as_ref() {
+					vec![str_lit.clone()]
+				} else {
+					panic!("{}", ARGERR);
+				}
+			},
+			&Expr::Tuple(ref description) => get_comma_delimited_strings(&description.elems, ARGERR),
+			item => panic!("Unrecognized description item: {:?}", item),
+		};
+		let desc_length = desc_elements.len();
+		if desc_length == 1 || desc_length == 2 {
+			let id = argument_names.get(i).expect("Couldn't find argument name");
+			// let desc_elements = ;
+			let description = desc_elements.get(0).expect("Couldn't find the description");
+			// let val_type = Type::clone(internal_argument_types.get(i).as_ref().expect("Couldn't find the internal argument type")).into_token_stream().to_string();
+			let val_type = Type::clone(internal_argument_types.get(i).as_ref().expect("Couldn't find the internal argument type"));
+			let val_type_str = val_type.to_token_stream().to_string();
+			let type_id: Box<dyn ToTokens> = if let Some(type_id) = desc_elements.get(1) { Box::new(quote!{Some(#type_id)}) } else { Box::new(quote!{None}) };
+			// let type_id: Box<dyn ToTokens> = Box::new(desc_elements.get(2).unwrap_or(quote!{None}));
+			input_tokens.push(Box::new(quote! {
+				simplydmx_plugin_framework::ServiceArgument {
+					id: #id,
+					description: #description,
+					#[cfg(feature = "export-services")]
+					val_type: {
+						// Add the value of the alias here
+						#[allow(nonstandard_style)]
+						#[derive(tsify::Tsify)]
+						#[serde(transparent)]
+						struct FunctionArgument (#val_type);
+						// This is not ideal. We want to use DECL[31..], but the compiler doesn't realize it's a static value
+						// and throws an error. For some reason Box::leak doesn't work either.
+						<FunctionArgument as tsify::Tsify>::DECL
+					},
+					#[cfg(not(feature = "export-services"))]
+					val_type: #val_type_str,
+					val_type_hint: #type_id,
+				}
+			}));
 		} else {
 			panic!("{}", ARGERR);
 		}

@@ -230,7 +230,8 @@ pub mod exporter {
 				}
 
 				rpc_modules += &format!(
-					"\t{}({}): Promise<{}> {{ return callService(\"{}\", \"{}\", [{}]) }},\n",
+					"\t/** {} */\n\t{}({}): Promise<{}> {{ return callService(\"{}\", \"{}\", [{}]) }},\n",
+					&service.description,
 					&service.id,
 					&service_args_with_types.join(", "),
 					if let Some(ref arg) = service.returns {

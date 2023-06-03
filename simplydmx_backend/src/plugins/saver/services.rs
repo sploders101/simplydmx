@@ -10,7 +10,7 @@ impl SaveShow {
 	}
 
 	#[service_main(
-		("Show File", "The raw byte output to be saved to a file"),
+		("The raw byte output to be saved to a file"),
 	)]
 	async fn save(self) -> Result<Vec<u8>, SaveError> {
 		return self.0.save_show().await;

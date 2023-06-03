@@ -442,7 +442,6 @@ export type SerializedData = number[] | Value;
 /** Describes an argument that must be passed to a service call */
 export interface ServiceArgumentOwned {
     id: string;
-    name: string;
     description: string;
     val_type: string;
     val_type_hint: string | null;
@@ -521,51 +520,85 @@ export interface VisualizationInfo {
 
 
 export const core = {
+	/** Log a message somewhere useful */
 	log(msg: string): Promise<void> { return callService("core", "log", [msg]) },
+	/** Log an error that needs to be addressed */
 	log_error(msg: string): Promise<void> { return callService("core", "log_error", [msg]) },
 };
 
 export const mixer = {
+	/** Commits all changes made in blind mode, deleting the previous look. Changes are made instantly. Use `set_blind_opacity` to fade. */
 	commit_blind(): Promise<void> { return callService("mixer", "commit_blind", []) },
+	/** Creates a new submaster that can be used for blending */
 	create_layer(name: string): Promise<Uuid> { return callService("mixer", "create_layer", [name]) },
+	/** Deletes a layer from the registry */
 	delete_layer(submaster_id: Uuid): Promise<boolean> { return callService("mixer", "delete_layer", [submaster_id]) },
+	/** Copies the default layer bin to a new one with 0 opacity, setting it as the new default. */
 	enter_blind_mode(): Promise<void> { return callService("mixer", "enter_blind_mode", []) },
+	/** Gets the opacity of the blind layer */
 	get_blind_opacity(): Promise<number | null> { return callService("mixer", "get_blind_opacity", []) },
+	/** Retrieves the contents of a layer */
 	get_layer_contents(submaster_id: Uuid): Promise<StaticLayer | null> { return callService("mixer", "get_layer_contents", [submaster_id]) },
+	/** Gets the opacity of a layer (Optionally within a specific bin) */
 	get_layer_opacity(submaster_id: Uuid): Promise<number | null> { return callService("mixer", "get_layer_opacity", [submaster_id]) },
+	/** Lists all user-created layers (submasters) */
 	list_submasters(): Promise<[Uuid, string][]> { return callService("mixer", "list_submasters", []) },
+	/** Renames a submaster */
 	rename_layer(submaster_id: Uuid, new_name: string): Promise<void> { return callService("mixer", "rename_layer", [submaster_id, new_name]) },
+	/** Manually requests the mixer to blend layers and emit new output */
 	request_blend(): Promise<void> { return callService("mixer", "request_blend", []) },
+	/** Reverts all changes made in blind mode. Changes are made instantly. Use `set_blind_opacity` to fade. */
 	revert_blind(): Promise<void> { return callService("mixer", "revert_blind", []) },
+	/** Sets the opacity of the blind layer */
 	set_blind_opacity(opacity: number): Promise<void> { return callService("mixer", "set_blind_opacity", [opacity]) },
+	/** Adds or removes content in a layer */
 	set_layer_contents(submaster_id: Uuid, submaster_delta: SubmasterData): Promise<boolean> { return callService("mixer", "set_layer_contents", [submaster_id, submaster_delta]) },
+	/** Sets the opacity of a layer (Optionally within a specific bin) */
 	set_layer_opacity(submaster_id: Uuid, opacity: number, auto_insert: boolean): Promise<boolean> { return callService("mixer", "set_layer_opacity", [submaster_id, opacity, auto_insert]) },
 };
 
 export const output_dmx = {
+	/** Creates a new, unlinked universe for DMX output */
 	create_universe(name: string): Promise<Uuid> { return callService("output_dmx", "create_universe", [name]) },
+	/** Deletes an existing universe, unlinking any associated lights or controllers */
 	delete_universe(universe_id: Uuid): Promise<void> { return callService("output_dmx", "delete_universe", [universe_id]) },
+	/** Gets a form for linking a universe */
 	get_link_universe_form(driver_id: string, universe_id: Uuid | null): Promise<{ Ok: FormDescriptor } | { Err: GetLinkUniverseFormError }> { return callService("output_dmx", "get_link_universe_form", [driver_id, universe_id]) },
+	/** Gets the ID of the controller linked to a universe */
 	get_linked_controller(universe_id: Uuid): Promise<string | null> { return callService("output_dmx", "get_linked_controller", [universe_id]) },
+	/** Links an existing universe to a DMX driver */
 	link_universe(universe_id: Uuid, driver: string, form_data: SerializedData): Promise<{ Ok: null } | { Err: LinkUniverseError }> { return callService("output_dmx", "link_universe", [universe_id, driver, form_data]) },
+	/** List the DMX device drivers registered with the DMX output driver */
 	list_drivers(): Promise<DMXDriverDescription[]> { return callService("output_dmx", "list_drivers", []) },
+	/** Lists the universes registered in the DMX driver */
 	list_universes(): Promise<[Uuid, string][]> { return callService("output_dmx", "list_universes", []) },
+	/** Renames a universe */
 	rename_universe(universe_id: Uuid, universe_name: string): Promise<void> { return callService("output_dmx", "rename_universe", [universe_id, universe_name]) },
+	/** Unlinks an existing universe from its driver */
 	unlink_universe(universe_id: Uuid): Promise<void> { return callService("output_dmx", "unlink_universe", [universe_id]) },
 };
 
 export const patcher = {
+	/** Creates a new fixture in the patcher */
 	create_fixture(fixture_type: Uuid, personality: string, name: string | null, comments: string | null, form_data: SerializedData): Promise<{ Ok: Uuid } | { Err: CreateFixtureError }> { return callService("patcher", "create_fixture", [fixture_type, personality, name, comments, form_data]) },
+	/** Deletes a fixture from the patcher */
 	delete_fixture(fixture_id: Uuid): Promise<{ Ok: null } | { Err: DeleteFixtureError }> { return callService("patcher", "delete_fixture", [fixture_id]) },
+	/** Edits the requested fixture using data provided by the user */
 	edit_fixture(instance_id: Uuid, personality: string, name: string | null, comments: string | null, form_data: SerializedData): Promise<{ Ok: null } | { Err: EditFixtureError }> { return callService("patcher", "edit_fixture", [instance_id, personality, name, comments, form_data]) },
+	/** Edits the x,y coordinates of the fixture within the visualizer */
 	edit_fixture_placement(fixture_id: Uuid, x: number, y: number): Promise<void> { return callService("patcher", "edit_fixture_placement", [fixture_id, x, y]) },
+	/** Queries the given fixture's driver for a fixture creation form to display */
 	get_creation_form(fixture_type: Uuid): Promise<{ Ok: FormDescriptor } | { Err: GetCreationFormError }> { return callService("patcher", "get_creation_form", [fixture_type]) },
+	/** Queries the given fixture's driver for a fixture edit form to display */
 	get_edit_form(fixture_id: Uuid): Promise<{ Ok: FormDescriptor } | { Err: GetEditFormError }> { return callService("patcher", "get_edit_form", [fixture_id]) },
+	/** Retrieves the current state of the patcher, with libraries, registered fixtures, etc. */
 	get_patcher_state(): Promise<SharablePatcherState> { return callService("patcher", "get_patcher_state", []) },
+	/** Import a fixture definition */
 	import_fixture(fixture_bundle: FixtureBundle): Promise<{ Ok: null } | { Err: ImportFixtureError }> { return callService("patcher", "import_fixture", [fixture_bundle]) },
 };
 
 export const saver = {
+	/** Saves the show, returning the raw byte vector */
 	save(): Promise<{ Ok: number[] } | { Err: SaveError }> { return callService("saver", "save", []) },
 };
 

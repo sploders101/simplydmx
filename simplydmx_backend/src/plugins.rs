@@ -3,6 +3,7 @@ pub mod core;
 pub mod mixer;
 pub mod patcher;
 pub mod saver;
+pub mod live_controller;
 pub mod midi_router;
 
 #[cfg(feature = "output-dmx")]

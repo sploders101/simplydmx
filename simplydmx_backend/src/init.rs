@@ -51,6 +51,11 @@ pub async fn async_main(plugin_manager: &PluginManager, data: Option<Vec<u8>>) {
 			.await
 			.unwrap();
 
+	let live_control_interface =
+		plugins::live_controller::ControllerInterface::init(plugin_manager)
+			.await
+			.unwrap();
+
 	#[cfg(feature = "output-dmx")]
 	let dmx_interface = plugins::output_dmx::initialize(
 		plugin_manager
@@ -95,6 +100,8 @@ pub async fn async_main(plugin_manager: &PluginManager, data: Option<Vec<u8>>) {
 		);
 	}
 }
+
+
 
 #[cfg(feature = "export-services")]
 pub mod exporter {

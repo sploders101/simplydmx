@@ -46,6 +46,11 @@ pub async fn async_main(plugin_manager: &PluginManager, data: Option<Vec<u8>>) {
 	.await
 	.unwrap();
 
+	let midi_router_interface =
+		plugins::midi_router::MidiRouterInterface::init(plugin_manager)
+			.await
+			.unwrap();
+
 	#[cfg(feature = "output-dmx")]
 	let dmx_interface = plugins::output_dmx::initialize(
 		plugin_manager

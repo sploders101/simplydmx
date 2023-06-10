@@ -13,7 +13,7 @@ pub enum SerializedData {
 impl SerializedData {
 	pub fn deserialize<T: DeserializeOwned>(self) -> Result<T, DeserializeError> {
 		let fixture_info: T = match self {
-			SerializedData::Cbor(data) => ciborium::de::from_reader::<'_, T, &[u8]>(&data)?,
+			SerializedData::Cbor(data) => ciborium::de::from_reader::<T, &[u8]>(&data)?,
 			SerializedData::JSON(data) => serde_json::from_value(data)?,
 		};
 

@@ -56,8 +56,6 @@ use std::borrow::Cow;
 use std::vec::Vec;
 
 use byteorder::{ByteOrder, NetworkEndian};
-#[cfg(not(feature = "std"))]
-use heapless::{String, Vec};
 use uuid::Uuid;
 
 use error::{PackError, ParseError};

@@ -10,7 +10,6 @@ use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Result};
 use std::net::UdpSocket;
 
-use net2::UdpBuilder;
 use uuid::Uuid;
 
 use packet::{AcnRootLayerProtocol, DataPacketDmpLayer, DataPacketFramingLayer, E131RootLayer,
@@ -75,8 +74,7 @@ impl DmxSource {
     /// Constructs a new DmxSource with DMX START code set to 0 with specified CID and IP address.
     pub fn with_cid_ip(name: &str, cid: Uuid, ip: &str) -> Result<DmxSource> {
         let ip_port = format!("{}:0", ip);
-        let socket_builder = UdpBuilder::new_v4()?;
-        let socket = socket_builder.bind(&ip_port)?;
+        let socket = UdpSocket::bind(&ip_port)?;
 
         Ok(DmxSource {
             socket,
@@ -248,7 +246,6 @@ impl DmxSource {
 #[cfg(test)]
 mod test {
     use super::*;
-    use net2::UdpBuilder;
     use std::iter;
     use std::net::Ipv4Addr;
 
@@ -333,7 +330,7 @@ mod test {
         source.set_start_code(start_code);
         source.set_multicast_loop(true).unwrap();
 
-        let recv_socket = UdpBuilder::new_v4().unwrap().bind("0.0.0.0:5568").unwrap();
+        let recv_socket = UdpSocket::bind("0.0.0.0:5568").unwrap();
         recv_socket.join_multicast_v4(&Ipv4Addr::new(239, 255, 0, 1), &Ipv4Addr::new(0, 0, 0, 0))
                    .unwrap();
 
@@ -350,7 +347,7 @@ mod test {
         let source = DmxSource::new("Source").unwrap();
         source.set_multicast_loop(true).unwrap();
 
-        let recv_socket = UdpBuilder::new_v4().unwrap().bind("0.0.0.0:5568").unwrap();
+        let recv_socket = UdpSocket::bind("0.0.0.0:5568").unwrap();
         recv_socket
             .join_multicast_v4(&Ipv4Addr::new(239, 255, 0, 1), &Ipv4Addr::new(0, 0, 0, 0))
             .unwrap();

@@ -19,10 +19,6 @@
 extern crate core;
 
 extern crate byteorder;
-#[cfg(not(feature = "std"))]
-extern crate heapless;
-#[cfg(feature = "std")]
-extern crate net2;
 extern crate uuid;
 
 #[cfg(feature = "std")]

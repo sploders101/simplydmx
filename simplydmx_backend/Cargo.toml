@@ -19,7 +19,7 @@ anyhow = "1.0.68"
 thiserror = "1.0.38"
 rustc-hash = "1.1.0"
 tokio = { version = "1.28.1", features = ["full"] }
-enttecopendmx = "0.1.1"
+enttecopendmx = { path = "../enttecopendmx-rs" }
 thread-priority = "0.13.1"
 
 [lib]

@@ -1,0 +1,29 @@
+[package]
+name = "enttecopendmx"
+authors = ["Maximilian Beuscher"]
+repository = "https://github.com/Beuscher/enttecopendmx-rs"
+documentation = "https://docs.rs/enttecopendmx/0.1.0/enttecopendmx/"
+version = "0.1.1"
+edition = "2018"
+description = "Rust bindings for the Enttec Open DMX USB and its FTDI D2XX Chip."
+readme = "README.md"
+license-file = "LICENSE"
+
+keywords = ["dmx", "ffi","ftdi","enttec","lighting"]
+categories = ["api-bindings","accessibility","hardware-support"]
+
+publish = true
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[badges]
+maintenance = { status = "experimental" }
+
+[dependencies]
+
+# ftd2xx dependency
+[dependencies.libftd2xx]
+version = "~0.31.0"
+
+# statically link the vendor library, defaults to dynamic if not set
+# this will make things "just work" on Linux and Windows
+features = ["static"]

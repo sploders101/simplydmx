@@ -874,8 +874,6 @@ dependencies = [
 [[package]]
 name = "enttecopendmx"
 version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "439b5a6167b4d55c80838155742c65c5159f76ee4acd25324bdeb142828aa0c5"
 dependencies = [
  "libftd2xx",
 ]

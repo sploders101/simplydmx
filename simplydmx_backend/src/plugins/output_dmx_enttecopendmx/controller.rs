@@ -68,10 +68,10 @@ fn thread_loop(shutdown_trigger: Arc<AtomicBool>, channels: Arc<Mutex<Option<[u8
 		eprintln!("Failed to set OpenDMX controller thread priority: {:?}", err);
 	}
 	let mut last_retry = Instant::now();
-	let mut port = EnttecOpenDMX::new().and_then(|mut port| {
+	let mut port: Option<EnttecOpenDMX> = EnttecOpenDMX::new().and_then(|mut port| {
 		port.open()?;
 		Ok(port)
-	});
+	}).ok();
 
 	loop {
 		if shutdown_trigger.load(std::sync::atomic::Ordering::Relaxed) {
@@ -79,7 +79,7 @@ fn thread_loop(shutdown_trigger: Arc<AtomicBool>, channels: Arc<Mutex<Option<[u8
 		}
 
 		match port {
-			Ok(ref mut inner_port) => {
+			Some(ref mut inner_port) => {
 				// Receive new values if any are available
 				let mut channels_inner = channels.blocking_lock();
 				if let Some(ref channels) = *channels_inner {
@@ -91,16 +91,16 @@ fn thread_loop(shutdown_trigger: Arc<AtomicBool>, channels: Arc<Mutex<Option<[u8
 				drop(channels_inner);
 
 				// Render universe
-				if let Err(err) = inner_port.render() {
+				if let Err(_) = inner_port.render() {
 					inner_port.close().ok();
-					port = Err(err);
+					port = None;
 				}
 
 				// Sleep to trigger a break in the DMX packet.
 				// This helps prevent flickering caused by running DMX packets too close together
 				std::thread::sleep(Duration::from_millis(5));
 			},
-			Err(_) => {
+			None => {
 				// Keep sleep durations small so we can check if we need to shut down frequently.
 				// Other tasks may be waiting on us to quit before they can continue.
 				while last_retry.elapsed() < Duration::from_secs(1) {
@@ -115,7 +115,7 @@ fn thread_loop(shutdown_trigger: Arc<AtomicBool>, channels: Arc<Mutex<Option<[u8
 				port = EnttecOpenDMX::new().and_then(|mut port| {
 					port.open()?;
 					Ok(port)
-				});
+				}).ok();
 			},
 		}
 	}

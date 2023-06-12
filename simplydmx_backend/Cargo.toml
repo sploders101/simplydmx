@@ -21,8 +21,9 @@ rustc-hash = "1.1.0"
 tokio = { version = "1.28.1", features = ["full"] }
 enttecopendmx = { path = "../enttecopendmx-rs" }
 thread-priority = "0.13.1"
-midir = "0.9.1"
 midly = "0.5.3"
+coremidi = "0.7.0"
+core-foundation = "0.9.3"
 
 [lib]
 path = "src/lib.rs"
@@ -39,11 +40,7 @@ default = ["default-plugins"]
 # Plugins should be specified manually. For example, to use the default plugin set, use `-F export-services,default-plugins`.
 export-services = ["linkme", "tsify", "simplydmx_plugin_framework/tsify", "stderr-logging"]
 
-default-plugins = [
-	"output-dmx",
-	"output-dmx-e131",
-	"output-dmx-enttecopendmx",
-]
+default-plugins = ["output-dmx", "output-dmx-e131", "output-dmx-enttecopendmx"]
 
 # Optional plugins
 output-dmx = []

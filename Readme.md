@@ -35,17 +35,17 @@ The current roadblocks to cross-platform support are listed below.
 
 * Midi
     * SimplyDMX currently uses coremidi for MIDI integration. I tried using midir, but it just doesn't
-				do what I need it to do. It seems overly-complicated and doesn't support multi-threading, async, or
-				unique device IDs. Coremidi supports multi-threading and *persistent* device IDs, which can provide
-				a significantly better UX with less effort on the platform I would be using for myself, so that's
-				where I've decided to start. I would like to add more platforms, but I'll have to add backends
-				myself individually, which takes time.
+    do what I need it to do. It seems overly-complicated and doesn't support multi-threading, async, or
+    unique device IDs. Coremidi supports multi-threading and *persistent* device IDs, which can provide
+    a significantly better UX with less effort on the platform I would be using for myself, so that's
+    where I've decided to start. I would like to add more platforms, but I'll have to add backends
+    myself individually, which takes time.
     * Once I have the controls system implemented, I will refocus on other platforms, either forking midir
     to make it work or trying something like portmidi or rtmidi.
-				* Please do not submit any pull requests for new midi backends for the time being. I am still working
-				out the design and the midi router's architecture is in flux, so merging in other backends will be
-				more work than I'd like to invest at the moment. I will remove this bullet point once the design is
-				finished, at which point I will gratefully accept pull requests.
+    * Please do not submit any pull requests for new midi backends for the time being. I am still working
+    out the design and the midi router's architecture is in flux, so merging in other backends will be
+    more work than I'd like to invest at the moment. I will remove this bullet point once the design is
+    finished, at which point I will gratefully accept pull requests.
 
 
 ## Testing

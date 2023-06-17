@@ -1,5 +1,6 @@
 use simplydmx_plugin_framework::*;
 
+#[cfg(feature = "midi-backend-coremidi")]
 pub mod coremidi_backend;
 
 /// Represents a set of criteria or an ID which can be used to search for
@@ -13,8 +14,10 @@ pub enum MidiMomento {
 }
 
 /// Contains information about an available midi device
+#[portable]
 pub struct AvailableMidiDevice {
 	name: String,
+	manufacturer: Option<String>,
 	id: MidiIndex,
 }
 
@@ -27,6 +30,12 @@ pub enum MidiIndex {
 }
 
 pub trait SourceLink {
+	/// Returns a "momento", or a chunk of data that can be used when
+	/// attempting to locate this device after a restart. Due to MIDI's
+	/// nature, a momento is not guaranteed to be unique, and may not always
+	/// succeed in locating the device, but should include as much detail
+	/// as possible to ensure the highest achievable success rate.
+	fn get_momento(&self) -> MidiMomento;
 	/// Indicates whether or not the source device this link connects to
 	/// is currently attached to the system
 	fn is_connected(&self) -> bool;
@@ -36,6 +45,12 @@ pub trait SourceLink {
 }
 
 pub trait DestLink {
+	/// Returns a "momento", or a chunk of data that can be used when
+	/// attempting to locate this device after a restart. Due to MIDI's
+	/// nature, a momento is not guaranteed to be unique, and may not always
+	/// succeed in locating the device, but should include as much detail
+	/// as possible to ensure the highest achievable success rate.
+	fn get_momento(&self) -> MidiMomento;
 	/// Sends a midi packet to the destination
 	fn send_midi(&mut self, data: &[u8]) -> anyhow::Result<()>;
 	/// Disconnects from the destination, consuming self and not allowing

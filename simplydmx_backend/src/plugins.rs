@@ -6,7 +6,6 @@ pub mod saver;
 pub mod live_controller;
 pub mod midi_router;
 
-#[cfg(feature = "output-dmx")]
 pub mod output_dmx;
 #[cfg(feature = "output-dmx-e131")]
 pub mod output_dmx_e131;

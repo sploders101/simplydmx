@@ -40,12 +40,12 @@ default = ["default-plugins"]
 # Plugins should be specified manually. For example, to use the default plugin set, use `-F export-services,default-plugins`.
 export-services = ["linkme", "tsify", "simplydmx_plugin_framework/tsify", "stderr-logging"]
 
-default-plugins = ["output-dmx", "output-dmx-e131", "output-dmx-enttecopendmx"]
+default-plugins = ["output-dmx-e131", "output-dmx-enttecopendmx", "midi-backend-coremidi"]
 
 # Optional plugins
-output-dmx = []
-output-dmx-e131 = ["output-dmx"]
-output-dmx-enttecopendmx = ["output-dmx"]
+output-dmx-e131 = []
+output-dmx-enttecopendmx = []
+midi-backend-coremidi = []
 
 # Debugging utilities
 stderr-logging = []

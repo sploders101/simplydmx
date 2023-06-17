@@ -3,12 +3,12 @@ use std::sync::Arc;
 use anyhow::{anyhow, Context};
 use thiserror::Error;
 use core_foundation::base::OSStatus;
-use coremidi::{Client, InputPortWithContext, OutputPort, EventBuffer};
+use coremidi::{Client, InputPortWithContext, OutputPort, EventBuffer, Properties};
 use tokio::sync::Mutex;
 
 use crate::plugins::midi_router::MidiCallback;
 
-use super::{SourceLink, AvailableMidiDevice, MidiIndex, DestLink};
+use super::{SourceLink, AvailableMidiDevice, MidiIndex, DestLink, MidiMomento};
 
 pub struct CoreMidiBackend {
 	client: Client,
@@ -26,6 +26,7 @@ impl CoreMidiBackend {
 			if let (Some(name), Some(id)) = (source.display_name(), source.unique_id()) {
 				return Some(AvailableMidiDevice {
 					name,
+					manufacturer: source.get_property(&Properties::manufacturer()).ok(),
 					id: MidiIndex::CoreMidi(id),
 				});
 			} else {
@@ -34,10 +35,11 @@ impl CoreMidiBackend {
 		}).collect();
 	}
 	pub fn list_sinks() -> Vec<AvailableMidiDevice> {
-		return coremidi::Destinations.into_iter().filter_map(|dest| {
-			if let (Some(name), Some(id)) = (dest.display_name(), dest.unique_id()) {
+		return coremidi::Destinations.into_iter().filter_map(|sink| {
+			if let (Some(name), Some(id)) = (sink.display_name(), sink.unique_id()) {
 				return Some(AvailableMidiDevice {
 					name,
+					manufacturer: sink.get_property(&Properties::manufacturer()).ok(),
 					id: MidiIndex::CoreMidi(id),
 				});
 			} else {
@@ -50,10 +52,10 @@ impl CoreMidiBackend {
 		uid: u32,
 		callback: Arc<Mutex<MidiCallback>>,
 	) -> anyhow::Result<CoreMidiSourceLink> {
-		let sources = coremidi::Sources
+		let source = coremidi::Sources
 			.into_iter()
 			.find(|source| source.unique_id() == Some(uid));
-		if let Some(source) = sources {
+		if let Some(source) = source {
 			let mut input_port = self
 				.client
 				.input_port_with_protocol(
@@ -79,22 +81,42 @@ impl CoreMidiBackend {
 				.context("An error occured while creating the input port")?;
 			input_port
 				.connect_source(&source, ())
-				.map_err(|status| CFOSError::from(status))
+				.map_err(CFOSError::from)
 				.context("An error occurred while connecting the input port")?;
 			return Ok(CoreMidiSourceLink {
+				uid,
 				input_port,
 				source,
 			});
 		}
 		return Err(anyhow!("Could not find midi source"));
 	}
+	pub fn connect_sink(
+		&self,
+		uid: u32,
+	) -> anyhow::Result<CoreMidiDestLink> {
+		let sink = coremidi::Destinations.into_iter().find(|dest| dest.unique_id() == Some(uid));
+		if let Some(sink) = sink {
+			let output_port = self.client.output_port(&uid.to_string()).map_err(CFOSError::from).context("An error occurred while creating the output port")?;
+			return Ok(CoreMidiDestLink {
+				uid,
+				output_port,
+				sink,
+			});
+		}
+		return Err(anyhow!("Could not find midi destination"));
+	}
 }
 
 pub struct CoreMidiDestLink {
+	uid: u32,
 	output_port: OutputPort,
-	destination: coremidi::Destination,
+	sink: coremidi::Destination,
 }
 impl DestLink for CoreMidiDestLink {
+	fn get_momento(&self) -> MidiMomento {
+		return MidiMomento::CoreMidi(self.uid);
+	}
 	fn send_midi(&mut self, data: &[u8]) -> anyhow::Result<()> {
 		// Everybody else works in bytes (&[u8]), but for some reason, CoreMidi works in &[u32],
 		// so we need to re-orient the data to get it ready to send. MIDI is big-endian, so we
@@ -125,7 +147,7 @@ impl DestLink for CoreMidiDestLink {
 		// Send packet through CoreMIDI
 		return Ok(self.output_port
 			.send(
-				&self.destination,
+				&self.sink,
 				EventBuffer::new(coremidi::Protocol::Midi10).with_packet(0, &packet),
 			)
 			.map_err(|err| CFOSError::from(err))?);
@@ -138,14 +160,18 @@ impl DestLink for CoreMidiDestLink {
 
 
 pub struct CoreMidiSourceLink {
+	uid: u32,
 	input_port: InputPortWithContext<()>,
 	source: coremidi::Source,
 }
 impl SourceLink for CoreMidiSourceLink {
+	fn get_momento(&self) -> MidiMomento {
+		return MidiMomento::CoreMidi(self.uid);
+	}
 	fn is_connected(&self) -> bool {
 		let result: Result<bool, OSStatus> = self
 			.source
-			.get_property(&coremidi::Properties::offline());
+			.get_property(&Properties::offline());
 		match result {
 			Ok(result) => {
 				return !result;

@@ -1,12 +1,14 @@
 use std::sync::Arc;
 
-use anyhow::{anyhow, Context};
+use anyhow::Context;
+use async_trait::async_trait;
+use serde::{Serialize, Deserialize};
 use thiserror::Error;
 use core_foundation::base::OSStatus;
 use coremidi::{Client, InputPortWithContext, OutputPort, EventBuffer, Properties};
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
-use crate::plugins::midi_router::MidiCallback;
+use crate::plugins::midi_router::{MidiCallback, LinkMidiError};
 
 use super::{SourceLink, AvailableMidiDevice, MidiIndex, DestLink, MidiMomento};
 
@@ -50,61 +52,65 @@ impl CoreMidiBackend {
 	pub fn connect_source(
 		&self,
 		uid: u32,
-		callback: Arc<Mutex<MidiCallback>>,
-	) -> anyhow::Result<CoreMidiSourceLink> {
+		callback: MidiCallback,
+	) -> Result<CoreMidiSourceLink, (LinkMidiError, MidiCallback)> {
 		let source = coremidi::Sources
 			.into_iter()
 			.find(|source| source.unique_id() == Some(uid));
 		if let Some(source) = source {
+			let callback = Arc::new(RwLock::new(Some(callback)));
+			let callback_inner = Arc::clone(&callback);
 			let mut input_port = self
 				.client
 				.input_port_with_protocol(
 					&uid.to_string(),
 					coremidi::Protocol::Midi10,
 					move |event_list, _ctx: &mut ()| {
-						let mut cb = callback.blocking_lock();
-						for event in event_list.iter() {
-							// Convert data into byte slice instead of u32 slice
-							let data = event.data();
-							// * 4 because u32 is 4 bytes (u8)
-							let mut buf = Vec::with_capacity(data.len() * 4);
-							for word in data {
-								buf.extend(word.to_be_bytes());
-							}
+						let cb = callback_inner.blocking_read();
+						if let Some(ref cb) = &*cb {
+							for event in event_list.iter() {
+								// Convert data into byte slice instead of u32 slice
+								let data = event.data();
+								// * 4 because u32 is 4 bytes (u8)
+								let mut buf = Vec::with_capacity(data.len() * 4);
+								for word in data {
+									buf.extend(word.to_be_bytes());
+								}
 
-							// Push byte slice to callback
-							cb(buf);
+								// Push byte slice to callback
+								cb(buf);
+							}
 						}
 					},
 				)
-				.map_err(|status| CFOSError::from(status))
-				.context("An error occured while creating the input port")?;
+				.map_err(|status| (CFOSError::from(status).into(), callback.blocking_write().take().unwrap()))?;
 			input_port
 				.connect_source(&source, ())
-				.map_err(CFOSError::from)
-				.context("An error occurred while connecting the input port")?;
+				.map_err(|err| (CFOSError::from(err).into(), callback.blocking_write().take().unwrap()))?;
 			return Ok(CoreMidiSourceLink {
 				uid,
 				input_port,
 				source,
+				callback,
 			});
 		}
-		return Err(anyhow!("Could not find midi source"));
+		return Err((LinkMidiError::DeviceNotFound, callback));
 	}
 	pub fn connect_sink(
 		&self,
 		uid: u32,
-	) -> anyhow::Result<CoreMidiDestLink> {
+	) -> Result<CoreMidiDestLink, LinkMidiError> {
 		let sink = coremidi::Destinations.into_iter().find(|dest| dest.unique_id() == Some(uid));
 		if let Some(sink) = sink {
-			let output_port = self.client.output_port(&uid.to_string()).map_err(CFOSError::from).context("An error occurred while creating the output port")?;
+			let output_port = self.client.output_port(&uid.to_string())
+				.map_err(|err| CFOSError::from(err).into())?;
 			return Ok(CoreMidiDestLink {
 				uid,
 				output_port,
 				sink,
 			});
 		}
-		return Err(anyhow!("Could not find midi destination"));
+		return Err(LinkMidiError::DeviceNotFound);
 	}
 }
 
@@ -113,6 +119,7 @@ pub struct CoreMidiDestLink {
 	output_port: OutputPort,
 	sink: coremidi::Destination,
 }
+#[async_trait]
 impl DestLink for CoreMidiDestLink {
 	fn get_momento(&self) -> MidiMomento {
 		return MidiMomento::CoreMidi(self.uid);
@@ -153,7 +160,7 @@ impl DestLink for CoreMidiDestLink {
 			.map_err(|err| CFOSError::from(err))?);
 	}
 
-	fn disconnect(self) {
+	async fn disconnect(self) {
 		drop(self);
 	}
 }
@@ -163,7 +170,9 @@ pub struct CoreMidiSourceLink {
 	uid: u32,
 	input_port: InputPortWithContext<()>,
 	source: coremidi::Source,
+	callback: Arc<RwLock<Option<MidiCallback>>>,
 }
+#[async_trait]
 impl SourceLink for CoreMidiSourceLink {
 	fn get_momento(&self) -> MidiMomento {
 		return MidiMomento::CoreMidi(self.uid);
@@ -186,7 +195,7 @@ impl SourceLink for CoreMidiSourceLink {
 			},
 		}
 	}
-	fn unlink(mut self) {
+	async fn unlink(mut self) -> MidiCallback {
 		if let Err(err) = self.input_port.disconnect_source(&self.source) {
 			#[cfg(debug_assertions)]
 			eprintln!(
@@ -194,11 +203,12 @@ impl SourceLink for CoreMidiSourceLink {
 				CFOSError::from(err)
 			);
 		}
+		return self.callback.write().await.take().expect("Callback was removed without consuming MidiCallback");
 	}
 }
 
 
-#[derive(Error, Debug, Clone, Copy)]
+#[derive(Error, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum CFOSError {
 	#[error("An unknown CoreFoundation error occurred: {0}")]
 	Unknown(OSStatus),
@@ -206,5 +216,13 @@ pub enum CFOSError {
 impl From<OSStatus> for CFOSError {
 	fn from(value: OSStatus) -> Self {
 		return Self::Unknown(value);
+	}
+}
+
+impl Into<LinkMidiError> for CFOSError {
+	fn into(self) -> LinkMidiError {
+		return match self {
+			CFOSError::Unknown(_) => LinkMidiError::Unknown(self.to_string())
+		};
 	}
 }

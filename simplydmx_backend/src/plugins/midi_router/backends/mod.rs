@@ -1,4 +1,7 @@
+use async_trait::async_trait;
 use simplydmx_plugin_framework::*;
+
+use super::MidiCallback;
 
 #[cfg(feature = "midi-backend-coremidi")]
 pub mod coremidi_backend;
@@ -10,6 +13,7 @@ pub mod coremidi_backend;
 /// automatically connected.
 #[portable]
 pub enum MidiMomento {
+	Unlinked,
 	CoreMidi(u32),
 }
 
@@ -26,9 +30,11 @@ pub struct AvailableMidiDevice {
 /// any consistency or validity guarantees across application restarts.
 #[portable]
 pub enum MidiIndex {
+	Unlinked,
 	CoreMidi(u32),
 }
 
+#[async_trait]
 pub trait SourceLink {
 	/// Returns a "momento", or a chunk of data that can be used when
 	/// attempting to locate this device after a restart. Due to MIDI's
@@ -41,9 +47,10 @@ pub trait SourceLink {
 	fn is_connected(&self) -> bool;
 	/// Unlinks the source from the destination, returning the destination
 	/// callback
-	fn unlink(self);
+	async fn unlink(self) -> MidiCallback;
 }
 
+#[async_trait]
 pub trait DestLink {
 	/// Returns a "momento", or a chunk of data that can be used when
 	/// attempting to locate this device after a restart. Due to MIDI's
@@ -55,5 +62,5 @@ pub trait DestLink {
 	fn send_midi(&mut self, data: &[u8]) -> anyhow::Result<()>;
 	/// Disconnects from the destination, consuming self and not allowing
 	/// any more packets to be sent
-	fn disconnect(self);
+	async fn disconnect(self);
 }

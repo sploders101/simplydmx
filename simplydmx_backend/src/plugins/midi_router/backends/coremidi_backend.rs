@@ -136,21 +136,20 @@ impl DestLink for CoreMidiDestLink {
 		// need to factor this in when building our u32s for CoreMIDI.
 		// If statement used until div_ceil is available (https://github.com/rust-lang/rust/issues/88581)
 		let mut packet = Vec::<u32>::with_capacity((data.len() / 4) + if data.len() % 4 > 0 { 1 } else { 0 });
-		let chunk_iter = data.chunks_exact(4);
+		let chunk_iter = data.chunks_exact(3);
 		let remainder = chunk_iter.remainder();
 		packet.extend(chunk_iter.map(|chunk| {
 			let mut new_chunk = [0u8; 4];
-			for i in 0..4 {
-				new_chunk[i] = chunk[i];
+			new_chunk[0] = 32; // MIDI 1.0 32-bit chunk
+			for i in 0..3 {
+				new_chunk[i+1] = chunk[i];
 			}
 			u32::from_be_bytes(new_chunk)
 		}));
 		let remainder_len = remainder.len();
 		if remainder_len > 0 {
 			let mut last_chunk = [0u8; 4];
-			for i in 0..(4 - remainder_len) {
-				last_chunk[i] = 0;
-			}
+			last_chunk[0] = 32;
 			for (i, byte) in remainder.iter().enumerate() {
 				last_chunk[4 - remainder_len + i] = *byte;
 			}

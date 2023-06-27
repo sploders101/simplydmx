@@ -60,10 +60,10 @@ impl CoreMidiBackend {
 		if let Some(source) = source {
 			let callback = Arc::new(RwLock::new(Some(callback)));
 			let callback_inner = Arc::clone(&callback);
-			let mut input_port = self
+			let input_port = self
 				.client
 				.input_port_with_protocol(
-					&uid.to_string(),
+					"simplydmx",
 					coremidi::Protocol::Midi10,
 					move |event_list, _ctx: &mut ()| {
 						let cb = callback_inner.blocking_read();
@@ -73,7 +73,11 @@ impl CoreMidiBackend {
 								let data = event.data();
 								// * 4 because u32 is 4 bytes (u8)
 								let mut buf = Vec::with_capacity(data.len() * 4);
-								for word in data {
+								let mut data_iter = data.iter();
+								if let Some(next_packet) = data_iter.next() {
+									buf.extend(&next_packet.to_be_bytes()[1..]);
+								}
+								for word in data_iter {
 									buf.extend(word.to_be_bytes());
 								}
 
@@ -82,11 +86,14 @@ impl CoreMidiBackend {
 							}
 						}
 					},
-				)
-				.map_err(|status| (CFOSError::from(status).into(), callback.blocking_write().take().unwrap()))?;
-			input_port
-				.connect_source(&source, ())
-				.map_err(|err| (CFOSError::from(err).into(), callback.blocking_write().take().unwrap()))?;
+				);
+			let mut input_port = match input_port {
+				Ok(input_port) => input_port,
+				Err(status) => return Err((CFOSError::from(status).into(), callback.blocking_write().take().unwrap())),
+			};
+			if let Err(status) = input_port.connect_source(&source, ()) {
+				return Err((CFOSError::from(status).into(), callback.blocking_write().take().unwrap()));
+			}
 			return Ok(CoreMidiSourceLink {
 				uid,
 				input_port,
@@ -102,8 +109,7 @@ impl CoreMidiBackend {
 	) -> Result<CoreMidiDestLink, LinkMidiError> {
 		let sink = coremidi::Destinations.into_iter().find(|dest| dest.unique_id() == Some(uid));
 		if let Some(sink) = sink {
-			let output_port = self.client.output_port(&uid.to_string())
-				.map_err(|err| CFOSError::from(err).into())?;
+			let output_port = self.client.output_port("simplydmx").map_err(|err| CFOSError::from(err).into())?;
 			return Ok(CoreMidiDestLink {
 				uid,
 				output_port,

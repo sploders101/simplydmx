@@ -16,6 +16,15 @@ export type AbstractLayerLight = FxHashMap<string, BlenderValue>;
 export type AssetDescriptor = { BuiltIn: string } | { SVGInline: string };
 
 /**
+ * Contains information about an available midi device
+ */
+export interface AvailableMidiDevice {
+    name: string;
+    manufacturer: string | null;
+    id: MidiIndex;
+}
+
+/**
  * Value to be used in a submaster with instructions for mixing it into the result
  */
 export type BlenderValue = "None" | { Static: number } | { Offset: number };
@@ -39,6 +48,15 @@ export interface BlendingData {
 export type BlendingScheme = "HTP" | "LTP";
 
 /**
+ * Describes a button input
+ */
+export interface ButtonCapabilities {
+    push: boolean;
+    push_feedback: boolean;
+    velocity: boolean;
+}
+
+/**
  * Information about a specific channel available on the fixture
  */
 export interface Channel {
@@ -60,6 +78,11 @@ export type ChannelSize = "U8" | "U16";
 export type ChannelType = { Segmented: { segments: Segment[]; priority: BlendingScheme; snapping: SnapData | null } } | { Linear: { priority: BlendingScheme } };
 
 /**
+ * Describes the type and capabilities of a control.
+ */
+export type ControlCapabilities = { Fader: FaderCapabilities } | { Knob: KnobCapabilities } | { Button: ButtonCapabilities };
+
+/**
  * Contains data about a group of channels that can be controlled using a special controller
  */
 export interface ControlGroup {
@@ -68,9 +91,45 @@ export interface ControlGroup {
 }
 
 /**
+ * Represents a group of distinct controls that are intended
+ * to be used together
+ */
+export interface ControlGroup {
+    name: string;
+    primary: ControlInstance;
+    flash_btn: ControlInstance | null;
+}
+
+/**
  * Specifies the type of ControlGroup in use and associated channels
  */
 export type ControlGroupData = { Intensity: string } | { RGBGroup: { red: string; green: string; blue: string } } | { CMYKGroup: { cyan: string; magenta: string; yellow: string; black: string } } | { PanTilt: { pan: string; tilt: string } } | { Gobo: string } | { ColorWheel: string } | { Zoom: string } | { GenericInput: string };
+
+/**
+ * Describes a single distinct control on the board
+ */
+export interface ControlInstance {
+    name: string | null;
+    capabilities: ControlCapabilities;
+}
+
+/**
+ * Describes a particular instance of a controller
+ */
+export interface ControllerInstance {
+    id: Uuid;
+    name: string;
+}
+
+/**
+ * Defines the structure of a controller.
+ * 
+ * This can be referenced by multiple instances
+ */
+export interface ControllerProfile {
+    name: string;
+    control_groups: FxHashMap<Uuid, ControlGroup>;
+}
 
 /**
  * An error that could occur when creating a fixture
@@ -180,6 +239,15 @@ export type EditFixtureError = "FixtureMissing" | "FixtureTypeMissing" | "Contro
  * A generic error originating from an OutputDriver interface when editing an existing fixture instance
  */
 export type EditInstanceError = { InvalidData: string } | { Other: string };
+
+/**
+ * Describes a single fader control
+ */
+export interface FaderCapabilities {
+    position: boolean;
+    position_feedback: boolean;
+    touch: boolean;
+}
 
 /** Represents criteria used to filter an event. For example, a submaster UUID could be used to filter submaster updates by that specific submaster */
 export type FilterCriteria = { type: "None" } | { type: "String"; data: string } | { type: "Uuid"; data: Uuid };
@@ -342,9 +410,44 @@ export type JSONCommand = { type: "CallService"; message_id: number; plugin_id: 
 export type JSONResponse = { type: "CallServiceResponse"; message_id: number; result: Value } | { type: "ServiceList"; message_id: number; list: ServiceDescription[] } | { type: "OptionsList"; message_id: number; list: { Ok: DropdownOptionJSON[] } | { Err: TypeSpecifierRetrievalError } } | { type: "CallServiceError"; message_id: number; error: JSONCallServiceError } | { type: "Event"; name: string; criteria: FilterCriteria; data: Value };
 
 /**
+ * Describes a rotary knob input
+ */
+export interface KnobCapabilities {
+    position: boolean;
+    position_feedback: boolean;
+    push: boolean;
+    push_feedback: boolean;
+}
+
+/** This type is currently undocumented. I will be working to resolve this for all types in the near future. */
+export type LinkMidiError = "NotRegistered" | "DeviceNotFound" | { Unknown: string };
+
+/**
  * An error that could occur while linking a DMX universe to a universe controller
  */
 export type LinkUniverseError = { ErrorFromController: RegisterUniverseError } | "UniverseNotFound" | "ControllerNotFound";
+
+/** This type is currently undocumented. I will be working to resolve this for all types in the near future. */
+export interface LiveControlState {
+    controller_profiles: FxHashMap<Uuid, ControllerProfile>;
+    controller_instances: FxHashMap<Uuid, ControllerInstance>;
+}
+
+/**
+ * Represents an ID or index that can be used to retrieve a MIDI device
+ * from a backend. This ID should **not** be saved. It does not provide
+ * any consistency or validity guarantees across application restarts.
+ */
+export type MidiIndex = "Unlinked" | { CoreMidi: number };
+
+/**
+ * Represents a set of criteria or an ID which can be used to search for
+ * a midi device upon loading a show file.
+ * 
+ * If exactly one device can be found using this criteria, it should be
+ * automatically connected.
+ */
+export type MidiMomento = "Unlinked" | { CoreMidi: number };
 
 /**
  * Data used by the mixer to blend submasters and produce a final result

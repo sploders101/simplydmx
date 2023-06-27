@@ -2,7 +2,7 @@ mod backends;
 
 use async_trait::async_trait;
 use rustc_hash::FxHashMap;
-pub use simplydmx_plugin_framework::*;
+use simplydmx_plugin_framework::*;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -10,8 +10,9 @@ use thiserror::Error;
 
 #[cfg(feature = "midi-backend-coremidi")]
 use self::backends::coremidi_backend::{CoreMidiDestLink, CoreMidiBackend, CoreMidiSourceLink};
-use self::backends::{
-	SourceLink, DestLink, MidiMomento, AvailableMidiDevice, MidiIndex,
+use self::backends::{SourceLink, DestLink};
+pub use self::backends::{
+	MidiMomento, AvailableMidiDevice, MidiIndex,
 };
 
 /// Creates the `MidiSource` type. This type is supposed to proxy `SourceLink` function
@@ -154,17 +155,21 @@ impl MidiRouterInterface {
 		});
 	}
 
-	pub async fn list_sources(&self) {
+	pub async fn list_sources(&self) -> Vec<AvailableMidiDevice> {
 		let mut midi_sources = Vec::<AvailableMidiDevice>::new();
 
 		#[cfg(feature = "midi-backend-coremidi")]
 		midi_sources.append(&mut CoreMidiBackend::list_sources());
+
+		return midi_sources;
 	}
-	pub async fn list_sinks(&self) {
+	pub async fn list_sinks(&self) -> Vec<AvailableMidiDevice> {
 		let mut midi_sinks = Vec::<AvailableMidiDevice>::new();
 
 		#[cfg(feature = "midi-backend-coremidi")]
 		midi_sinks.append(&mut CoreMidiBackend::list_sinks());
+
+		return midi_sinks;
 	}
 	pub async fn create_source(&self) -> Uuid {
 		return self.create_source_with_momento(MidiMomento::Unlinked).await;
@@ -172,11 +177,11 @@ impl MidiRouterInterface {
 	pub async fn create_source_with_momento(&self, momento: MidiMomento) -> Uuid {
 		let mut internal_sources = self.inner.internal_sources.write().await;
 		let new_uuid = Uuid::new_v4();
-		let source = self.get_source_from_momento(momento).await;
+		let source = self.get_source_from_momento(momento);
 		internal_sources.insert(new_uuid.clone(), source);
 		return new_uuid;
 	}
-	async fn get_source_from_momento(&self, momento: MidiMomento) -> InternalSource {
+	fn get_source_from_momento(&self, momento: MidiMomento) -> InternalSource {
 		return match momento {
 			MidiMomento::Unlinked => InternalSource::Unlinked,
 			MidiMomento::CoreMidi(coremidi_id) => connect_if!(
@@ -221,16 +226,16 @@ impl MidiRouterInterface {
 		let mut internal_sources = self.inner.internal_sources.write().await;
 		internal_sources.remove(&source_id);
 	}
-	pub async fn add_sink(&self, callback: impl Into<MidiCallback>) -> Uuid {
+	pub async fn add_sink(&self, callback: impl Fn(Vec<u8>) -> () + Send + Sync + 'static) -> Uuid {
 		return self.add_sink_with_momento(callback, MidiMomento::Unlinked).await;
 	}
-	pub async fn add_sink_with_momento(&self, callback: impl Into<MidiCallback>, momento: MidiMomento) -> Uuid {
+	pub async fn add_sink_with_momento(&self, callback: impl Fn(Vec<u8>) -> () + Send + Sync + 'static, momento: MidiMomento) -> Uuid {
 		let mut internal_sinks = self.inner.internal_sinks.write().await;
 		let new_uuid = Uuid::new_v4();
-		internal_sinks.insert(new_uuid.clone(), self.get_sink_from_momento(momento, callback.into()).await);
+		internal_sinks.insert(new_uuid.clone(), self.get_sink_from_momento(momento, Box::new(callback)));
 		return new_uuid;
 	}
-	pub async fn get_sink_from_momento(&self, momento: MidiMomento, callback: MidiCallback) -> InternalSink {
+	pub fn get_sink_from_momento(&self, momento: MidiMomento, callback: MidiCallback) -> InternalSink {
 		return match momento {
 			MidiMomento::Unlinked => InternalSink::Unlinked(callback),
 			MidiMomento::CoreMidi(coremidi_id) => connect_if!(

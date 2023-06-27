@@ -23,7 +23,7 @@ impl CoreMidiBackend {
 				.context("An error occured while creating the CoreMIDI backend")?,
 		});
 	}
-	pub fn list_sources() -> Vec<AvailableMidiDevice> {
+	pub fn list_inputs() -> Vec<AvailableMidiDevice> {
 		return coremidi::Sources.into_iter().filter_map(|source| {
 			if let (Some(name), Some(id)) = (source.display_name(), source.unique_id()) {
 				return Some(AvailableMidiDevice {
@@ -36,7 +36,7 @@ impl CoreMidiBackend {
 			}
 		}).collect();
 	}
-	pub fn list_sinks() -> Vec<AvailableMidiDevice> {
+	pub fn list_outputs() -> Vec<AvailableMidiDevice> {
 		return coremidi::Destinations.into_iter().filter_map(|sink| {
 			if let (Some(name), Some(id)) = (sink.display_name(), sink.unique_id()) {
 				return Some(AvailableMidiDevice {
@@ -49,7 +49,7 @@ impl CoreMidiBackend {
 			}
 		}).collect();
 	}
-	pub fn connect_source(
+	pub fn connect_input(
 		&self,
 		uid: u32,
 		callback: MidiCallback,
@@ -103,7 +103,7 @@ impl CoreMidiBackend {
 		}
 		return Err((LinkMidiError::DeviceNotFound, callback));
 	}
-	pub fn connect_sink(
+	pub fn connect_output(
 		&self,
 		uid: u32,
 	) -> Result<CoreMidiDestLink, LinkMidiError> {

@@ -97,82 +97,57 @@ async fn load_file(app: tauri::AppHandle, state: tauri::State<'_, Arc<RwLock<Opt
 	return Ok(());
 }
 
-#[derive(Default)]
-pub struct AppBuilder {
-	setup: Option<SetupHook>,
-}
+pub fn run_app() {
+	let quitting = Arc::new(RwLock::new(false));
 
-impl AppBuilder {
-	pub fn new() -> Self {
-		Self::default()
-	}
+	let application_state: Arc<RwLock<Option<ApplicationState>>> = Arc::new(RwLock::new(None));
+	let application_state_setup = Arc::clone(&application_state);
+	let application_state_exit = Arc::clone(&application_state);
 
-	#[must_use]
-	pub fn setup<F>(mut self, setup: F) -> Self
-	where
-		F: FnOnce(&mut App) -> Result<(), Box<dyn std::error::Error>> + Send + 'static,
-	{
-		self.setup.replace(Box::new(setup));
-		self
-	}
+	let mut app = tauri::Builder::default()
+		.manage(application_state)
+		.invoke_handler(tauri::generate_handler![sdmx, load_file])
+		.setup(move |app| {
+			#[cfg(all(debug_assertions, tokio_unstable))]
+			console_subscriber::init();
+			let app_ref = app.app_handle();
+			let mut application_state = block_on(application_state_setup.write());
+			*application_state = Some(block_on(ApplicationState::start_plugins(app_ref, None)));
 
-	pub fn run(self) {
+			#[cfg(target_os = "macos")]
+			{
+				let window = app.get_window("main").unwrap();
+				apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, None, None)
+					.expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS")
+			}
 
-		let setup = self.setup;
-		let quitting = Arc::new(RwLock::new(false));
-
-		let application_state: Arc<RwLock<Option<ApplicationState>>> = Arc::new(RwLock::new(None));
-		let application_state_setup = Arc::clone(&application_state);
-		let application_state_exit = Arc::clone(&application_state);
-
-		tauri::Builder::default()
-			.manage(application_state)
-			.invoke_handler(tauri::generate_handler![sdmx, load_file])
-			.setup(move |app| {
-				#[cfg(all(debug_assertions, tokio_unstable))]
-				console_subscriber::init();
-				let app_ref = app.app_handle();
-				let mut application_state = block_on(application_state_setup.write());
-				*application_state = Some(block_on(ApplicationState::start_plugins(app_ref, None)));
-
-				#[cfg(target_os = "macos")]
-				{
-					let window = app.get_window("main").unwrap();
-					apply_vibrancy(&window, NSVisualEffectMaterial::HudWindow, None, None)
-						.expect("Unsupported platform! 'apply_vibrancy' is only supported on macOS")
+			Ok(())
+		})
+		.build(tauri::generate_context!())
+		.expect("error while running tauri application")
+		.run(move |app_handle, event| match event {
+			RunEvent::Exit => {
+				// Issue shutdown if necessary
+				let application_state = Arc::clone(&application_state_exit);
+				let quitting = Arc::clone(&quitting);
+				let app_handle = app_handle.clone();
+				// If we're already quitting, ignore the event. Otherwise, mark that we are quitting
+				let mut quitting = block_on(quitting.write());
+				if *quitting {
+					return;
 				}
+				*quitting = true;
+				drop(quitting);
 
-				if let Some(setup) = setup {
-					(setup)(app)?;
+				// If we have a plugin system, shut it down. Otherwise, go ahead and close the window
+				if let Some(ref state) = *block_on(application_state.read()) {
+					block_on(state.plugin_manager.shutdown());
+					block_on(state.plugin_manager.finish_shutdown());
+					#[cfg(feature = "verbose-debugging")]
+					println!("Successfully shut down.");
 				}
-				Ok(())
-			})
-			.build(tauri::generate_context!())
-			.expect("error while running tauri application")
-			.run(move |app_handle, event| match event {
-				RunEvent::Exit => {
-					// Issue shutdown if necessary
-					let application_state = Arc::clone(&application_state_exit);
-					let quitting = Arc::clone(&quitting);
-					let app_handle = app_handle.clone();
-					// If we're already quitting, ignore the event. Otherwise, mark that we are quitting
-					let mut quitting = block_on(quitting.write());
-					if *quitting {
-						return;
-					}
-					*quitting = true;
-					drop(quitting);
-
-					// If we have a plugin system, shut it down. Otherwise, go ahead and close the window
-					if let Some(ref state) = *block_on(application_state.read()) {
-						block_on(state.plugin_manager.shutdown());
-						block_on(state.plugin_manager.finish_shutdown());
-						#[cfg(feature = "verbose-debugging")]
-						println!("Successfully shut down.");
-					}
-					app_handle.exit(0);
-				},
-				_ => {},
-			});
-	}
+				app_handle.exit(0);
+			},
+			_ => {}
+		});
 }

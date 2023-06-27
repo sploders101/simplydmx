@@ -2,6 +2,6 @@
 mod desktop;
 
 fn main() {
-  #[cfg(desktop)]
-  desktop::main();
+	#[cfg(desktop)]
+	desktop::main();
 }

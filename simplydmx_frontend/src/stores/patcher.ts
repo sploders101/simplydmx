@@ -9,8 +9,8 @@ let listeners = 0;
 export function usePatcherState() {
 	onMounted(() => {
 		if (listeners === 0) {
-			ipc.patcher.get_patcher_state().then((state) => patcherData.value = state);
 			unlisten = listenForUpdates(() => patcherData.value, (state) => patcherData.value = state);
+			ipc.patcher.get_patcher_state().then((state) => patcherData.value = state);
 		}
 		listeners += 1;
 	});

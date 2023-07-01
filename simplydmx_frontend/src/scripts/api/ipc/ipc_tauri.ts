@@ -11,7 +11,9 @@ export function sendRPC(message: JSONCommand) {
 }
 
 export async function connect(listener: (event: JSONResponse) => void): Promise<void> {
-	await tauriListen<JSONResponse>("sdmx", (event) => listener(event.payload));
+	await tauriListen<JSONResponse>("sdmx", (event) => {
+		listener(event.payload);
+	});
 }
 
 export function loadFile(file?: number[]) {

@@ -5,6 +5,7 @@ mod services;
 mod state;
 
 use self::{
+	driver_plugin_api::{FixtureInfo, FixtureInstance},
 	services::{
 		CreateFixture, DeleteFixture, EditFixture, EditFixturePlacement, GetCreationForm,
 		GetEditForm, GetPatcherState, ImportFixtureDefinition,
@@ -16,7 +17,6 @@ pub use interface::PatcherInterface;
 use simplydmx_plugin_framework::*;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use uuid::Uuid;
 
 pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface) -> Result<PatcherInterface, PatcherInitializationError> {
 	// Create patcher context
@@ -30,17 +30,17 @@ pub async fn initialize(plugin_context: PluginContext, saver: SaverInterface) ->
 		return Err(PatcherInitializationError::UnrecognizedData);
 	};
 
-	plugin_context.declare_event::<()>(
+	plugin_context.declare_event::<Option<FixtureInstance>>(
 		"patcher.patch_updated".to_owned(),
 		Some("Event emitted by the patcher when a fixture is updated, intended for use by the mixer to trigger a re-blend of the entire show.".to_owned()),
 	).await.unwrap();
 
-	plugin_context.declare_event::<()>(
+	plugin_context.declare_event::<FixtureInfo>(
 		"patcher.new_fixture".into(),
 		Some("Event emitted when a new fixture type has been successfully imported into SimplyDMX".into()),
 	).await.unwrap();
 
-	plugin_context.declare_event::<(Uuid, VisualizationInfo)>(
+	plugin_context.declare_event::<VisualizationInfo>(
 		"patcher.visualization_updated".into(),
 		Some("Event emitted when a fixture's visualization properties have been updated".into()),
 	).await.unwrap();

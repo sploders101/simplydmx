@@ -2,6 +2,8 @@ import {
 	listen,
 	patcher,
 	VisualizationInfo,
+	FixtureInstance,
+	FixtureInfo,
 } from "../ipc";
 import type {
 	SharablePatcherState,
@@ -9,23 +11,40 @@ import type {
 
 
 export async function listenForUpdates(mutableGetter: () => SharablePatcherState | null, setter: (state: SharablePatcherState) => void): Promise<() => Promise<void>> {
-	const patchUpdates = listen<void>(
+	const patchUpdates = listen<FixtureInstance | null>(
 		"patcher.patch_updated",
 		{ type: "None" },
-		() => patcher.get_patcher_state().then(setter),
+		(event) => {
+			if (event.criteria.type !== "Uuid") throw new Error("Invalid criteria");
+			const existingState = mutableGetter();
+			if (existingState !== null) {
+				existingState.fixture_order.push(event.criteria.data);
+				if (event.data === null) {
+					delete existingState.fixtures[event.criteria.data];
+				} else {
+					existingState.fixtures[event.criteria.data] = event.data;
+				}
+			}
+		},
 	);
-	const libraryUpdates = listen<void>(
+	const libraryUpdates = listen<FixtureInfo>(
 		"patcher.new_fixture",
 		{ type: "None" },
-		() => patcher.get_patcher_state().then(setter),
+		(event) => {
+			const existingState = mutableGetter();
+			if (existingState !== null) {
+				existingState.library[event.data.id] = event.data;
+			}
+		},
 	);
-	const visualizationUpdates = listen<[string, VisualizationInfo]>(
+	const visualizationUpdates = listen<VisualizationInfo>(
 		"patcher.visualization_updated",
 		{ type: "None" },
 		(event) => {
 			const existingState = mutableGetter();
 			if (existingState) {
-				existingState.fixtures[event.data[0]].visualization_info = event.data[1];
+				if (event.criteria.type !== "Uuid") throw new Error("Invalid criteria");
+				existingState.fixtures[event.criteria.data].visualization_info = event.data;
 			} else {
 				patcher.get_patcher_state().then(setter);
 			}

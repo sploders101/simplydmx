@@ -338,7 +338,12 @@ impl EventEmitter {
 
 	}
 
-	pub async fn emit_borrowed<T: BidirectionalPortable + Clone>(&mut self, event_name: String, filter: FilterCriteria, message: Arc<T>) {
+	pub async fn emit_borrowed<T: BidirectionalPortable + Clone>(
+		&mut self,
+		event_name: String,
+		filter: FilterCriteria,
+		message: &T,
+	) {
 		self.gc();
 
 		if let Some(listeners) = self.listeners.get_mut(&event_name) {
@@ -347,25 +352,114 @@ impl EventEmitter {
 			// Re-broadcast JSON
 			if relevant_listener(&filter, &listeners.json_listeners) {
 				if let Ok(translated) = message.serialize_json() {
-					send_filtered(&filter, PortableJSONEvent::Msg { data: Arc::new(translated), criteria: Arc::clone(&filter) }, &listeners.json_listeners);
+					send_filtered(
+						&filter,
+						PortableJSONEvent::Msg {
+							data: Arc::new(translated),
+							criteria: Arc::clone(&filter),
+						},
+						&listeners.json_listeners,
+					);
 				}
 			}
 
 			// Re-broadcast CBOR
 			if relevant_listener(&filter, &listeners.cbor_listeners) {
 				if let Ok(translated) = message.serialize_cbor() {
-					send_filtered(&filter, PortableCborEvent::Msg { data: Arc::new(translated), criteria: Arc::clone(&filter) }, &listeners.cbor_listeners);
+					send_filtered(
+						&filter,
+						PortableCborEvent::Msg {
+							data: Arc::new(translated),
+							criteria: Arc::clone(&filter),
+						},
+						&listeners.cbor_listeners,
+					);
 				}
 			}
 
 			if relevant_listener(&filter, &listeners.listeners) {
 				let message: Arc<Box<dyn PortableMessage>> = Arc::new(Box::new(T::clone(&message)));
-				send_filtered(&filter, PortableEvent::Msg { data: Arc::clone(&message), criteria: Arc::clone(&filter) }, &listeners.listeners);
-				send_filtered_closures(&filter, &message, &mut listeners.closure_listeners.values_mut());
+				send_filtered(
+					&filter,
+					PortableEvent::Msg {
+						data: Arc::clone(&message),
+						criteria: Arc::clone(&filter),
+					},
+					&listeners.listeners,
+				);
+				send_filtered_closures(
+					&filter,
+					&message,
+					&mut listeners.closure_listeners.values_mut(),
+				);
+			}
+		}
+	}
+
+	pub async fn emit_if_needed<T: BidirectionalPortable + Clone>(
+		&mut self,
+		event_name: String,
+		filter: FilterCriteria,
+		message_fn: impl FnOnce() -> T,
+	) {
+		self.gc();
+
+		if let Some(listeners) = self.listeners.get_mut(&event_name) {
+			let filter = Arc::new(filter);
+			let json_listeners = relevant_listener(&filter, &listeners.json_listeners);
+			let cbor_listeners = relevant_listener(&filter, &listeners.cbor_listeners);
+			let arcany_listeners = relevant_listener(&filter, &listeners.listeners);
+			let message: Option<Arc<Box<dyn PortableMessage>>> = if json_listeners || cbor_listeners || arcany_listeners {
+				Some(Arc::new(Box::new(message_fn())))
+			} else {
+				None
+			};
+
+			// Re-broadcast JSON
+			if let (Some(message), true) = (message.as_ref(), json_listeners) {
+				if let Ok(translated) = message.serialize_json() {
+					send_filtered(
+						&filter,
+						PortableJSONEvent::Msg {
+							data: Arc::new(translated),
+							criteria: Arc::clone(&filter),
+						},
+						&listeners.json_listeners,
+					);
+				}
 			}
 
-		}
+			// Re-broadcast CBOR
+			if let (Some(message), true) = (message.as_ref(), cbor_listeners) {
+				if let Ok(translated) = message.serialize_cbor() {
+					send_filtered(
+						&filter,
+						PortableCborEvent::Msg {
+							data: Arc::new(translated),
+							criteria: Arc::clone(&filter),
+						},
+						&listeners.cbor_listeners,
+					);
+				}
+			}
 
+			if let (Some(message), true) = (message.as_ref(), arcany_listeners) {
+				let message: Arc<Box<dyn PortableMessage>> = Arc::clone(message);
+				send_filtered(
+					&filter,
+					PortableEvent::Msg {
+						data: Arc::clone(&message),
+						criteria: Arc::clone(&filter),
+					},
+					&listeners.listeners,
+				);
+				send_filtered_closures(
+					&filter,
+					&message,
+					&mut listeners.closure_listeners.values_mut(),
+				);
+			}
+		}
 	}
 
 	/// Emits a JSON value to the bus, deserializing for listeners of other formats if

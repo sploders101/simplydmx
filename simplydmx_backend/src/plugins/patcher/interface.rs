@@ -144,13 +144,13 @@ impl PatcherInterface {
 				return Err(ImportFixtureError::ErrorFromController(controller_error));
 			} else {
 				// Controller successfully loaded protocol-specific details
+				self.0
+					.emit_if_needed("patcher.new_fixture".into(), FilterCriteria::None, || fixture_bundle.fixture_info.clone())
+					.await;
 				ctx.sharable.library.insert(
 					fixture_bundle.fixture_info.id.clone(),
 					fixture_bundle.fixture_info,
 				);
-				self.0
-					.emit("patcher.new_fixture".into(), FilterCriteria::None, ())
-					.await;
 				return Ok(());
 			}
 		} else {
@@ -221,22 +221,27 @@ impl PatcherInterface {
 				{
 					return Err(CreateFixtureError::ErrorFromController(controller_error));
 				} else {
+					let fixture = FixtureInstance {
+						id: instance_uuid.clone(),
+						fixture_id: fixture_type,
+						personality,
+						name,
+						comments,
+						visualization_info: Default::default(),
+					};
+					self.0
+						.emit_if_needed(
+							"patcher.patch_updated".into(),
+							FilterCriteria::Uuid(instance_uuid.clone()),
+							|| Some(fixture.clone()),
+						)
+						.await;
 					// Controller successfully loaded protocol-specific details
 					ctx.sharable.fixture_order.push(instance_uuid.clone());
 					ctx.sharable.fixtures.insert(
 						instance_uuid.clone(),
-						FixtureInstance {
-							id: instance_uuid.clone(),
-							fixture_id: fixture_type,
-							personality,
-							name,
-							comments,
-							visualization_info: Default::default(),
-						},
+						fixture,
 					);
-					self.0
-						.emit("patcher.patch_updated".into(), FilterCriteria::None, ())
-						.await;
 					return Ok(instance_uuid);
 				}
 			} else {
@@ -275,7 +280,7 @@ impl PatcherInterface {
 		} else {
 			ctx.sharable.fixture_order.retain(|fixture| fixture != fixture_id);
 			self.0
-				.emit("patcher.patch_updated".into(), FilterCriteria::None, ())
+				.emit("patcher.patch_updated".into(), FilterCriteria::Uuid(fixture_id.clone()), Option::<FixtureInstance>::None)
 				.await;
 			return Ok(());
 		}
@@ -326,20 +331,25 @@ impl PatcherInterface {
 			return Err(EditFixtureError::ErrorFromController(controller_err));
 		} else {
 			// Insert the new fixture
+			let new_instance = FixtureInstance {
+				id: instance_id,
+				fixture_id: fixture.fixture_id,
+				personality,
+				name,
+				comments,
+				visualization_info: fixture.visualization_info,
+			};
+			self.0
+				.emit_if_needed(
+					"patcher.patch_updated".into(),
+					FilterCriteria::Uuid(fixture.id.clone()),
+					|| Some(new_instance.clone()),
+				)
+				.await;
 			ctx.sharable.fixtures.insert(
 				fixture.id,
-				FixtureInstance {
-					id: instance_id,
-					fixture_id: fixture.fixture_id,
-					personality,
-					name,
-					comments,
-					visualization_info: fixture.visualization_info,
-				},
+				new_instance,
 			);
-			self.0
-				.emit("patcher.patch_updated".into(), FilterCriteria::None, ())
-				.await;
 			return Ok(());
 		}
 	}
@@ -353,13 +363,14 @@ impl PatcherInterface {
 			fixture.visualization_info.y = y;
 		}
 
-		self.0.emit("patcher.visualization_updated".into(), FilterCriteria::None, (
-			instance_id.clone(),
-			VisualizationInfo {
+		self.0.emit_if_needed(
+			"patcher.visualization_updated".into(),
+			FilterCriteria::Uuid(instance_id.clone()), 
+			|| VisualizationInfo {
 				x,
 				y,
 			},
-		)).await;
+		).await;
 	}
 
 	/// Gets the position of a fixture within the visualizer

@@ -59,6 +59,7 @@ pub struct FixtureInstance {
 }
 
 #[portable]
+/// Contains the position of a light in the visualizer
 pub struct VisualizationInfo {
 	pub x: u16,
 	pub y: u16,

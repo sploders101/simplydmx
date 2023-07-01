@@ -57,9 +57,9 @@ macro_rules! midi_sink {
 				$(#[cfg(feature = $feature_name)])?
 				Self::$variant_name(ref connection) => connection.get_momento(),
 			),+}}
-			fn send_midi(&mut self, data: &[u8]) -> anyhow::Result<()> {match *self {$(
+			fn send_midi(&self, data: &[u8]) -> anyhow::Result<()> {match *self {$(
 				$(#[cfg(feature = $feature_name)])?
-				Self::$variant_name(ref mut connection) => connection.send_midi(data),
+				Self::$variant_name(ref connection) => connection.send_midi(data),
 			),+}}
 			async fn disconnect(self) {match self {$(
 				$(#[cfg(feature = $feature_name)])?
@@ -133,6 +133,7 @@ pub struct MidiRouterInner {
 ///
 /// This interface also allows quick, user-friendly mapping of virtual
 /// interfaces to physical ones.
+#[derive(Clone)]
 pub struct MidiRouterInterface {
 	plugin: PluginContext,
 	inner: Arc<MidiRouterInner>,
@@ -222,6 +223,18 @@ impl MidiRouterInterface {
 
 		return Ok(());
 	}
+	pub async fn send_output(&self, output_id: &Uuid, packet: &[u8]) -> Result<(), SendOutputError> {
+		let outputs = self.inner.outputs.read().await;
+		match outputs.get(output_id) {
+			Some(output) => {
+				if let LogicalOutput::Linked(controller) = output {
+					controller.send_midi(packet).map_err(|err| SendOutputError::Unknown(err.to_string()))?;
+				}
+				return Ok(());
+			}
+			None => return Err(SendOutputError::NotRegistered),
+		}
+	}
 	pub async fn remove_output(&self, output_id: &Uuid) {
 		let mut outputs = self.inner.outputs.write().await;
 		outputs.remove(&output_id);
@@ -303,11 +316,23 @@ impl MidiRouterInterface {
 
 #[portable]
 #[derive(Error)]
+/// Represents an error that occurred when linking logical MIDI
+/// devices with external ones
 pub enum LinkMidiError {
 	#[error("The requested logical channel was not registered")]
 	NotRegistered,
 	#[error("The requested MIDI device doesn't exist.")]
 	DeviceNotFound,
+	#[error("Unknown error: {0}")]
+	Unknown(String),
+}
+
+#[portable]
+#[derive(Error)]
+/// Represents an error that occurred when sending MIDI output
+pub enum SendOutputError {
+	#[error("The requested logical channel was not registered")]
+	NotRegistered,
 	#[error("Unknown error: {0}")]
 	Unknown(String),
 }

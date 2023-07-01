@@ -130,8 +130,8 @@ impl DestLink for CoreMidiDestLink {
 	fn get_momento(&self) -> MidiMomento {
 		return MidiMomento::CoreMidi(self.uid);
 	}
-	fn send_midi(&mut self, data: &[u8]) -> anyhow::Result<()> {
-		// Everybody else works in bytes (&[u8]), but for some reason, CoreMidi works in &[u32],
+	fn send_midi(&self, data: &[u8]) -> anyhow::Result<()> {
+		// Everybody else works in bytes (&[u8]) at the moment, but CoreMidi works in &[u32] (MIDI UMP),
 		// so we need to re-orient the data to get it ready to send. MIDI is big-endian, so we
 		// need to factor this in when building our u32s for CoreMIDI.
 		// If statement used until div_ceil is available (https://github.com/rust-lang/rust/issues/88581)

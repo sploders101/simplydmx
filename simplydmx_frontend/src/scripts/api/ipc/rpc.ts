@@ -83,14 +83,6 @@ export type ChannelType = { Segmented: { segments: Segment[]; priority: Blending
 export type ControlCapabilities = { Fader: FaderCapabilities } | { Knob: KnobCapabilities } | { Button: ButtonCapabilities };
 
 /**
- * Contains data about a group of channels that can be controlled using a special controller
- */
-export interface ControlGroup {
-    name: string | null;
-    channels: ControlGroupData;
-}
-
-/**
  * Represents a group of distinct controls that are intended
  * to be used together
  */
@@ -98,6 +90,14 @@ export interface ControlGroup {
     name: string;
     primary: ControlInstance;
     flash_btn: ControlInstance | null;
+}
+
+/**
+ * Contains data about a group of channels that can be controlled using a special controller
+ */
+export interface ControlGroup {
+    name: string | null;
+    channels: ControlGroupData;
 }
 
 /**
@@ -376,7 +376,10 @@ export type GetCreationFormError = "FixtureTypeMissing" | { Other: string };
  */
 export type GetEditFormError = "FixtureMissing" | "FixtureDefinitionMissing" | "ControllerMissing" | { ControllerError: string };
 
-/** This type is currently undocumented. I will be working to resolve this for all types in the near future. */
+/**
+ * An error that could occur while trying to obtain a user form for linking a
+ * virtual universe to an external one
+ */
 export type GetLinkUniverseFormError = { ErrorFromController: string } | "ControllerNotFound";
 
 /**
@@ -419,7 +422,10 @@ export interface KnobCapabilities {
     push_feedback: boolean;
 }
 
-/** This type is currently undocumented. I will be working to resolve this for all types in the near future. */
+/**
+ * Represents an error that occurred when linking logical MIDI
+ * devices with external ones
+ */
 export type LinkMidiError = "NotRegistered" | "DeviceNotFound" | { Unknown: string };
 
 /**
@@ -536,6 +542,11 @@ export interface Segment {
 export type SegmentDisplay = { Gobo: { asset: AssetDescriptor } } | { Color: { red: number; green: number; blue: number } } | { Image: { asset: AssetDescriptor } } | "Other";
 
 /**
+ * Represents an error that occurred when sending MIDI output
+ */
+export type SendOutputError = "NotRegistered" | { Unknown: string };
+
+/**
  * Data type used to hold a serialized instance of an arbitrary data type.
  * 
  * This is intended to encapsulate dynamically-typed data intended for deserialization by the output plugin
@@ -615,7 +626,9 @@ export type Uuid = string;
 /** Represents Rust's `serde_json::Value` type. This is used for dynamic typing, like when using backend-defined forms. */
 export type Value = any;
 
-/** This type is currently undocumented. I will be working to resolve this for all types in the near future. */
+/**
+ * Contains the position of a light in the visualizer
+ */
 export interface VisualizationInfo {
     x: number;
     y: number;

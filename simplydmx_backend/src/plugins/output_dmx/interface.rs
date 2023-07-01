@@ -560,6 +560,8 @@ pub enum LinkUniverseError {
 }
 
 #[portable]
+/// An error that could occur while trying to obtain a user form for linking a
+/// virtual universe to an external one
 pub enum GetLinkUniverseFormError {
 	ErrorFromController(String),
 	ControllerNotFound,

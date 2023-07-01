@@ -59,7 +59,7 @@ pub trait DestLink {
 	/// as possible to ensure the highest achievable success rate.
 	fn get_momento(&self) -> MidiMomento;
 	/// Sends a midi packet to the destination
-	fn send_midi(&mut self, data: &[u8]) -> anyhow::Result<()>;
+	fn send_midi(&self, data: &[u8]) -> anyhow::Result<()>;
 	/// Disconnects from the destination, consuming self and not allowing
 	/// any more packets to be sent
 	async fn disconnect(self);

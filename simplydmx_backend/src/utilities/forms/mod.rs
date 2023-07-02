@@ -164,11 +164,12 @@ impl FormDescriptor {
 	///
 	/// Example:
 	/// ```rust
-	/// FormDescriptor::new()
-	///     .section(|form| form
+	/// # use simplydmx_lib::utilities::forms::FormDescriptor;
+	/// let form = FormDescriptor::new()
+	///     .section("My Section Name", |form| form
 	///         .textbox("My Textbox", "myTextbox")
 	///         .textbox("Another textbox", "anotherTextbox")
-	///     )
+	///     );
 	/// ```
 	pub fn section(
 		mut self,
@@ -199,11 +200,12 @@ impl FormDescriptor {
 	///
 	/// Example:
 	/// ```rust
-	/// FormDescriptor::new()
+	/// # use simplydmx_lib::utilities::forms::FormDescriptor;
+	/// let form = FormDescriptor::new()
 	///     .vertical(|form| form
 	///         .textbox("My Textbox", "myTextbox")
 	///         .textbox("Another textbox", "anotherTextbox")
-	///     )
+	///     );
 	/// ```
 	pub fn vertical(mut self, builder: impl FnOnce(FormDescriptor) -> FormDescriptor) -> Self {
 		self.0
@@ -217,11 +219,12 @@ impl FormDescriptor {
 	///
 	/// Example:
 	/// ```rust
-	/// FormDescriptor::new()
+	/// # use simplydmx_lib::utilities::forms::FormDescriptor;
+	/// let form = FormDescriptor::new()
 	///     .horizontal(|form| form
 	///         .textbox("My Textbox", "myTextbox")
 	///         .textbox("Another textbox", "anotherTextbox")
-	///     )
+	///     );
 	/// ```
 	pub fn horizontal(mut self, builder: impl FnOnce(FormDescriptor) -> FormDescriptor) -> Self {
 		self.0

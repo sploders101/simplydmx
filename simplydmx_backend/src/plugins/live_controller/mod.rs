@@ -1,5 +1,8 @@
 pub mod types;
-pub use simplydmx_plugin_framework::*;
+pub mod control_interfaces;
+pub mod control_proxies;
+pub mod scalable_value;
+use simplydmx_plugin_framework::*;
 
 pub struct ControllerInterface {
 	plugin: PluginContext,

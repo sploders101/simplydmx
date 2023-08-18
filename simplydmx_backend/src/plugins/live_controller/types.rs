@@ -64,7 +64,7 @@ pub enum ControlCapabilities {
 #[portable]
 /// Describes a single fader control
 pub struct FaderCapabilities {
-	position: bool,
+	position: Option<Uuid>,
 	position_feedback: bool,
 	touch: bool,
 }
@@ -73,11 +73,11 @@ pub struct FaderCapabilities {
 /// Describes a rotary knob input
 pub struct KnobCapabilities {
 	/// Indicates whether the knob can communicate position
-	position: bool,
+	position: Option<Uuid>,
 	/// Indicates whether the knob can receive position updates
 	position_feedback: bool,
 	/// Indicates whether the knob can be pushed like a button
-	push: bool,
+	push: Option<Uuid>,
 	/// Indicates whether the knob can receive button push updates
 	/// (ie. for toggles)
 	push_feedback: bool,
@@ -87,7 +87,7 @@ pub struct KnobCapabilities {
 /// Describes a button input
 pub struct ButtonCapabilities {
 	/// Indicates whether the button can communicate push events
-	push: bool,
+	push: Option<Uuid>,
 	/// Indicates whether the button can receive push events
 	push_feedback: bool,
 	/// Indicates whether the button can receive velocity events

@@ -1,12 +1,14 @@
 //! This file defines proxy types used to add extra functionality
 //! to physical control interfaces by polyfilling.
 
-use std::{cmp::Ordering, sync::Arc};
 use async_trait::async_trait;
 use std::sync::Mutex;
+use std::{cmp::Ordering, sync::Arc};
 
-use super::super::{control_interfaces::{Action, AnalogInterface}, scalable_value::ScalableValue};
-
+use super::super::{
+	control_interfaces::{Action, AnalogInterface},
+	scalable_value::ScalableValue,
+};
 
 /// Debounces analog I/O so the physical input must cross the
 /// logical state value before taking effect.
@@ -15,13 +17,9 @@ use super::super::{control_interfaces::{Action, AnalogInterface}, scalable_value
 /// that aren't motorized. If the user pushes the fader to 100%, and
 /// then the submaster is set to 50% in software, the user must move
 /// the fader to 50% before any further movement takes effect.
-#[derive(Clone)]
-pub struct DebounceAnalog (Arc<DebounceAnalogInner>);
-pub struct DebounceAnalogInner {
-	state: Mutex<DebounceAnalogState>,
-	action: Option<Action<ScalableValue>>,
-	/// Keeps ownership of the original object when permanently wrapping
-	wraps: Option<Box<dyn AnalogInterface + Send + Sync + 'static>>,
+pub struct DebounceAnalog {
+	state: Arc<Mutex<DebounceAnalogState>>,
+	wraps: Arc<dyn AnalogInterface + Send + Sync + 'static>,
 }
 enum DebounceAnalogLock {
 	Unlocked,
@@ -31,78 +29,57 @@ enum DebounceAnalogLock {
 	LockedLte,
 }
 struct DebounceAnalogState {
+	action: Option<Action<ScalableValue>>,
 	locked: DebounceAnalogLock,
 	logical_state: ScalableValue,
 	physical_state: ScalableValue,
 }
 impl DebounceAnalog {
-	fn handle_value(&self, new_value: ScalableValue) {
-		if let Some(action) = self.0.action {
+	/// Wraps a control interface in a `DebounceAnalog` interface
+	pub fn new(inner: Arc<dyn AnalogInterface + Send + Sync + 'static>) -> Self {
+		let state = Arc::new(Mutex::new(DebounceAnalogState {
+			action: None,
+			locked: DebounceAnalogLock::Unlocked,
+			logical_state: ScalableValue::U8(0),
+			physical_state: ScalableValue::U8(0),
+		}));
+		let state_ref = Arc::clone(&state);
+		inner.set_analog_action(Some(Box::new(move |new_value: ScalableValue| {
+			let mut state = state_ref.lock().unwrap();
 			// Re-implement recv_analog
 			let result = new_value;
-			let mut state = self.0.state.lock().unwrap();
 			state.physical_state = result;
 			match state.locked {
 				DebounceAnalogLock::Unlocked => {
-					return action(result);
+					state.action.as_ref().map(|action| action(result));
 				}
 				DebounceAnalogLock::LockedGte => {
 					if result >= state.logical_state {
 						state.locked = DebounceAnalogLock::Unlocked;
-						return action(result);
+						state.action.as_ref().map(|action| action(result));
 					}
 				}
 				DebounceAnalogLock::LockedLte => {
 					if result <= state.logical_state {
 						state.locked = DebounceAnalogLock::Unlocked;
-						return action(result);
+						state.action.as_ref().map(|action| action(result));
 					}
 				}
 			}
-		}
-	}
-	/// Registers a new DebounceAnalog interface as an intermediary action
-	pub fn register(interface: &dyn AnalogInterface) -> Self {
-		let new_debounce = Self(Arc::new(DebounceAnalogInner {
-			action: None,
-			state: Mutex::new(DebounceAnalogState {
-				locked: DebounceAnalogLock::Unlocked,
-				logical_state: ScalableValue::U8(0),
-				physical_state: ScalableValue::U8(0),
-			}),
-			wraps: None,
-		}));
-		let self_ref = new_debounce.clone();
-		interface.set_analog_action(Some(Box::new(move |new_value: ScalableValue| {
-			self_ref.handle_value(new_value);
 		})));
-		return new_debounce;
-	}
-	/// Wraps a control interface in a `DebounceAnalog` interface
-	pub fn wrap(mut inner: Box<dyn AnalogInterface + Send + Sync + 'static>) -> Self {
-		let new_debounce = Self(Arc::new(DebounceAnalogInner {
-			action: None,
-			state: Mutex::new(DebounceAnalogState {
-				locked: DebounceAnalogLock::Unlocked,
-				logical_state: ScalableValue::U8(0),
-				physical_state: ScalableValue::U8(0),
-			}),
-			wraps: Some(inner),
-		}));
-		let self_ref = new_debounce.clone();
-		inner.set_analog_action(Some(Box::new(move |new_value: ScalableValue| {
-			self_ref.handle_value(new_value);
-		})));
-		return new_debounce;
+		return DebounceAnalog {
+			state,
+			wraps: inner,
+		};
 	}
 }
 #[async_trait]
 impl AnalogInterface for DebounceAnalog {
-	fn set_analog_action(&mut self, action: Option<Action<ScalableValue>>) {
-		self.0.action = action;
+	fn set_analog_action(&self, action: Option<Action<ScalableValue>>) {
+		self.state.lock().unwrap().action = action;
 	}
 	async fn send_analog(&self, value: ScalableValue) -> bool {
-		let mut state = self.0.state.lock().unwrap();
+		let mut state = self.state.lock().unwrap();
 		state.logical_state = value;
 		match value.cmp(&state.physical_state) {
 			Ordering::Less => state.locked = DebounceAnalogLock::LockedLte,

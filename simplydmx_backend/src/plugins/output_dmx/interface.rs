@@ -465,7 +465,6 @@ impl OutputDriver for DMXInterface {
 				}
 			}
 		}
-		drop(patcher_data);
 
 		// Sort universes into designated controller-centric HashMaps
 		let mut sorted_universes = HashMap::<String, HashMap<Uuid, DMXFrame>>::new();

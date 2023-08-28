@@ -104,7 +104,7 @@ pub fn run_app() {
 	let application_state_setup = Arc::clone(&application_state);
 	let application_state_exit = Arc::clone(&application_state);
 
-	let mut app = tauri::Builder::default()
+	tauri::Builder::default()
 		.manage(application_state)
 		.invoke_handler(tauri::generate_handler![sdmx, load_file])
 		.setup(move |app| {

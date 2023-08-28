@@ -23,15 +23,19 @@ impl AnalogToBoolean {
 			last_value: None,
 		}));
 		let state_ref = Arc::clone(&state);
-		wraps.set_analog_action(Some(Box::new(|value: ScalableValue| {
+		wraps.set_analog_action(Some(Box::new(move |value: ScalableValue| {
 			let new_state = value >= threshold;
 			let mut inner_state = state_ref.lock().unwrap();
 			match inner_state.last_value {
 				Some(state) if state != new_state => {
-					inner_state.action.map(|action| action(new_state));
+					if let Some(ref mut action) = inner_state.action {
+						action(new_state);
+					}
 				}
 				None => {
-					inner_state.action.map(|action| action(new_state));
+					if let Some(ref mut action) = inner_state.action {
+						action(new_state);
+					}
 				}
 				_ => {}
 			}

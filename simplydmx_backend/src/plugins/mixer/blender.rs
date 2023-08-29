@@ -19,7 +19,7 @@ use crate::{
 		layer::MixerLayer,
 		state::{FullMixerBlendingData, FullMixerOutput},
 	},
-	plugins::patcher::PatcherInterface,
+	plugins::patcher::{driver_plugin_api::FixtureInstance, PatcherInterface},
 };
 
 /// Start the blending engine
@@ -46,7 +46,7 @@ pub async fn start_blender(
 		};
 
 		// Set up patch updated listener
-		match plugin_context.listen::<()>(String::from("patcher.patch_updated"), FilterCriteria::None).await {
+		match plugin_context.listen::<Option<FixtureInstance>>(String::from("patcher.patch_updated"), FilterCriteria::None).await {
 			Ok(mut listener) => {
 				loop {
 					let start = Instant::now();

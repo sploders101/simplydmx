@@ -25,6 +25,11 @@ pub async fn async_main(plugin_manager: &PluginManager, data: Option<Vec<u8>>) {
 	)
 	.await;
 
+	let live_control_interface =
+		plugins::live_controller::ControllerInterface::init(plugin_manager)
+			.await
+			.unwrap();
+
 	let patcher_interface = plugins::patcher::initialize(
 		plugin_manager
 			.register_plugin("patcher", "SimplyDMX Fixture Patcher")
@@ -48,11 +53,6 @@ pub async fn async_main(plugin_manager: &PluginManager, data: Option<Vec<u8>>) {
 
 	let midi_router_interface =
 		plugins::midi_router::MidiRouterInterface::init(plugin_manager)
-			.await
-			.unwrap();
-
-	let live_control_interface =
-		plugins::live_controller::ControllerInterface::init(plugin_manager)
 			.await
 			.unwrap();
 

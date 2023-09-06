@@ -1,95 +1,164 @@
+use std::sync::Arc;
+
 use rustc_hash::FxHashMap;
-use simplydmx_plugin_framework::*;
 use uuid::Uuid;
 
+use super::{
+	control_interfaces::{AnalogInterface, BooleanInterface},
+	controller_services::ControllerServiceLink,
+};
 
-#[portable]
-pub struct LiveControlState {
-	controller_profiles: FxHashMap<Uuid, ControllerProfile>,
-	controller_instances: FxHashMap<Uuid, ControllerInstance>,
+#[derive(Clone)]
+/// Describes a controller
+pub struct Controller {
+	/// Contains a mapping of `control_id` to the control's state object
+	controls: FxHashMap<Uuid, ControlState>,
+}
+impl Controller {
+	pub fn new() -> Controller {
+		return Self {
+			controls: FxHashMap::default(),
+		};
+	}
 }
 
-#[portable]
-/// Describes a particular instance of a controller
-pub struct ControllerInstance {
-	id: Uuid,
-	name: String,
+#[derive(Clone)]
+/// Holds all of a control's state
+pub struct ControlState {
+	/// Holds an interface to the service that is currently bound to the control
+	binding: Option<Arc<dyn ControllerServiceLink + Send + Sync + 'static>>,
+	/// Holds the control itself
+	control: Control,
+}
+impl ControlState {
+	pub fn new(control: Control) -> Self {
+		return Self {
+			binding: None,
+			control,
+		};
+	}
 }
 
-#[portable]
-/// Defines the structure of a controller.
-///
-/// This can be referenced by multiple instances
-pub struct ControllerProfile {
-	name: String,
-	control_groups: FxHashMap<Uuid, ControlGroup>,
+#[derive(Clone)]
+/// Describes the type and capabilities of a control.
+pub enum Control {
+	FaderColumn(ControlInstance<FaderColumnControl>),
+	Fader(ControlInstance<FaderControl>),
+	Knob(ControlInstance<KnobControl>),
+	Button(ControlInstance<ButtonControl>),
+}
+impl From<ControlInstance<FaderColumnControl>> for Control {
+	fn from(value: ControlInstance<FaderColumnControl>) -> Self {
+		return Control::FaderColumn(value);
+	}
+}
+impl From<ControlInstance<FaderControl>> for Control {
+	fn from(value: ControlInstance<FaderControl>) -> Self {
+		return Control::Fader(value);
+	}
+}
+impl From<ControlInstance<KnobControl>> for Control {
+	fn from(value: ControlInstance<KnobControl>) -> Self {
+		return Control::Knob(value);
+	}
+}
+impl From<ControlInstance<ButtonControl>> for Control {
+	fn from(value: ControlInstance<ButtonControl>) -> Self {
+		return Control::Button(value);
+	}
 }
 
-#[portable]
-/// Represents a group of distinct controls that are intended
-/// to be used together
-pub struct ControlGroup {
-	name: String,
-	/// The primary control within the group. This is usually
-	/// the largest or most-often used.
-	primary: ControlInstance,
-	/// The flash button is usually the button right below a
-	/// fader. It is normally used as a momentary override to
-	/// set the submaster to 100%, returning to the fader's
-	/// position upon release.
-	flash_btn: Option<ControlInstance>,
-}
-
-#[portable]
+#[derive(Clone)]
 /// Describes a single distinct control on the board
-pub struct ControlInstance {
-	/// The name of the control. This should always be presented
-	/// within the context of the containing group, so it does
-	/// not need to make sense on its own.
-	name: Option<String>,
+pub struct ControlInstance<T> {
+	/// The name of the control in the configuration screen
+	name: Arc<str>,
 	/// The control's capabilities. Controls may have multiple
 	/// ways of interacting with them (despite being a single
 	/// control), or extra metadata.
-	capabilities: ControlCapabilities,
+	capabilities: T,
+}
+impl<T> ControlInstance<T> {
+	pub fn new(name: Arc<str>, control: T) -> Self {
+		return Self {
+			name: Arc::from(name),
+			capabilities: control,
+		};
+	}
 }
 
-#[portable]
-/// Describes the type and capabilities of a control.
-pub enum ControlCapabilities {
-	Fader(FaderCapabilities),
-	Knob(KnobCapabilities),
-	Button(ButtonCapabilities),
+#[derive(Clone)]
+/// Describes a group of controls tightly coupled with a fader
+pub struct FaderColumnControl {
+	fader: FaderControl,
+	flash_btn: Option<ButtonControl>,
+}
+impl FaderColumnControl {
+	pub fn build(fader: FaderControl) -> Self {
+		return FaderColumnControl {
+			fader,
+			flash_btn: None,
+		};
+	}
+	pub fn add_flash_btn(&mut self, flash_btn: ButtonControl) {
+		self.flash_btn = Some(flash_btn);
+	}
 }
 
-#[portable]
+#[derive(Clone)]
 /// Describes a single fader control
-pub struct FaderCapabilities {
-	position: Option<Uuid>,
-	position_feedback: bool,
-	touch: bool,
+pub struct FaderControl {
+	position: Arc<dyn AnalogInterface + Send + Sync + 'static>,
+	touch: Option<Arc<dyn BooleanInterface + Send + Sync + 'static>>,
+}
+impl FaderControl {
+	pub fn build(position: Arc<dyn AnalogInterface + Send + Sync + 'static>) -> Self {
+		return Self {
+			position,
+			touch: None,
+		};
+	}
+	pub fn add_touch(&mut self, touch: Arc<dyn BooleanInterface + Send + Sync + 'static>) {
+		self.touch = Some(touch);
+	}
 }
 
-#[portable]
+#[derive(Clone)]
 /// Describes a rotary knob input
-pub struct KnobCapabilities {
+pub struct KnobControl {
 	/// Indicates whether the knob can communicate position
-	position: Option<Uuid>,
-	/// Indicates whether the knob can receive position updates
-	position_feedback: bool,
+	position: Arc<dyn AnalogInterface + Send + Sync + 'static>,
 	/// Indicates whether the knob can be pushed like a button
-	push: Option<Uuid>,
-	/// Indicates whether the knob can receive button push updates
-	/// (ie. for toggles)
-	push_feedback: bool,
+	push: Option<Arc<dyn BooleanInterface + Send + Sync + 'static>>,
+}
+impl KnobControl {
+	pub fn build(position: Arc<dyn AnalogInterface + Send + Sync + 'static>) -> Self {
+		return Self {
+			position,
+			push: None,
+		};
+	}
+	pub fn add_push(&mut self, push: Arc<dyn BooleanInterface + Send + Sync + 'static>) {
+		self.push = Some(push);
+	}
 }
 
-#[portable]
+#[derive(Clone)]
 /// Describes a button input
-pub struct ButtonCapabilities {
+pub struct ButtonControl {
 	/// Indicates whether the button can communicate push events
-	push: Option<Uuid>,
-	/// Indicates whether the button can receive push events
-	push_feedback: bool,
+	push: Arc<dyn BooleanInterface + Send + Sync + 'static>,
 	/// Indicates whether the button can receive velocity events
 	velocity: bool,
+}
+impl ButtonControl {
+	pub fn build(push: Arc<dyn BooleanInterface + Send + Sync + 'static>) -> Self {
+		return Self {
+			push,
+			velocity: false,
+		};
+	}
+	pub fn enable_velocity(&mut self) {
+		self.velocity = true;
+	}
 }

@@ -36,7 +36,7 @@ struct DebounceAnalogState {
 }
 impl DebounceAnalog {
 	/// Wraps a control interface in a `DebounceAnalog` interface
-	pub fn new(inner: Arc<dyn AnalogInterface + Send + Sync + 'static>) -> Self {
+	pub async fn new(inner: Arc<dyn AnalogInterface + Send + Sync + 'static>) -> Self {
 		let state = Arc::new(Mutex::new(DebounceAnalogState {
 			action: None,
 			locked: DebounceAnalogLock::Unlocked,
@@ -66,7 +66,7 @@ impl DebounceAnalog {
 					}
 				}
 			}
-		})));
+		}))).await;
 		return DebounceAnalog {
 			state,
 			wraps: inner,
@@ -75,7 +75,7 @@ impl DebounceAnalog {
 }
 #[async_trait]
 impl AnalogInterface for DebounceAnalog {
-	fn set_analog_action(&self, action: Option<Action<ScalableValue>>) {
+	async fn set_analog_action(&self, action: Option<Action<ScalableValue>>) {
 		self.state.lock().unwrap().action = action;
 	}
 	async fn send_analog(&self, value: ScalableValue) -> bool {

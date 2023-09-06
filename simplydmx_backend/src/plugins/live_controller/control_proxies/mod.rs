@@ -1,3 +1,6 @@
+//! This module contains proxies designed to assist in the
+//! development of controller integrations.
+
 mod debounce_analog;
 pub use debounce_analog::DebounceAnalog;
 mod analog_to_digital;

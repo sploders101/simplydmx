@@ -2,11 +2,22 @@ pub mod types;
 pub mod control_interfaces;
 pub mod control_proxies;
 pub mod scalable_value;
-use simplydmx_plugin_framework::*;
+pub mod controller_services;
+use std::sync::Arc;
 
-pub struct ControllerInterface {
-	plugin: PluginContext,
+use rustc_hash::FxHashMap;
+use simplydmx_plugin_framework::*;
+use tokio::sync::RwLock;
+use uuid::Uuid;
+
+use self::{controller_services::ControllerService, types::Controller};
+
+pub struct ControllerInterface(PluginContext, Arc<RwLock<ControllerInterfaceInner>>);
+struct ControllerInterfaceInner {
+	control_services: FxHashMap<Uuid, Arc<dyn ControllerService + Send + Sync + 'static>>,
+	controllers: FxHashMap<Uuid, Controller>,
 }
+
 impl ControllerInterface {
 	pub async fn init(plugin_framework: &PluginManager) -> anyhow::Result<Self> {
 		let plugin = plugin_framework
@@ -14,8 +25,11 @@ impl ControllerInterface {
 			.await
 			.unwrap();
 
-		return Ok(ControllerInterface {
-			plugin,
-		});
+		return Ok(ControllerInterface(plugin, Arc::new(RwLock::new(ControllerInterfaceInner {
+			control_services: Default::default(),
+			controllers: Default::default(),
+		}))));
 	}
+
+	// pub async fn register_service
 }

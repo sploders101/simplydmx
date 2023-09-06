@@ -98,6 +98,10 @@ macro_rules! connect_if {
 
 pub type MidiCallback = Box<dyn Fn(Vec<u8>) -> () + Send + Sync + 'static>;
 
+#[portable]
+pub struct InputMeta {
+	name: String,
+}
 pub enum LogicalInput {
 	/// An unlinked sink should contain a MidiCallback to be passed to the
 	/// controller when it is eventually linked
@@ -108,6 +112,10 @@ pub enum LogicalInput {
 	Linked(MidiInput),
 }
 
+#[portable]
+pub struct OutputMeta {
+	name: String,
+}
 pub enum LogicalOutput {
 	/// An unlinked internal source is simply a placeholder for a MIDI
 	/// communication channel, and allows the channel to be linked via a GUI
@@ -119,8 +127,8 @@ pub enum LogicalOutput {
 }
 
 pub struct MidiRouterInner {
-	outputs: RwLock<FxHashMap<Uuid, LogicalOutput>>,
-	inputs: RwLock<FxHashMap<Uuid, LogicalInput>>,
+	outputs: RwLock<FxHashMap<Uuid, (OutputMeta, LogicalOutput)>>,
+	inputs: RwLock<FxHashMap<Uuid, (InputMeta, LogicalInput)>>,
 	#[cfg(feature = "midi-backend-coremidi")]
 	coremidi_backend: CoreMidiBackend,
 }
@@ -172,14 +180,14 @@ impl MidiRouterInterface {
 
 		return midi_sinks;
 	}
-	pub async fn create_output(&self) -> Uuid {
-		return self.create_output_with_momento(MidiMomento::Unlinked).await;
+	pub async fn create_output(&self, meta: OutputMeta) -> Uuid {
+		return self.create_output_with_momento(meta, MidiMomento::Unlinked).await;
 	}
-	pub async fn create_output_with_momento(&self, momento: MidiMomento) -> Uuid {
+	pub async fn create_output_with_momento(&self, meta: OutputMeta, momento: MidiMomento) -> Uuid {
 		let mut internal_sources = self.inner.outputs.write().await;
 		let new_uuid = Uuid::new_v4();
 		let source = self.get_output_from_momento(momento);
-		internal_sources.insert(new_uuid.clone(), source);
+		internal_sources.insert(new_uuid.clone(), (meta, source));
 		return new_uuid;
 	}
 	fn get_output_from_momento(&self, momento: MidiMomento) -> LogicalOutput {
@@ -202,12 +210,12 @@ impl MidiRouterInterface {
 		let mut outputs = self.inner.outputs.write().await;
 		let output = outputs.remove_entry(output_id);
 
-		let uuid = match output {
+		let (meta, uuid) = match output {
 			None => return Err(LinkMidiError::NotRegistered),
-			Some((id, LogicalOutput::Unlinked)) => id,
-			Some((id, LogicalOutput::Linked(controller))) => {
+			Some((id, (meta, LogicalOutput::Unlinked))) => (meta, id),
+			Some((id, (meta, LogicalOutput::Linked(controller)))) => {
 				controller.disconnect().await;
-				id
+				(meta, id)
 			}
 		};
 
@@ -219,7 +227,7 @@ impl MidiRouterInterface {
 				Err(LinkMidiError::DeviceNotFound),
 			),
 		};
-		outputs.insert(uuid, LogicalOutput::Linked(controller));
+		outputs.insert(uuid, (meta, LogicalOutput::Linked(controller)));
 
 		return Ok(());
 	}
@@ -227,7 +235,7 @@ impl MidiRouterInterface {
 		let outputs = self.inner.outputs.read().await;
 		match outputs.get(output_id) {
 			Some(output) => {
-				if let LogicalOutput::Linked(controller) = output {
+				if let (_, LogicalOutput::Linked(controller)) = output {
 					controller.send_midi(packet).map_err(|err| SendOutputError::Unknown(err.to_string()))?;
 				}
 				return Ok(());
@@ -239,13 +247,13 @@ impl MidiRouterInterface {
 		let mut outputs = self.inner.outputs.write().await;
 		outputs.remove(&output_id);
 	}
-	pub async fn create_input(&self, callback: impl Fn(Vec<u8>) -> () + Send + Sync + 'static) -> Uuid {
-		return self.create_input_with_momento(callback, MidiMomento::Unlinked).await;
+	pub async fn create_input(&self, meta: InputMeta, callback: impl Fn(Vec<u8>) -> () + Send + Sync + 'static) -> Uuid {
+		return self.create_input_with_momento(meta, callback, MidiMomento::Unlinked).await;
 	}
-	pub async fn create_input_with_momento(&self, callback: impl Fn(Vec<u8>) -> () + Send + Sync + 'static, momento: MidiMomento) -> Uuid {
+	pub async fn create_input_with_momento(&self, meta: InputMeta, callback: impl Fn(Vec<u8>) -> () + Send + Sync + 'static, momento: MidiMomento) -> Uuid {
 		let mut inputs = self.inner.inputs.write().await;
 		let new_uuid = Uuid::new_v4();
-		inputs.insert(new_uuid.clone(), self.get_input_from_momento(momento, Box::new(callback)));
+		inputs.insert(new_uuid.clone(), (meta, self.get_input_from_momento(momento, Box::new(callback))));
 		return new_uuid;
 	}
 	pub fn get_input_from_momento(&self, momento: MidiMomento, callback: MidiCallback) -> LogicalInput {
@@ -271,12 +279,12 @@ impl MidiRouterInterface {
 		let mut inputs = self.inner.inputs.write().await;
 		let input = inputs.remove_entry(sink_id);
 
-		let (id, callback) = match input {
+		let (meta, id, callback) = match input {
 			None => return Err(LinkMidiError::NotRegistered),
-			Some((id, LogicalInput::Unlinked(callback))) => (id, callback),
-			Some((id, LogicalInput::Linked(controller))) => {
+			Some((id, (meta, LogicalInput::Unlinked(callback)))) => (meta, id, callback),
+			Some((id, (meta, LogicalInput::Linked(controller)))) => {
 				let callback = controller.unlink().await;
-				(id, callback)
+				(meta, id, callback)
 			}
 		};
 
@@ -288,7 +296,7 @@ impl MidiRouterInterface {
 					match self.inner.coremidi_backend.connect_input(coremidi_id, callback) {
 						Ok(controller) => LogicalInput::Linked(MidiInput::CoreMidi(controller)),
 						Err((err, callback)) => {
-							inputs.insert(id, LogicalInput::Unlinked(callback));
+							inputs.insert(id, (meta, LogicalInput::Unlinked(callback)));
 							return Err(err);
 						}
 					}
@@ -299,7 +307,7 @@ impl MidiRouterInterface {
 				}
 			),
 		};
-		inputs.insert(id, controller);
+		inputs.insert(id, (meta, controller));
 
 		return Ok(());
 	}
@@ -307,8 +315,8 @@ impl MidiRouterInterface {
 		let mut inputs = self.inner.inputs.write().await;
 		if let Some(input) = inputs.remove(sink_id) {
 			match input {
-				LogicalInput::Unlinked(_) => {}
-				LogicalInput::Linked(controller) => { let _ = controller.unlink().await; }
+				(_meta, LogicalInput::Unlinked(_)) => {}
+				(_meta, LogicalInput::Linked(controller)) => { let _ = controller.unlink().await; }
 			}
 		}
 	}

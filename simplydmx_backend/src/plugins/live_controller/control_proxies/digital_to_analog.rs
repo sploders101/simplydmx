@@ -11,6 +11,8 @@ use super::super::{
 };
 
 
+/// Accepts a boolean input and converts it to an analog output, using 0% for
+/// false and 100% for true
 pub struct BooleanToAnalog {
 	state: Arc<Mutex<InnerState>>,
 	wraps: Arc<dyn BooleanInterface + Send + Sync + 'static>,
@@ -20,7 +22,7 @@ struct InnerState {
 	last_value: Option<bool>,
 }
 impl BooleanToAnalog {
-	pub fn new(wraps: Arc<dyn BooleanInterface + Send + Sync + 'static>) -> Self {
+	pub async fn new(wraps: Arc<dyn BooleanInterface + Send + Sync + 'static>) -> Self {
 		let state = Arc::new(Mutex::new(InnerState {
 			action: None,
 			last_value: None,
@@ -34,7 +36,7 @@ impl BooleanToAnalog {
 					action(if value { ScalableValue::U8(255) } else { ScalableValue::U8(0) });
 				}
 			}
-		})));
+		}))).await;
 		return Self {
 			state,
 			wraps,
@@ -44,7 +46,7 @@ impl BooleanToAnalog {
 
 #[async_trait]
 impl AnalogInterface for BooleanToAnalog {
-	fn set_analog_action(&self, action: Option<Action<ScalableValue>>) {
+	async fn set_analog_action(&self, action: Option<Action<ScalableValue>>) {
 		self.state.lock().unwrap().action = action;
 	}
 	async fn send_analog(&self, value: ScalableValue) -> bool {

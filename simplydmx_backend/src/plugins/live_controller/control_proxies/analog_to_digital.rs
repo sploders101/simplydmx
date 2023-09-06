@@ -1,6 +1,3 @@
-//! This file defines proxy types used to add extra functionality
-//! to physical control interfaces by polyfilling.
-
 use std::sync::Arc;
 use async_trait::async_trait;
 use std::sync::Mutex;
@@ -8,6 +5,8 @@ use std::sync::Mutex;
 use super::super::{scalable_value::ScalableValue, control_interfaces::{Action, AnalogInterface, BooleanInterface}};
 
 
+/// Converts an analog input into a boolean input. When the analog value
+/// crosses above the threshold, the output will become true.
 pub struct AnalogToBoolean {
 	state: Arc<Mutex<InnerState>>,
 	wraps: Arc<dyn AnalogInterface + Send + Sync + 'static>,
@@ -17,7 +16,7 @@ struct InnerState {
 	last_value: Option<bool>,
 }
 impl AnalogToBoolean {
-	pub fn new(wraps: Arc<dyn AnalogInterface + Send + Sync + 'static>, threshold: ScalableValue) -> Self {
+	pub async fn new(wraps: Arc<dyn AnalogInterface + Send + Sync + 'static>, threshold: ScalableValue) -> Self {
 		let state = Arc::new(Mutex::new(InnerState {
 			action: None,
 			last_value: None,
@@ -40,7 +39,7 @@ impl AnalogToBoolean {
 				_ => {}
 			}
 			inner_state.last_value = Some(new_state);
-		})));
+		}))).await;
 		return Self {
 			state,
 			wraps,
@@ -50,7 +49,7 @@ impl AnalogToBoolean {
 
 #[async_trait]
 impl BooleanInterface for AnalogToBoolean {
-	fn set_bool_action(&self, action: Option<Action<bool>>) {
+	async fn set_bool_action(&self, action: Option<Action<bool>>) {
 		self.state.lock().unwrap().action = action;
 	}
 	async fn send_bool(&self, state: bool) -> bool {
@@ -60,7 +59,7 @@ impl BooleanInterface for AnalogToBoolean {
 		}
 		return false;
 	}
-	fn set_bool_with_velocity_action(&self, action: Option<Action<(bool, Option<ScalableValue>)>>) {
+	async fn set_bool_with_velocity_action(&self, action: Option<Action<(bool, Option<ScalableValue>)>>) {
 		self.state.lock().unwrap().action = match action {
 			Some(action) => Some(Box::new(move |input: bool| action((input, None)))),
 			None => None,

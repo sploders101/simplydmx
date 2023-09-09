@@ -51,10 +51,16 @@ pub async fn async_main(plugin_manager: &PluginManager, data: Option<Vec<u8>>) {
 	.await
 	.unwrap();
 
-	let midi_router_interface =
-		plugins::midi_router::MidiRouterInterface::init(plugin_manager)
-			.await
-			.unwrap();
+	let midi_router_interface = plugins::midi_router::MidiRouterInterface::init(plugin_manager)
+		.await
+		.unwrap();
+
+	let midi_control_interface = plugins::midi_controllers::MidiControllersInterface::init(
+		plugin_manager,
+		midi_router_interface,
+		live_control_interface,
+	)
+	.await;
 
 	let dmx_interface = plugins::output_dmx::initialize(
 		plugin_manager
@@ -100,8 +106,6 @@ pub async fn async_main(plugin_manager: &PluginManager, data: Option<Vec<u8>>) {
 	}
 }
 
-
-
 #[cfg(feature = "export-services")]
 pub mod exporter {
 	use linkme::distributed_slice;
@@ -109,8 +113,8 @@ pub mod exporter {
 		DropdownOptionJSON, FilterCriteria, PluginManager, ServiceArgumentOwned,
 		ServiceDescription, TypeSpecifierRetrievalError,
 	};
-	use tokio::runtime::Runtime;
 	use std::{cmp::Ordering, collections::HashMap, fs::File, io::Write};
+	use tokio::runtime::Runtime;
 	use tsify::Tsify;
 
 	#[distributed_slice]
@@ -132,7 +136,7 @@ pub mod exporter {
 				"FxHashMap",
 				"export type FxHashMap<K extends string | number | symbol, V> = Record<K, V>;",
 				&Some(
-					r#"/** This is the same as a HashMap, but uses a more efficient hashing algorithm in the backend */"#
+					r#"/** This is the same as a HashMap, but uses a more efficient hashing algorithm in the backend */"#,
 				),
 			),
 			(

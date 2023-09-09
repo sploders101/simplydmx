@@ -66,5 +66,5 @@ pub trait ControllerService {
 #[async_trait]
 pub trait ControllerServiceLink {
 	async fn save(&self) -> SerializedData;
-	async fn unlink(&mut self) {}
+	async fn unlink(&self) {}
 }

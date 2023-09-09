@@ -1,14 +1,38 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use midly::num::{u7, u4};
+use midly::num::{u4, u7};
 use rustc_hash::FxHashMap;
 use simplydmx_plugin_framework::*;
-// use thiserror::Error;
+use thiserror::Error;
 use tokio::{sync::RwLock, task};
 use uuid::Uuid;
 
-use crate::plugins::{live_controller::{control_interfaces::{Action, BooleanInterface, AnalogInterface}, scalable_value::ScalableValue}, midi_router::{MidiRouterInterface, MidiMomento, InputMeta, OutputMeta}};
+use crate::{
+	plugins::{
+		live_controller::{
+			control_interfaces::{Action, AnalogInterface, BooleanInterface},
+			scalable_value::ScalableValue,
+			types::Controller,
+		},
+		midi_router::{InputMeta, MidiMomento, MidiRouterInterface, OutputMeta},
+	},
+	utilities::{forms::FormDescriptor, serialized_data::SerializedData},
+};
+
+#[async_trait]
+pub trait MidiControllerProvider: Send + Sync + 'static {
+	fn id(&self) -> Uuid;
+	fn name(&self) -> Arc<str>;
+	fn manufacturer(&self) -> Arc<str> { Arc::from("Unknown") }
+	fn family(&self) -> Option<Arc<str>> { None }
+	async fn create_form(&self) -> FormDescriptor;
+	async fn create_controller(
+		&self,
+		form_data: SerializedData,
+		controller: &mut MidiInterfaceController,
+	) -> anyhow::Result<Controller>;
+}
 
 #[portable]
 /// Represents a control that communicates via MIDI NoteOn/NoteOff messages
@@ -17,6 +41,45 @@ pub struct MidiNote {
 	pub recv_data: (u8, u8),
 	/// channel, note
 	pub send_data: Option<(u8, u8)>,
+}
+impl MidiNote {
+	pub fn create(
+		&self,
+		interface: &mut MidiInterfaceController,
+	) -> Result<Arc<MidiNoteControl>, MidiCreationError> {
+		if self.recv_data.0 > u4::max_value().as_int() {
+			return Err(MidiCreationError::InvalidChannel);
+		}
+		if self.recv_data.1 > u7::max_value().as_int() {
+			return Err(MidiCreationError::InvalidId);
+		}
+		let note_control = Arc::new(MidiNoteControl {
+			midi: interface.get_router(),
+			action: RwLock::new(None),
+			send_data: if let Some((channel_u8, cc_u8)) = self.send_data {
+				if channel_u8 > u4::max_value().as_int() {
+					return Err(MidiCreationError::InvalidChannel);
+				}
+				if cc_u8 > u7::max_value().as_int() {
+					return Err(MidiCreationError::InvalidId);
+				}
+				Some((
+					interface
+						.get_output_id()
+						.ok_or(MidiCreationError::InvalidId)?,
+					channel_u8.into(),
+					cc_u8.into(),
+				))
+			} else {
+				None
+			},
+		});
+		interface.notes.insert(
+			(self.recv_data.0.into(), self.recv_data.1.into()),
+			Arc::clone(&note_control),
+		);
+		return Ok(note_control);
+	}
 }
 
 #[portable]
@@ -27,16 +90,53 @@ pub struct MidiCC {
 	/// channel, controlchange
 	pub send_data: Option<(u8, u8)>,
 }
-// impl MidiCC {
-// 	pub fn create(&self, router: MidiRouterInterface, interface: &mut MidiInterfaceController) -> Result<Arc<MidiNoteControl>, MidiCreationError> {
-// 		// 1. Create listener in MIDI router to call control action
-// 		// 2. Cast channel and controlchange types, bubbling range errors
-// 	}
-// }
+impl MidiCC {
+	pub fn create(
+		&self,
+		interface: &mut MidiInterfaceController,
+	) -> Result<Arc<MidiCCControl>, MidiCreationError> {
+		if self.recv_data.0 > u4::max_value().as_int() {
+			return Err(MidiCreationError::InvalidChannel);
+		}
+		if self.recv_data.1 > u7::max_value().as_int() {
+			return Err(MidiCreationError::InvalidId);
+		}
+		let cc_control = Arc::new(MidiCCControl {
+			midi: interface.get_router(),
+			action: RwLock::new(None),
+			send_data: if let Some((channel_u8, cc_u8)) = self.send_data {
+				if channel_u8 > u4::max_value().as_int() {
+					return Err(MidiCreationError::InvalidChannel);
+				}
+				if cc_u8 > u7::max_value().as_int() {
+					return Err(MidiCreationError::InvalidId);
+				}
+				Some((
+					interface
+						.get_output_id()
+						.ok_or(MidiCreationError::InvalidId)?,
+					channel_u8.into(),
+					cc_u8.into(),
+				))
+			} else {
+				None
+			},
+		});
+		interface.controls.insert(
+			(self.recv_data.0.into(), self.recv_data.1.into()),
+			Arc::clone(&cc_control),
+		);
+		return Ok(cc_control);
+	}
+}
 
-// #[derive(Debug, Clone, Error)]
-// pub enum MidiCreationError {
-// }
+#[derive(Debug, Clone, Error)]
+pub enum MidiCreationError {
+	#[error("Invalid channel")]
+	InvalidChannel,
+	#[error("Invalid ID")]
+	InvalidId,
+}
 
 /// A midi interface controller dedicated to routing within the controls framework
 pub struct MidiInterfaceController {
@@ -47,7 +147,7 @@ pub struct MidiInterfaceController {
 	controls: FxHashMap<(u4, u7), Arc<MidiCCControl>>,
 }
 impl MidiInterfaceController {
-	pub async fn new_with_output(
+	pub async fn new(
 		midi: MidiRouterInterface,
 		input_meta: InputMeta,
 		input_momento: MidiMomento,
@@ -64,16 +164,24 @@ impl MidiInterfaceController {
 
 		// Create interfaces in the midi router
 		let interface_ref = Arc::clone(&interface);
-		let input_id = midi.create_input_with_momento(input_meta, move |msg| {
-			let interface_ref = Arc::clone(&interface_ref);
-			task::spawn(async move {
-				interface_ref.read().await.push_msg(&msg).await;
-			});
-		}, input_momento).await;
+		let input_id = midi
+			.create_input_with_momento(
+				input_meta,
+				move |msg| {
+					let interface_ref = Arc::clone(&interface_ref);
+					task::spawn(async move {
+						interface_ref.read().await.push_msg(&msg).await;
+					});
+				},
+				input_momento,
+			)
+			.await;
 		let mut write_interface = interface.write().await;
 		write_interface.input_id = Some(input_id);
 		if let Some((output_meta, output_momento)) = output_data {
-			let output_id = midi.create_output_with_momento(output_meta, output_momento).await;
+			let output_id = midi
+				.create_output_with_momento(output_meta, output_momento)
+				.await;
 			write_interface.output_id = Some(output_id);
 		}
 		drop(write_interface);
@@ -86,34 +194,35 @@ impl MidiInterfaceController {
 	pub fn get_output_id(&self) -> Option<Uuid> {
 		return self.output_id.clone();
 	}
+	pub fn get_router(&self) -> MidiRouterInterface {
+		return self.midi.clone();
+	}
 	pub async fn push_msg(&self, msg: &[u8]) {
 		match midly::live::LiveEvent::parse(msg) {
-			Ok(midly::live::LiveEvent::Midi { channel, message }) => {
-				match message {
-					midly::MidiMessage::Controller { controller, value } => {
-						if let Some(control) = self.controls.get(&(channel, controller)) {
-							if let Some(ref action) = *control.action.read().await {
-								action(ScalableValue::U7(value));
-							}
+			Ok(midly::live::LiveEvent::Midi { channel, message }) => match message {
+				midly::MidiMessage::Controller { controller, value } => {
+					if let Some(control) = self.controls.get(&(channel, controller)) {
+						if let Some(ref action) = *control.action.read().await {
+							action(ScalableValue::U7(value));
 						}
 					}
-					midly::MidiMessage::NoteOff { key, vel } => {
-						if let Some(control) = self.notes.get(&(channel, key)) {
-							if let Some(ref action) = *control.action.read().await {
-								action((false, Some(ScalableValue::U7(vel))));
-							}
-						}
-					}
-					midly::MidiMessage::NoteOn { key, vel } => {
-						if let Some(control) = self.notes.get(&(channel, key)) {
-							if let Some(ref action) = *control.action.read().await {
-								action((true, Some(ScalableValue::U7(vel))));
-							}
-						}
-					}
-					_ => {}
 				}
-			}
+				midly::MidiMessage::NoteOff { key, vel } => {
+					if let Some(control) = self.notes.get(&(channel, key)) {
+						if let Some(ref action) = *control.action.read().await {
+							action((false, Some(ScalableValue::U7(vel))));
+						}
+					}
+				}
+				midly::MidiMessage::NoteOn { key, vel } => {
+					if let Some(control) = self.notes.get(&(channel, key)) {
+						if let Some(ref action) = *control.action.read().await {
+							action((true, Some(ScalableValue::U7(vel))));
+						}
+					}
+				}
+				_ => {}
+			},
 			_ => {}
 		}
 	}
@@ -134,9 +243,13 @@ impl BooleanInterface for MidiNoteControl {
 		};
 	}
 	async fn send_bool(&self, state: bool) -> bool {
-		self.send_bool_with_velocity((state, ScalableValue::U7(u7::max_value()))).await
+		self.send_bool_with_velocity((state, ScalableValue::U7(u7::max_value())))
+			.await
 	}
-	async fn set_bool_with_velocity_action(&self, action: Option<Action<(bool, Option<ScalableValue>)>>) {
+	async fn set_bool_with_velocity_action(
+		&self,
+		action: Option<Action<(bool, Option<ScalableValue>)>>,
+	) {
 		*self.action.write().await = action;
 	}
 	async fn send_bool_with_velocity(&self, state: (bool, ScalableValue)) -> bool {
@@ -159,7 +272,8 @@ impl BooleanInterface for MidiNoteControl {
 							vel: state.1.into(),
 						},
 					},
-				}.write_std(&mut output);
+				}
+				.write_std(&mut output);
 				if let Ok(()) = result {
 					if let Ok(()) = self.midi.send_output(&interface_id, &output).await {
 						true
@@ -170,9 +284,7 @@ impl BooleanInterface for MidiNoteControl {
 					false
 				}
 			}
-			None => {
-				false
-			}
+			None => false,
 		}
 	}
 }
@@ -198,7 +310,8 @@ impl AnalogInterface for MidiCCControl {
 						controller: cc,
 						value: value.into(),
 					},
-				}.write_std(&mut output);
+				}
+				.write_std(&mut output);
 				if let Ok(()) = result {
 					if let Ok(()) = self.midi.send_output(&interface_id, &output).await {
 						true
@@ -208,13 +321,8 @@ impl AnalogInterface for MidiCCControl {
 				} else {
 					false
 				}
-			},
+			}
 			None => false,
 		}
 	}
-}
-
-/// Represents the different types of controls during assembly
-pub enum ControlType {
-	
 }

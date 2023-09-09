@@ -8,11 +8,10 @@ use super::{
 	controller_services::ControllerServiceLink,
 };
 
-#[derive(Clone)]
 /// Describes a controller
 pub struct Controller {
 	/// Contains a mapping of `control_id` to the control's state object
-	controls: FxHashMap<Uuid, ControlState>,
+	pub controls: FxHashMap<Uuid, ControlState>,
 }
 impl Controller {
 	pub fn new() -> Controller {
@@ -22,24 +21,53 @@ impl Controller {
 	}
 }
 
-#[derive(Clone)]
 /// Holds all of a control's state
 pub struct ControlState {
 	/// Holds an interface to the service that is currently bound to the control
-	binding: Option<Arc<dyn ControllerServiceLink + Send + Sync + 'static>>,
+	binding: Option<Box<dyn ControllerServiceLink + Send + Sync + 'static>>,
 	/// Holds the control itself
-	control: Control,
+	control: Arc<Control>,
 }
 impl ControlState {
 	pub fn new(control: Control) -> Self {
 		return Self {
 			binding: None,
-			control,
+			control: Arc::new(control),
 		};
+	}
+	pub async fn unbind(&mut self) {
+		if let Some(binding) = self.binding.take() {
+			match *self.control.as_ref() {
+				Control::FaderColumn(ref column) => {
+					column.capabilities.fader.position.set_analog_action(None).await;
+					if let Some(ref btn) = column.capabilities.flash_btn {
+						btn.push.set_bool_action(None).await;
+						btn.push.set_bool_with_velocity_action(None).await;
+					}
+				}
+				Control::Fader(ref fader) => {
+					fader.capabilities.position.set_analog_action(None).await;
+					if let Some(ref touch) = fader.capabilities.touch {
+						touch.set_bool_action(None).await;
+						touch.set_bool_with_velocity_action(None).await;
+					}
+				}
+				Control::Knob(ref knob) => {
+					knob.capabilities.position.set_analog_action(None).await;
+					if let Some(ref push) = knob.capabilities.push {
+						push.set_bool_action(None).await;
+						push.set_bool_with_velocity_action(None).await;
+					}
+				}
+				Control::Button(ref button) => {
+					button.capabilities.push.set_bool_action(None).await;
+				}
+			}
+			binding.unlink().await;
+		}
 	}
 }
 
-#[derive(Clone)]
 /// Describes the type and capabilities of a control.
 pub enum Control {
 	FaderColumn(ControlInstance<FaderColumnControl>),
@@ -68,7 +96,6 @@ impl From<ControlInstance<ButtonControl>> for Control {
 	}
 }
 
-#[derive(Clone)]
 /// Describes a single distinct control on the board
 pub struct ControlInstance<T> {
 	/// The name of the control in the configuration screen
@@ -87,7 +114,6 @@ impl<T> ControlInstance<T> {
 	}
 }
 
-#[derive(Clone)]
 /// Describes a group of controls tightly coupled with a fader
 pub struct FaderColumnControl {
 	fader: FaderControl,
@@ -100,12 +126,15 @@ impl FaderColumnControl {
 			flash_btn: None,
 		};
 	}
+	pub fn with_flash_btn(mut self, flash_btn: ButtonControl) -> Self {
+		self.add_flash_btn(flash_btn);
+		return self;
+	}
 	pub fn add_flash_btn(&mut self, flash_btn: ButtonControl) {
 		self.flash_btn = Some(flash_btn);
 	}
 }
 
-#[derive(Clone)]
 /// Describes a single fader control
 pub struct FaderControl {
 	position: Arc<dyn AnalogInterface + Send + Sync + 'static>,
@@ -118,12 +147,15 @@ impl FaderControl {
 			touch: None,
 		};
 	}
+	pub fn with_touch(mut self, touch: Arc<dyn BooleanInterface + Send + Sync + 'static>) -> Self {
+		self.add_touch(touch);
+		return self;
+	}
 	pub fn add_touch(&mut self, touch: Arc<dyn BooleanInterface + Send + Sync + 'static>) {
 		self.touch = Some(touch);
 	}
 }
 
-#[derive(Clone)]
 /// Describes a rotary knob input
 pub struct KnobControl {
 	/// Indicates whether the knob can communicate position
@@ -138,12 +170,15 @@ impl KnobControl {
 			push: None,
 		};
 	}
+	pub fn with_push(mut self, push: Arc<dyn BooleanInterface + Send + Sync + 'static>) -> Self {
+		self.add_push(push);
+		return self;
+	}
 	pub fn add_push(&mut self, push: Arc<dyn BooleanInterface + Send + Sync + 'static>) {
 		self.push = Some(push);
 	}
 }
 
-#[derive(Clone)]
 /// Describes a button input
 pub struct ButtonControl {
 	/// Indicates whether the button can communicate push events

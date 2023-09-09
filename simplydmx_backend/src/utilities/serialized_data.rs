@@ -1,4 +1,5 @@
 use serde::de::DeserializeOwned;
+use thiserror::Error;
 use simplydmx_plugin_framework::*;
 
 /// Data type used to hold a serialized instance of an arbitrary data type.
@@ -24,6 +25,8 @@ impl SerializedData {
 /// Struct used to support `?` syntax for casting to `Err(...)`.
 ///
 /// Returned when there is an error deserializing `SerializedData`
+#[derive(Error, Debug)]
+#[error("An error occurred while parsing data:\n{0}")]
 pub struct DeserializeError(pub String);
 impl<T> From<ciborium::de::Error<T>> for DeserializeError {
 	fn from(err: ciborium::de::Error<T>) -> Self {

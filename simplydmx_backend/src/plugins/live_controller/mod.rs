@@ -31,5 +31,28 @@ impl ControllerInterface {
 		}))));
 	}
 
-	// pub async fn register_service
+	/// Registers a new controller to be available for linking with control services
+	pub async fn register_controller(&self, uuid: Uuid, controller: Controller) -> () {
+		let mut ctx = self.1.write().await;
+		ctx.controllers.insert(uuid, controller);
+	}
+
+	/// Unregisters a controller, unlinking all associated actions
+	pub async fn unregister_controller(&self, uuid: &Uuid) {
+		let mut ctx = self.1.write().await;
+		if let Some(old_controller) = ctx.controllers.remove(uuid) {
+			for mut control in old_controller.controls.into_values() {
+				control.unbind().await;
+			}
+		}
+	}
+
+	/// Registers a new control service. These should be static and never unloaded. Options can be controlled
+	/// using form elements
+	pub async fn register_service(&self, service: Arc<dyn ControllerService + Send + Sync + 'static>) -> Uuid {
+		let mut ctx = self.1.write().await;
+		let service_id = Uuid::new_v4();
+		ctx.control_services.insert(service_id.clone(), service);
+		return service_id;
+	}
 }

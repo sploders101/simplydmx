@@ -99,63 +99,33 @@ async fn smoke_test() {
 				{
 					"description": "This indicates how the service was called.",
 					"id": "from",
-					"name": "Called From",
-					"val_type": {
-						"modifier": "Required",
-						"value": {
-							"type": "String"
-						}
-					},
-					"val_type_id": null
+					"val_type": "String",
+					"val_type_hint": null
 				},
 				{
 					"description": "This is the ID of the light that you would like to control",
 					"id": "light_id",
-					"name": "Light",
-					"val_type": {
-						"modifier": "Required",
-						"value": {
-							"type": "U32"
-						}
-					},
-					"val_type_id": null
+					"val_type": "u32",
+					"val_type_hint": null
 				},
 				{
 					"description": "This is the value you want to assign to the light (0-65535)",
 					"id": "value",
-					"name": "New Value",
-					"val_type": {
-						"modifier": "Optional",
-						"value": {
-							"type": "U16"
-						}
-					},
-					"val_type_id": null
+					"val_type": "Option :: < u16 >",
+					"val_type_hint": null
 				},
 				{
 					"description": "These are some more miscellaneous values to show off the service framework",
 					"id": "values",
-					"name": "Misc Values",
-					"val_type": {
-						"modifier": "Vector",
-						"value": {
-							"type": "String"
-						}
-					},
-					"val_type_id": "some-stuff"
+					"val_type": "Vec :: < String >",
+					"val_type_hint": "some-stuff"
 				}
 			],
 			"return": {
 				"description": "This is a formatted string created from the inputs that were supplied",
 				"id": "return",
-				"name": "Formatted string",
-				"val_type": {
-					"modifier": "Required",
-					"value": {
-						"type": "String"
-					}
-				},
-				"val_type_id": null
+				"val_type": "String",
+				"val_type_hint": null
 			}
 		})
 	);

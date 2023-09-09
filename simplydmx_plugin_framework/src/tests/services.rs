@@ -4,9 +4,7 @@ use std::{
 };
 
 use serde_json::json;
-use tokio::{
-	time::sleep,
-};
+use tokio::time::sleep;
 
 // Create an alias for macro output to use since this is an internal function
 // and the macro outputs fully-qualified type paths
@@ -28,11 +26,11 @@ struct Test ();
 impl TestService {
 	#![inner(Test)]
 	#[service_main(
-		("Called From", "This indicates how the service was called."),
-		("Light", "This is the ID of the light that you would like to control"),
-		("New Value", "This is the value you want to assign to the light (0-65535)"),
-		("Misc Values", "These are some more miscellaneous values to show off the service framework", "some-stuff"),
-		("Formatted string", "This is a formatted string created from the inputs that were supplied"),
+		"This indicates how the service was called.",
+		"This is the ID of the light that you would like to control",
+		"This is the value you want to assign to the light (0-65535)",
+		("These are some more miscellaneous values to show off the service framework", "some-stuff"),
+		"This is a formatted string created from the inputs that were supplied",
 	)]
 	pub async fn call_internal(self, from: String, light_id: u32, value: Option::<u16>, values: Vec::<String>) -> String {
 		// Check carrying of data across await

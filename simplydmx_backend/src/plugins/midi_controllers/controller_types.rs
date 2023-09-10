@@ -30,7 +30,7 @@ pub trait MidiControllerProvider: Send + Sync + 'static {
 	async fn create_controller(
 		&self,
 		form_data: SerializedData,
-		controller: &mut MidiInterfaceController,
+		controller: Arc<RwLock<MidiInterfaceController>>,
 	) -> anyhow::Result<Controller>;
 }
 
@@ -188,13 +188,10 @@ impl MidiInterfaceController {
 
 		return interface;
 	}
-	pub fn get_input_id(&self) -> Uuid {
-		return self.input_id.clone().unwrap();
-	}
-	pub fn get_output_id(&self) -> Option<Uuid> {
+	fn get_output_id(&self) -> Option<Uuid> {
 		return self.output_id.clone();
 	}
-	pub fn get_router(&self) -> MidiRouterInterface {
+	fn get_router(&self) -> MidiRouterInterface {
 		return self.midi.clone();
 	}
 	pub async fn push_msg(&self, msg: &[u8]) {
@@ -224,6 +221,14 @@ impl MidiInterfaceController {
 				_ => {}
 			},
 			_ => {}
+		}
+	}
+	pub async fn teardown(&mut self) {
+		if let Some(ref input_id) = self.input_id {
+			self.midi.remove_input(input_id).await;
+		}
+		if let Some(ref output_id) = self.output_id {
+			self.midi.remove_output(output_id).await;
 		}
 	}
 }

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use midly::num::u4;
 use rustc_hash::FxHashMap;
+use tokio::sync::RwLock;
 use uuid::{uuid, Uuid};
 use serde::Deserialize;
 
@@ -138,7 +139,7 @@ impl MidiControllerProvider for XTouchCompact {
 	async fn create_controller(
 		&self,
 		form_data: SerializedData,
-		controller: &mut MidiInterfaceController,
+		controller: Arc<RwLock<MidiInterfaceController>>,
 	) -> anyhow::Result<Controller> {
 		#[derive(Deserialize, Debug)]
 		struct XTouchCompactData {
@@ -147,7 +148,7 @@ impl MidiControllerProvider for XTouchCompact {
 
 		let data: XTouchCompactData = form_data.deserialize()?;
 
-		let built_controller = create_x_touch(controller, data.channel.into()).await;
+		let built_controller = create_x_touch(&mut *controller.write().await, data.channel.into()).await;
 
 		return Ok(built_controller);
 	}

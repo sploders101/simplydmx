@@ -99,11 +99,11 @@ impl From<ControlInstance<ButtonControl>> for Control {
 /// Describes a single distinct control on the board
 pub struct ControlInstance<T> {
 	/// The name of the control in the configuration screen
-	name: Arc<str>,
+	pub name: Arc<str>,
 	/// The control's capabilities. Controls may have multiple
 	/// ways of interacting with them (despite being a single
 	/// control), or extra metadata.
-	capabilities: T,
+	pub capabilities: T,
 }
 impl<T> ControlInstance<T> {
 	pub fn new(name: Arc<str>, control: T) -> Self {
@@ -116,8 +116,8 @@ impl<T> ControlInstance<T> {
 
 /// Describes a group of controls tightly coupled with a fader
 pub struct FaderColumnControl {
-	fader: FaderControl,
-	flash_btn: Option<ButtonControl>,
+	pub fader: FaderControl,
+	pub flash_btn: Option<ButtonControl>,
 }
 impl FaderColumnControl {
 	pub fn build(fader: FaderControl) -> Self {
@@ -137,8 +137,8 @@ impl FaderColumnControl {
 
 /// Describes a single fader control
 pub struct FaderControl {
-	position: Arc<dyn AnalogInterface + Send + Sync + 'static>,
-	touch: Option<Arc<dyn BooleanInterface + Send + Sync + 'static>>,
+	pub position: Arc<dyn AnalogInterface + Send + Sync + 'static>,
+	pub touch: Option<Arc<dyn BooleanInterface + Send + Sync + 'static>>,
 }
 impl FaderControl {
 	pub fn build(position: Arc<dyn AnalogInterface + Send + Sync + 'static>) -> Self {
@@ -159,9 +159,9 @@ impl FaderControl {
 /// Describes a rotary knob input
 pub struct KnobControl {
 	/// Indicates whether the knob can communicate position
-	position: Arc<dyn AnalogInterface + Send + Sync + 'static>,
+	pub position: Arc<dyn AnalogInterface + Send + Sync + 'static>,
 	/// Indicates whether the knob can be pushed like a button
-	push: Option<Arc<dyn BooleanInterface + Send + Sync + 'static>>,
+	pub push: Option<Arc<dyn BooleanInterface + Send + Sync + 'static>>,
 }
 impl KnobControl {
 	pub fn build(position: Arc<dyn AnalogInterface + Send + Sync + 'static>) -> Self {
@@ -182,9 +182,9 @@ impl KnobControl {
 /// Describes a button input
 pub struct ButtonControl {
 	/// Indicates whether the button can communicate push events
-	push: Arc<dyn BooleanInterface + Send + Sync + 'static>,
+	pub push: Arc<dyn BooleanInterface + Send + Sync + 'static>,
 	/// Indicates whether the button can receive velocity events
-	velocity: bool,
+	pub velocity: bool,
 }
 impl ButtonControl {
 	pub fn build(push: Arc<dyn BooleanInterface + Send + Sync + 'static>) -> Self {

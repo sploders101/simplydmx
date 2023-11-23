@@ -12,6 +12,7 @@ use uuid::Uuid;
 
 use self::{controller_services::ControllerService, types::Controller};
 
+#[derive(Clone)]
 pub struct ControllerInterface(PluginContext, Arc<RwLock<ControllerInterfaceInner>>);
 struct ControllerInterfaceInner {
 	control_services: FxHashMap<Uuid, Arc<dyn ControllerService + Send + Sync + 'static>>,

@@ -2,6 +2,8 @@ mod blender;
 mod commands;
 mod state;
 
+use self::state::OpacityGroup;
+
 use super::{
 	patcher::PatcherInterface,
 	saver::{Savable, SaverInterface},
@@ -349,7 +351,8 @@ impl MixerInterface {
 			).await;
 
 			if let Some(opacity) = ctx.default_context.layer_opacities.get(&submaster_id) {
-				if *opacity > 0 {
+				let opacity = opacity.get();
+				if opacity > 0 {
 					self.2.notify_one();
 				}
 			}
@@ -369,29 +372,35 @@ impl MixerInterface {
 			.cloned();
 	}
 
-	/// Sets the opacity of a layer (Optionally within a specific bin)
+	/// Sets the opacity of a layer
 	///
 	/// If auto-insert is true, the layer will be automatically inserted if `opacity > 0` and it isn't in the stack.
 	/// Likewise, it will be removed if `opacity == 0` and it *is* in the stack
 	///
 	/// Returns a boolean indicating if the operation was successful (this can be safely ignored)
-	pub async fn set_layer_opacity(&self, submaster_id: Uuid, opacity: u16, auto_insert: bool) -> bool {
+	pub async fn set_layer_opacity(&self, submaster_id: &Uuid, opacity: u16, auto_insert: bool) -> bool {
 		let mut ctx = self.1.write().await;
 		if ctx
 			.default_context
 			.user_submasters
 			.contains_key(&submaster_id)
 		{
-			ctx.default_context
-				.layer_opacities
-				.insert(submaster_id, opacity);
+			let opacity_group = match ctx.default_context.layer_opacities.get_mut(&submaster_id) {
+				Some(opacity_group) => opacity_group,
+				None => {
+					ctx.default_context.layer_opacities.insert(submaster_id.clone(), OpacityGroup::default());
+					ctx.default_context.layer_opacities.get_mut(submaster_id).unwrap()
+				}
+			};
+			opacity_group.opacity = opacity;
+			let active_opacity = opacity_group.get();
 			if auto_insert {
-				if opacity > 0 && !ctx.default_context.layer_order.contains(&submaster_id) {
+				if active_opacity > 0 && !ctx.default_context.layer_order.contains(&submaster_id) {
 					ctx.default_context.layer_order.push(submaster_id.clone())
-				} else if opacity == 0 && ctx.default_context.layer_order.contains(&submaster_id) {
+				} else if active_opacity == 0 && ctx.default_context.layer_order.contains(&submaster_id) {
 					ctx.default_context
 						.layer_order
-						.retain(|x| *x != submaster_id);
+						.retain(|x| x != submaster_id);
 				}
 			}
 			// TODO: Send this event only if the opacity *changes*
@@ -402,13 +411,52 @@ impl MixerInterface {
 		}
 	}
 
-	/// Gets the opacity of a layer (Optionally within a specific bin)
+	/// Places a temporary opacity override on a layer without affecting the original value
+	///
+	/// If auto-insert is true, the layer will be automatically inserted if `opacity > 0` and it isn't in the stack.
+	/// Likewise, it will be removed if `opacity == 0` and it *is* in the stack
+	///
+	/// Returns a boolean indicating if the operation was successful (this can be safely ignored)
+	pub async fn flash_layer(&self, submaster_id: &Uuid, opacity: Option<u16>, auto_insert: bool) -> bool {
+		let mut ctx = self.1.write().await;
+		if ctx
+			.default_context
+			.user_submasters
+			.contains_key(&submaster_id)
+		{
+			let opacity_group = match ctx.default_context.layer_opacities.get_mut(&submaster_id) {
+				Some(opacity_group) => opacity_group,
+				None => {
+					ctx.default_context.layer_opacities.insert(submaster_id.clone(), OpacityGroup::default());
+					ctx.default_context.layer_opacities.get_mut(submaster_id).unwrap()
+				}
+			};
+			opacity_group.flash_opacity = opacity;
+			let active_opacity = opacity_group.get();
+			if auto_insert {
+				if active_opacity > 0 && !ctx.default_context.layer_order.contains(&submaster_id) {
+					ctx.default_context.layer_order.push(submaster_id.clone())
+				} else if active_opacity == 0 && ctx.default_context.layer_order.contains(&submaster_id) {
+					ctx.default_context
+						.layer_order
+						.retain(|x| x != submaster_id);
+				}
+			}
+			// TODO: Send this event only if the opacity *changes*
+			self.2.notify_one();
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	/// Gets the opacity of a layer
 	///
 	/// Returns the opacity of the layer, or `None` if it is not in the stack
 	pub async fn get_layer_opacity(&self, submaster_id: Uuid) -> Option<u16> {
 		let ctx = self.1.read().await;
 		return match ctx.default_context.layer_opacities.get(&submaster_id) {
-			Some(opacity) => Some(*opacity),
+			Some(opacity) => Some(opacity.opacity),
 			None => None,
 		};
 	}

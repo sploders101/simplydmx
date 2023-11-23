@@ -4,7 +4,7 @@ mod controllers;
 use std::sync::Arc;
 
 use anyhow::anyhow;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use simplydmx_plugin_framework::*;
 use tokio::sync::RwLock;
 use uuid::Uuid;

@@ -224,7 +224,7 @@ impl SetLayerOpacity {
 	async fn main(self, submaster_id: Uuid, opacity: u16, auto_insert: bool) -> bool {
 		return self
 			.0
-			.set_layer_opacity(submaster_id, opacity, auto_insert)
+			.set_layer_opacity(&submaster_id, opacity, auto_insert)
 			.await;
 	}
 }

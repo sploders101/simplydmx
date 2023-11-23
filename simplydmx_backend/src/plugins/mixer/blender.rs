@@ -64,12 +64,13 @@ pub async fn start_blender(
 					let mut cumulative_layer: FullMixerOutput = locked_data_sources.base_layer().clone();
 					for layer_id in ctx_read.default_context.layer_order.iter() {
 						if let Some(opacity) = ctx_read.default_context.layer_opacities.get(layer_id) {
-							if *opacity == 0 { continue } // Skip if opacity is 0
+							let opacity = opacity.get();
+							if opacity == 0 { continue } // Skip if opacity is 0
 							if let Some(layer) = ctx_read.default_context.user_submasters.get(layer_id) {
 								if layer.animated() {
 									animated = true;
 								}
-								layer.blend(&mut cumulative_layer, &locked_data_sources, *opacity).await;
+								layer.blend(&mut cumulative_layer, &locked_data_sources, opacity).await;
 							}
 						}
 					}

@@ -56,12 +56,25 @@ impl MixerContext {
 }
 
 #[portable]
+#[derive(Default)]
+/// Defines a set of constraints used for blending a layer
+pub struct OpacityGroup {
+	pub opacity: u16,
+	pub flash_opacity: Option<u16>,
+}
+impl OpacityGroup {
+	pub fn get(&self) -> u16 {
+		return self.flash_opacity.unwrap_or(self.opacity);
+	}
+}
+
+#[portable]
 /// Describes a single mixer instance, with its own internal state for driving layers and effects
 ///
 /// Multiple instances are used for creating a blind mode
 pub struct MixingContext {
 	pub layer_order: Vec<Uuid>,
-	pub layer_opacities: HashMap<Uuid, u16>,
+	pub layer_opacities: HashMap<Uuid, OpacityGroup>,
 	pub user_submaster_order: Vec<Uuid>,
 	pub user_submasters: HashMap<Uuid, StaticLayer>,
 }

@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use simplydmx_plugin_framework::*;
 use thiserror::Error;
 
-use super::types::Control;
+use super::{types::Control, scalable_value::ScalableValue};
 
 
 #[portable]
@@ -45,26 +45,88 @@ pub trait ControllerService {
 	async fn get_form(
 		&self,
 		prefilled: Option<SerializedData>,
-		control_group: Arc<Control>,
 	) -> FormDescriptor;
 
 	/// Links a control to the service
 	async fn create_link(
 		&self,
+		from_save: bool,
 		form_data: SerializedData,
-		control_group: Arc<Control>,
-	) -> Result<Arc<dyn ControllerServiceLink + Send + Sync + 'static>, ControllerLinkError>;
-
-	/// Loads a control from previously-saved data
-	async fn load_from_save(
-		&self,
-		save_data: SerializedData,
-		control_group: Arc<Control>,
-	) -> Result<Arc<dyn ControllerServiceLink + Send + Sync + 'static>, ControllerRestoreError>;
+		capabilities: ControlCapabilities,
+	) -> Result<Box<dyn ControllerServiceLink + Send + Sync + 'static>, ControllerLinkError>;
 }
 
 #[async_trait]
+/// This represents the interface between a control and an action in SimplyDMX
 pub trait ControllerServiceLink {
 	async fn save(&self) -> SerializedData;
+	async fn clone_link(&self) -> Box<dyn ControllerServiceLink + Send + Sync + 'static>;
+	async fn emit(&self, event: ControllerEvent);
 	async fn unlink(&self) {}
+}
+
+/// Describes what a controller's capabilities are. This could affect the heuristics
+/// of the action it controls
+pub enum ControlCapabilities {
+	FaderColumn(FaderColumnCapabilities),
+	Fader(FaderCapabilities),
+	Knob(KnobCapabilities),
+	Button(ButtonCapabilities),
+}
+
+/// Describes the capabilities of a fader column
+pub struct FaderColumnCapabilities {
+	pub fader: FaderCapabilities,
+	pub button: ButtonCapabilities,
+}
+
+/// Describes the optional capabilities of a fader
+pub struct FaderCapabilities {
+	pub touch: bool,
+}
+
+/// Describes the optional capabilities of a knob
+pub struct KnobCapabilities {
+	pub push: bool,
+}
+
+/// Describes the optional capabilities of a button
+pub struct ButtonCapabilities {
+	pub velocity: bool,
+}
+
+/// An event emitted from a control. This top layer of the enum
+/// tree indicates what kind of control emitted the event.
+pub enum ControllerEvent {
+	FaderColumn(ControllerFaderColumnEvent),
+	Fader(ControllerFaderEvent),
+	Knob(ControllerKnobEvent),
+	Button(ControllerButtonEvent),
+}
+
+/// An event emitted by a fader column. This layer indicates which
+/// item within the column emitted the event.
+pub enum ControllerFaderColumnEvent {
+	Fader(ControllerFaderEvent),
+	Button(ControllerButtonEvent)
+}
+
+/// An event emitted by a fader.
+pub enum ControllerFaderEvent {
+	Pos(ScalableValue),
+	Touch(bool),
+}
+
+/// An event emitted by a knob
+pub enum ControllerKnobEvent {
+	Pos(ScalableValue),
+	Push(bool),
+}
+
+/// An event emitted by a button
+pub enum ControllerButtonEvent {
+	Push {
+		state: bool,
+		velocity: Option<ScalableValue>,
+	}
 }

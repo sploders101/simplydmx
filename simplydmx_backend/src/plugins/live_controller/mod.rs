@@ -1,6 +1,4 @@
 pub mod types;
-pub mod control_interfaces;
-pub mod control_proxies;
 pub mod scalable_value;
 pub mod controller_services;
 use std::sync::Arc;

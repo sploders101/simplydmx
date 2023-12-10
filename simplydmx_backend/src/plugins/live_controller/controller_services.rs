@@ -6,8 +6,9 @@ use crate::utilities::{forms::FormDescriptor, serialized_data::SerializedData};
 use async_trait::async_trait;
 use simplydmx_plugin_framework::*;
 use thiserror::Error;
+use tokio::sync::mpsc::Sender;
 
-use super::{types::Control, scalable_value::ScalableValue};
+use super::scalable_value::ScalableValue;
 
 
 #[portable]
@@ -56,12 +57,51 @@ pub trait ControllerService {
 	) -> Result<Box<dyn ControllerServiceLink + Send + Sync + 'static>, ControllerLinkError>;
 }
 
+/// Used for signaling updates to a control.
+///
+/// This can contain either a differential or full update for the control,
+/// with logic used to determine the values for multiple display methods.
+pub trait ControlUpdate {
+	/// Gets the label for the control, to be displayed by the controller
+	fn get_label(&self) -> Option<Arc<str>> { None }
+	/// Gets a textual representation of the value
+	fn get_value_text(&self) -> Option<Arc<str>> { None }
+	/// Gets the value to be used with a motorized fader
+	fn get_fader(&self) -> Option<ScalableValue> { None }
+	/// Gets the value to be displayed on a rotary encoder or motorized knob
+	fn get_knob(&self) -> Option<ScalableValue> { self.get_fader() }
+	/// Gets the boolean value to be displayed by an LED
+	fn get_led(&self) -> Option<bool> { None }
+	/// Gets a variable brightness to be displayed by an LED
+	fn get_led_brightness(&self) -> Option<ScalableValue> {
+		if self.get_led()? {
+			return Some(ScalableValue::U16(u16::MAX));
+		} else {
+			return Some(ScalableValue::U16(u16::MIN));
+		}
+	}
+	/// Gets an RGB color value to be displayed by an LED
+	fn get_rgb_led(&self) -> Option<(ScalableValue, ScalableValue, ScalableValue)> {
+		let brightness = self.get_led_brightness()?;
+		return Some((brightness, brightness, brightness));
+	}
+}
+
 #[async_trait]
 /// This represents the interface between a control and an action in SimplyDMX
 pub trait ControllerServiceLink {
+	/// Serializes information about the link so it can be saved to a file
 	async fn save(&self) -> SerializedData;
+	/// Clones the link so it can be applied to another control (namely for LiveAssign)
 	async fn clone_link(&self) -> Box<dyn ControllerServiceLink + Send + Sync + 'static>;
+	/// Handles an event emitted from the control
 	async fn emit(&self, event: ControllerEvent);
+	/// Gets what should be the current state of the control. This is used to initialize the
+	/// control after creating a link.
+	async fn get_current_value(&self) -> Arc<dyn ControlUpdate + Send + Sync + 'static>;
+	/// Sets the channel that should be used for communicating updates to the control
+	async fn set_update_channel(&self, update_channel: Sender<Arc<dyn ControlUpdate + Send + Sync + 'static>>);
+	/// Unlinks the service from the control, tearing down any related interfaces
 	async fn unlink(&self) {}
 }
 

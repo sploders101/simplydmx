@@ -1,6 +1,7 @@
-pub mod types;
-pub mod scalable_value;
 pub mod controller_services;
+pub mod providers;
+pub mod scalable_value;
+pub mod types;
 use std::sync::Arc;
 
 use rustc_hash::FxHashMap;
@@ -13,7 +14,7 @@ use self::{controller_services::ControllerService, types::Controller};
 pub struct ControllerInterface(PluginContext, Arc<RwLock<ControllerInterfaceInner>>);
 struct ControllerInterfaceInner {
 	control_services: FxHashMap<Uuid, Arc<dyn ControllerService + Send + Sync + 'static>>,
-	controllers: FxHashMap<Uuid, Controller>,
+	controllers: FxHashMap<Uuid, Arc<dyn Controller + Send + Sync + 'static>>,
 }
 
 impl ControllerInterface {
@@ -23,14 +24,21 @@ impl ControllerInterface {
 			.await
 			.unwrap();
 
-		return Ok(ControllerInterface(plugin, Arc::new(RwLock::new(ControllerInterfaceInner {
-			control_services: Default::default(),
-			controllers: Default::default(),
-		}))));
+		return Ok(ControllerInterface(
+			plugin,
+			Arc::new(RwLock::new(ControllerInterfaceInner {
+				control_services: Default::default(),
+				controllers: Default::default(),
+			})),
+		));
 	}
 
 	/// Registers a new controller to be available for linking with control services
-	pub async fn register_controller(&self, uuid: Uuid, controller: Controller) -> () {
+	pub async fn register_controller(
+		&self,
+		uuid: Uuid,
+		controller: Arc<dyn Controller + Send + Sync + 'static>,
+	) -> () {
 		let mut ctx = self.1.write().await;
 		ctx.controllers.insert(uuid, controller);
 	}
@@ -39,15 +47,24 @@ impl ControllerInterface {
 	pub async fn unregister_controller(&self, uuid: &Uuid) {
 		let mut ctx = self.1.write().await;
 		if let Some(old_controller) = ctx.controllers.remove(uuid) {
-			for mut control in old_controller.controls.into_values() {
-				control.unbind().await;
+			for control in old_controller
+				.get_controls()
+				.iter()
+				.map(|control_meta| old_controller.get_control_by_uuid(&control_meta.id))
+			{
+				if let Some(control) = control {
+					control.unbind().await;
+				}
 			}
 		}
 	}
 
 	/// Registers a new control service. These should be static and never unloaded. Options can be controlled
 	/// using form elements
-	pub async fn register_service(&self, service: Arc<dyn ControllerService + Send + Sync + 'static>) -> Uuid {
+	pub async fn register_service(
+		&self,
+		service: Arc<dyn ControllerService + Send + Sync + 'static>,
+	) -> Uuid {
 		let mut ctx = self.1.write().await;
 		let service_id = Uuid::new_v4();
 		ctx.control_services.insert(service_id.clone(), service);

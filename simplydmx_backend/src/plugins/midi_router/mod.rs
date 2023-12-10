@@ -101,6 +101,8 @@ pub type MidiCallback = Box<dyn Fn(Vec<u8>) -> () + Send + Sync + 'static>;
 #[portable]
 pub struct InputMeta {
 	pub name: Arc<str>,
+	/// Objects with the same group ID will be combined in the UI
+	pub group: Option<Uuid>,
 }
 pub enum LogicalInput {
 	/// An unlinked sink should contain a MidiCallback to be passed to the
@@ -115,6 +117,8 @@ pub enum LogicalInput {
 #[portable]
 pub struct OutputMeta {
 	pub name: Arc<str>,
+	/// Objects with the same group ID will be combined in the UI
+	pub group: Option<Uuid>,
 }
 pub enum LogicalOutput {
 	/// An unlinked internal source is simply a placeholder for a MIDI

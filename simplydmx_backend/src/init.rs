@@ -55,13 +55,6 @@ pub async fn async_main(plugin_manager: &PluginManager, data: Option<Vec<u8>>) {
 		.await
 		.unwrap();
 
-	let midi_control_interface = plugins::midi_controllers::MidiControllersInterface::init(
-		plugin_manager,
-		midi_router_interface,
-		live_control_interface,
-	)
-	.await;
-
 	let dmx_interface = plugins::output_dmx::initialize(
 		plugin_manager
 			.register_plugin("output_dmx", "DMX Universe Renderer")

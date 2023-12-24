@@ -24,6 +24,7 @@ thread-priority = "0.13.1"
 midly = "0.5.3"
 coremidi = "0.7.0"
 core-foundation = "0.9.3"
+lazy_static = "1.4.0"
 
 [lib]
 path = "src/lib.rs"

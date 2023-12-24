@@ -1,6 +1,7 @@
 mod backends;
 
 use async_trait::async_trait;
+use midly::live::LiveEvent;
 use rustc_hash::FxHashMap;
 use simplydmx_plugin_framework::*;
 use std::sync::Arc;
@@ -147,7 +148,7 @@ pub struct MidiRouterInner {
 /// interfaces to physical ones.
 #[derive(Clone)]
 pub struct MidiRouterInterface {
-	plugin: PluginContext,
+	_plugin: PluginContext,
 	inner: Arc<MidiRouterInner>,
 }
 impl MidiRouterInterface {
@@ -158,7 +159,7 @@ impl MidiRouterInterface {
 			.unwrap();
 
 		return Ok(MidiRouterInterface {
-			plugin,
+			_plugin: plugin,
 			inner: Arc::new(MidiRouterInner {
 				outputs: RwLock::new(FxHashMap::default()),
 				inputs: RwLock::new(FxHashMap::default()),
@@ -246,6 +247,16 @@ impl MidiRouterInterface {
 			}
 			None => return Err(SendOutputError::NotRegistered),
 		}
+	}
+	pub async fn send_output_message<'a>(&self, output_id: &Uuid, message: LiveEvent<'a>) -> Result<(), SendOutputError> {
+		let mut buf = Vec::<u8>::new();
+		if message.write(&mut buf).is_ok() {
+			self.send_output(output_id, &buf).await?;
+		} else {
+			#[cfg(debug_assertions)]
+			eprintln!("Couldn't form midi message");
+		}
+		return Ok(());
 	}
 	pub async fn remove_output(&self, output_id: &Uuid) {
 		let mut outputs = self.inner.outputs.write().await;

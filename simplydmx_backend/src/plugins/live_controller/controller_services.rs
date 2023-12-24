@@ -6,10 +6,8 @@ use crate::utilities::{forms::FormDescriptor, serialized_data::SerializedData};
 use async_trait::async_trait;
 use simplydmx_plugin_framework::*;
 use thiserror::Error;
-use tokio::sync::mpsc::Sender;
 
 use super::scalable_value::ScalableValue;
-
 
 #[portable]
 #[derive(Debug, Clone, Error)]
@@ -43,10 +41,7 @@ pub trait ControllerService {
 	///
 	/// `control_group` is an `Arc` containing a reference to the control
 	/// group that is being edited.
-	async fn get_form(
-		&self,
-		prefilled: Option<SerializedData>,
-	) -> FormDescriptor;
+	async fn get_form(&self, prefilled: Option<SerializedData>) -> FormDescriptor;
 
 	/// Links a control to the service
 	async fn create_link(
@@ -63,15 +58,25 @@ pub trait ControllerService {
 /// with logic used to determine the values for multiple display methods.
 pub trait ControlUpdate {
 	/// Gets the label for the control, to be displayed by the controller
-	fn get_label(&self) -> Option<Arc<str>> { None }
+	fn get_label(&self) -> Option<Arc<str>> {
+		None
+	}
 	/// Gets a textual representation of the value
-	fn get_value_text(&self) -> Option<Arc<str>> { None }
+	fn get_value_text(&self) -> Option<Arc<str>> {
+		None
+	}
 	/// Gets the value to be used with a motorized fader
-	fn get_fader(&self) -> Option<ScalableValue> { None }
+	fn get_fader(&self) -> Option<ScalableValue> {
+		None
+	}
 	/// Gets the value to be displayed on a rotary encoder or motorized knob
-	fn get_knob(&self) -> Option<ScalableValue> { self.get_fader() }
+	fn get_knob(&self) -> Option<ScalableValue> {
+		self.get_fader()
+	}
 	/// Gets the boolean value to be displayed by an LED
-	fn get_led(&self) -> Option<bool> { None }
+	fn get_led(&self) -> Option<bool> {
+		None
+	}
 	/// Gets a variable brightness to be displayed by an LED
 	fn get_led_brightness(&self) -> Option<ScalableValue> {
 		if self.get_led()? {
@@ -87,9 +92,17 @@ pub trait ControlUpdate {
 	}
 }
 
+#[portable]
+pub struct ControllerLinkDisplay {
+	name: Arc<str>,
+	description: Option<Arc<str>>,
+}
+
 #[async_trait]
 /// This represents the interface between a control and an action in SimplyDMX
 pub trait ControllerServiceLink {
+	/// Returns data useful for displaying details about the link to the user
+	fn display_data(&self) -> ControllerLinkDisplay;
 	/// Serializes information about the link so it can be saved to a file
 	async fn save(&self) -> SerializedData;
 	/// Clones the link so it can be applied to another control (namely for LiveAssign)
@@ -99,10 +112,15 @@ pub trait ControllerServiceLink {
 	/// Gets what should be the current state of the control. This is used to initialize the
 	/// control after creating a link.
 	async fn get_current_value(&self) -> Arc<dyn ControlUpdate + Send + Sync + 'static>;
-	/// Sets the channel that should be used for communicating updates to the control
-	async fn set_update_channel(&self, update_channel: Sender<Arc<dyn ControlUpdate + Send + Sync + 'static>>);
+	/// Sets the callback that should be used for communicating updates to the control.
+	async fn set_update_channel(
+		&self,
+		update_channel: Box<
+			dyn Fn(Arc<dyn ControlUpdate + Send + Sync + 'static>) + Send + Sync + 'static,
+		>,
+	);
 	/// Unlinks the service from the control, tearing down any related interfaces
-	async fn unlink(&self) {}
+	async fn unlink(&self);
 }
 
 /// Describes what a controller's capabilities are. This could affect the heuristics
@@ -148,7 +166,7 @@ pub enum ControllerEvent {
 /// item within the column emitted the event.
 pub enum ControllerFaderColumnEvent {
 	Fader(ControllerFaderEvent),
-	Button(ControllerButtonEvent)
+	Button(ControllerButtonEvent),
 }
 
 /// An event emitted by a fader.
@@ -168,5 +186,5 @@ pub enum ControllerButtonEvent {
 	Push {
 		state: bool,
 		velocity: Option<ScalableValue>,
-	}
+	},
 }

@@ -9,12 +9,17 @@ use simplydmx_plugin_framework::*;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
-use self::{controller_services::ControllerService, types::Controller};
+use self::{
+	controller_services::ControllerService,
+	providers::{get_providers, ControllerProvider},
+	types::Controller,
+};
 
 pub struct ControllerInterface(PluginContext, Arc<RwLock<ControllerInterfaceInner>>);
 struct ControllerInterfaceInner {
 	control_services: FxHashMap<Uuid, Arc<dyn ControllerService + Send + Sync + 'static>>,
-	controllers: FxHashMap<Uuid, Arc<dyn Controller + Send + Sync + 'static>>,
+	controller_providers: FxHashMap<Uuid, Box<dyn ControllerProvider + Send + Sync + 'static>>,
+	controllers: FxHashMap<Uuid, Box<dyn Controller + Send + Sync + 'static>>,
 }
 
 impl ControllerInterface {
@@ -28,6 +33,7 @@ impl ControllerInterface {
 			plugin,
 			Arc::new(RwLock::new(ControllerInterfaceInner {
 				control_services: Default::default(),
+				controller_providers: get_providers(),
 				controllers: Default::default(),
 			})),
 		));
@@ -37,7 +43,7 @@ impl ControllerInterface {
 	pub async fn register_controller(
 		&self,
 		uuid: Uuid,
-		controller: Arc<dyn Controller + Send + Sync + 'static>,
+		controller: Box<dyn Controller + Send + Sync + 'static>,
 	) -> () {
 		let mut ctx = self.1.write().await;
 		ctx.controllers.insert(uuid, controller);
@@ -46,16 +52,8 @@ impl ControllerInterface {
 	/// Unregisters a controller, unlinking all associated actions
 	pub async fn unregister_controller(&self, uuid: &Uuid) {
 		let mut ctx = self.1.write().await;
-		if let Some(old_controller) = ctx.controllers.remove(uuid) {
-			for control in old_controller
-				.get_controls()
-				.iter()
-				.map(|control_meta| old_controller.get_control_by_uuid(&control_meta.id))
-			{
-				if let Some(control) = control {
-					control.unbind().await;
-				}
-			}
+		if let Some(mut old_controller) = ctx.controllers.remove(uuid) {
+			old_controller.wait_teardown().await;
 		}
 	}
 

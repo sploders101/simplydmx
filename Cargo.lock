@@ -2806,6 +2806,7 @@ dependencies = [
  "core-foundation",
  "coremidi",
  "enttecopendmx",
+ "lazy_static",
  "linkme",
  "midly",
  "rustc-hash",

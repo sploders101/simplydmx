@@ -3,12 +3,15 @@ mod boards;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use rustc_hash::FxHashMap;
 use uuid::Uuid;
 
 use crate::{
 	plugins::midi_router::MidiRouterInterface,
 	utilities::{forms::FormDescriptor, serialized_data::SerializedData},
 };
+
+use self::boards::behringer::x_touch::compact::XTouchCompactProvider;
 
 use super::types::{Controller, ControllerMeta};
 
@@ -36,4 +39,13 @@ pub trait ControllerProvider: Send + Sync + 'static {
 		form_data: SerializedData,
 		interfaces: &ControllerInterfaces,
 	) -> anyhow::Result<Box<dyn Controller + Send + Sync + 'static>>;
+}
+
+pub fn get_providers() -> FxHashMap<Uuid, Box<dyn ControllerProvider + Send + Sync + 'static>> {
+	let mut controllers: FxHashMap<Uuid, Box<dyn ControllerProvider + Send + Sync + 'static>> = FxHashMap::default();
+
+	let x_touch_compact = XTouchCompactProvider;
+	controllers.insert(x_touch_compact.id(), Box::new(x_touch_compact));
+
+	return controllers;
 }

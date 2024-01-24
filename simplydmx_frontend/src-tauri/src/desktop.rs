@@ -4,5 +4,12 @@
 )]
 
 pub fn main() {
-  simplydmx::AppBuilder::new().run();
+  simplydmx::AppBuilder::new().setup(|_app| {
+    if let Ok(mut nosleep) = nosleep::NoSleep::new() {
+      let _ = nosleep.start(nosleep::NoSleepType::PreventUserIdleDisplaySleep);
+    }
+    #[cfg(target_os = "macos")]
+    macos_app_nap::prevent();
+    Ok(())
+  }).run();
 }

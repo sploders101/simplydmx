@@ -26,7 +26,7 @@ pub async fn initialize(
 	).await.unwrap();
 
 	let loaded_data = if let Some(loaded_data) = loaded_data {
-		match ciborium::de::from_reader::<'_, ShowFile, &[u8]>(&loaded_data) {
+		match ciborium::de::from_reader::<ShowFile, &[u8]>(&loaded_data) {
 			Ok(result) => Some(result),
 			Err(err) => return Err(format!("{:?}", err)),
 		}
@@ -111,7 +111,7 @@ impl SaverInterface {
 		let mut ctx = self.1.write().await;
 		if let Some(ref mut loaded_data) = ctx.loaded_data {
 			if let Some(encoded_data) = loaded_data.plugin_data.remove(id) {
-				return match ciborium::de::from_reader::<'_, T, &[u8]>(&encoded_data) {
+				return match ciborium::de::from_reader::<T, &[u8]>(&encoded_data) {
 					Ok(result) => Ok(Some(result)),
 					Err(error) => Err(format!("{:?}", error)),
 				};

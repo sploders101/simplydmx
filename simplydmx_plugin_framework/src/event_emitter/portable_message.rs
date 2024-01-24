@@ -4,9 +4,7 @@ use std::{
 	marker::PhantomData,
 };
 
-use serde::{
-	Serialize,
-};
+use serde::Serialize;
 
 use serde_json::{
 	self,
@@ -92,7 +90,7 @@ impl<T: BidirectionalPortable> PortableMessageGenericDeserializer for PortableMe
 		};
 	}
 	fn deserialize_cbor(&self, value: &[u8]) -> Result<Box<dyn PortableMessage>, String> {
-		return match ciborium::de::from_reader::<'_, T, &[u8]>(&value) {
+		return match ciborium::de::from_reader::<T, &[u8]>(value) {
 			Ok(decoded) => Ok(Box::new(decoded)),
 			Err(error) => Err(format!("{:?}", error)),
 		}

@@ -209,7 +209,7 @@ fn interpolate_service_main(outer_type: Type, attr: TokenStream, body: ImplItemM
 					}
 				}));
 				internal_arguments_cbor.push(Box::new(quote! {
-					match ciborium::de::from_reader::<'_, #ty, &[u8]>(&arguments[#index]) {
+					match ciborium::de::from_reader::<#ty, &[u8]>(&arguments[#index]) {
 						Ok(arg) => arg,
 						Err(_) => return Err(simplydmx_plugin_framework::CallServiceRPCError::DeserializationFailed),
 					}

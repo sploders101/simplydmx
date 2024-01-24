@@ -50,7 +50,7 @@ impl ApplicationState {
 				tokio::select! {
 					msg = response_receiver.recv() => {
 						if let Some(msg) = msg {
-							app.emit_all("sdmx", msg).ok();
+							app.emit("sdmx", msg).ok();
 						} else {
 							break;
 						}
@@ -133,7 +133,7 @@ impl AppBuilder {
 				console_subscriber::init();
 				let app_ref = app.app_handle();
 				let mut application_state = block_on(application_state_setup.write());
-				*application_state = Some(block_on(ApplicationState::start_plugins(app_ref, None)));
+				*application_state = Some(block_on(ApplicationState::start_plugins(app_ref.clone(), None)));
 
 				#[cfg(target_os = "macos")]
 				{

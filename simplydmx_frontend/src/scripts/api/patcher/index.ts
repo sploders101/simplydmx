@@ -24,7 +24,7 @@ export async function listenForUpdates(mutableGetter: () => SharablePatcherState
 		{ type: "None" },
 		(event) => {
 			const existingState = mutableGetter();
-			if (existingState) {
+			if (existingState && existingState.fixtures[event.data[0]]) {
 				existingState.fixtures[event.data[0]].visualization_info = event.data[1];
 			} else {
 				patcher.get_patcher_state().then(setter);

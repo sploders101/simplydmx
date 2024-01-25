@@ -50,7 +50,7 @@ impl ApplicationState {
 				tokio::select! {
 					msg = response_receiver.recv() => {
 						if let Some(msg) = msg {
-							app.emit_all("sdmx", msg).ok();
+							app.emit("sdmx", msg).ok();
 						} else {
 							break;
 						}
@@ -104,6 +104,13 @@ pub fn run_app() {
 	let application_state_setup = Arc::clone(&application_state);
 	let application_state_exit = Arc::clone(&application_state);
 
+	// Disable power saving features
+	if let Ok(mut nosleep) = nosleep::NoSleep::new() {
+		let _ = nosleep.start(nosleep::NoSleepType::PreventUserIdleDisplaySleep);
+	}
+	#[cfg(target_os = "macos")]
+	macos_app_nap::prevent();
+
 	tauri::Builder::default()
 		.manage(application_state)
 		.invoke_handler(tauri::generate_handler![sdmx, load_file])
@@ -112,7 +119,7 @@ pub fn run_app() {
 			console_subscriber::init();
 			let app_ref = app.app_handle();
 			let mut application_state = block_on(application_state_setup.write());
-			*application_state = Some(block_on(ApplicationState::start_plugins(app_ref, None)));
+			*application_state = Some(block_on(ApplicationState::start_plugins(app_ref.clone(), None)));
 
 			#[cfg(target_os = "macos")]
 			{

@@ -42,8 +42,8 @@ export async function listenForUpdates(mutableGetter: () => SharablePatcherState
 		{ type: "None" },
 		(event) => {
 			const existingState = mutableGetter();
-			if (existingState) {
-				if (event.criteria.type !== "Uuid") throw new Error("Invalid criteria");
+			if (event.criteria.type !== "Uuid") throw new Error("Invalid criteria");
+			if (existingState && existingState.fixtures[event.criteria.data]) {
 				existingState.fixtures[event.criteria.data].visualization_info = event.data;
 			} else {
 				patcher.get_patcher_state().then(setter);

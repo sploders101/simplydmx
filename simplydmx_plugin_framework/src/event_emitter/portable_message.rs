@@ -4,9 +4,7 @@ use std::{
 	marker::PhantomData,
 };
 
-use serde::{
-	Serialize,
-};
+use serde::Serialize;
 
 use serde_json::{
 	self,

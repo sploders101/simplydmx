@@ -3,7 +3,6 @@ use std::{
 	sync::{atomic::AtomicBool, Arc},
 	time::{Duration, Instant},
 };
-use thread_priority::{set_current_thread_priority, ThreadPriority};
 use tokio::{sync::Mutex, task::JoinHandle};
 
 /// This controls an OpenDMX interface and allows intermittent
@@ -63,10 +62,7 @@ impl Drop for OpenDMXController {
 }
 
 fn thread_loop(shutdown_trigger: Arc<AtomicBool>, channels: Arc<Mutex<Option<[u8; 512]>>>) {
-	if let Err(err) = set_current_thread_priority(ThreadPriority::Max) {
-		#[cfg(debug_assertions)]
-		eprintln!("Failed to set OpenDMX controller thread priority: {:?}", err);
-	}
+	audio_thread_priority::atp_promote_current_thread_to_real_time(512, 44);
 	let mut last_retry = Instant::now();
 	let mut port: Option<EnttecOpenDMX> = EnttecOpenDMX::new().and_then(|mut port| {
 		port.open()?;

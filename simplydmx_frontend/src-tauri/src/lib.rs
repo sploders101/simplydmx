@@ -108,8 +108,6 @@ pub fn run_app() {
 	if let Ok(mut nosleep) = nosleep::NoSleep::new() {
 		let _ = nosleep.start(nosleep::NoSleepType::PreventUserIdleDisplaySleep);
 	}
-	#[cfg(target_os = "macos")]
-	macos_app_nap::prevent();
 
 	tauri::Builder::default()
 		.manage(application_state)

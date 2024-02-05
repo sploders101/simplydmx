@@ -3,92 +3,6 @@ use simplydmx_plugin_framework::PluginManager;
 
 // Public so the GUI plugin can run it
 pub async fn async_main(plugin_manager: &PluginManager, data: Option<Vec<u8>>) {
-	// TODO: Error handling during init. This wasn't originally intended to be necessary,
-	// but since file loading re-starts plugins with untrusted data, it needs to be done.
-
-	let saver = plugins::saver::initialize(
-		plugin_manager
-			.register_plugin("saver", "Data Saver/Loader")
-			.await
-			.unwrap(),
-		data,
-	)
-	.await
-	.unwrap();
-
-	// Register core plugin
-	plugins::core::initialize(
-		plugin_manager
-			.register_plugin("core", "SimplyDMX Core")
-			.await
-			.unwrap(),
-	)
-	.await;
-
-	let patcher_interface = plugins::patcher::initialize(
-		plugin_manager
-			.register_plugin("patcher", "SimplyDMX Fixture Patcher")
-			.await
-			.unwrap(),
-		saver.clone(),
-	)
-	.await
-	.unwrap();
-
-	let mixer_interface = plugins::mixer::initialize_mixer(
-		plugin_manager
-			.register_plugin("mixer", "SimplyDMX Mixer")
-			.await
-			.unwrap(),
-		saver.clone(),
-		patcher_interface.clone(),
-	)
-	.await
-	.unwrap();
-
-	#[cfg(feature = "output-dmx")]
-	let dmx_interface = plugins::output_dmx::initialize(
-		plugin_manager
-			.register_plugin("output_dmx", "DMX Universe Renderer")
-			.await
-			.unwrap(),
-		saver.clone(),
-		mixer_interface.clone(),
-		patcher_interface.clone(),
-	)
-	.await
-	.unwrap();
-
-	#[cfg(feature = "output-dmx-e131")]
-	plugins::output_dmx_e131::initialize(
-		plugin_manager
-			.register_plugin("output_dmx_e131", "E1.31/sACN DMX Output")
-			.await
-			.unwrap(),
-		saver.clone(),
-		dmx_interface.clone(),
-	)
-	.await
-	.unwrap();
-
-	#[cfg(feature = "output-dmx-enttecopendmx")]
-	plugins::output_dmx_enttecopendmx::initialize(
-		plugin_manager
-			.register_plugin("output_dmx_enttecopendmx", "Enttec OpenDMX Output")
-			.await
-			.unwrap(),
-		saver.clone(),
-		dmx_interface.clone(),
-	)
-	.await
-	.unwrap();
-
-	let init_status = saver.finish_initialization().await;
-	if let SaverInitializationStatus::FinishedUnsafe = init_status {
-		panic!(
-			"Save file contains features that are not compatible with this version of SimplyDMX"
-		);
-	}
 }
 
 #[cfg(feature = "export-services")]
@@ -98,8 +12,8 @@ pub mod exporter {
 		DropdownOptionJSON, FilterCriteria, PluginManager, ServiceArgumentOwned,
 		ServiceDescription, TypeSpecifierRetrievalError,
 	};
-	use tokio::runtime::Runtime;
 	use std::{cmp::Ordering, collections::HashMap, fs::File, io::Write};
+	use tokio::runtime::Runtime;
 	use tsify::Tsify;
 
 	#[distributed_slice]
@@ -118,10 +32,17 @@ pub mod exporter {
 		// Sort types to enable deterministic exports for git tracking
 		let mut types: Vec<(&'static str, &'static str, &'static Option<&'static str>)> = vec![
 			(
+				"Arc",
+				"export type Arc<T> = T;",
+				&Some(
+					r#"/** This is an artifact from the rust -> typescript conversion. It is not relevant to TS code */"#,
+				),
+			),
+			(
 				"FxHashMap",
 				"export type FxHashMap<K extends string | number | symbol, V> = Record<K, V>;",
 				&Some(
-					r#"/** This is the same as a HashMap, but uses a more efficient hashing algorithm in the backend */"#
+					r#"/** This is the same as a HashMap, but uses a more efficient hashing algorithm in the backend */"#,
 				),
 			),
 			(

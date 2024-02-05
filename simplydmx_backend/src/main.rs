@@ -3,11 +3,7 @@
 	windows_subsystem = "windows"
 )]
 
-pub mod api_utilities;
 pub mod init;
-pub mod mixer_utils;
-pub mod plugins;
-pub mod utilities;
 
 fn main() {
 	#[cfg(all(feature = "export-services", feature = "gui"))]

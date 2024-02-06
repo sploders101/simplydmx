@@ -198,7 +198,7 @@ fn interpolate_service_main(outer_type: Type, attr: TokenStream, body: ImplItemM
 				// `call` implementation: Downcasts values to the correct type to call service-specific function
 				internal_arguments.push(Box::new(quote! {
 					match arguments[#index].downcast_ref::<#ty>() {
-						Some(value) => #ty::clone(value),
+						Some(value) => <#ty>::clone(value),
 						None => return Err(simplydmx_plugin_framework::CallServiceError::TypeValidationFailed),
 					}
 				}));

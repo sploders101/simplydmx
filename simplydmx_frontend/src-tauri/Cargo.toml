@@ -24,6 +24,7 @@ simplydmx_lib = { path = "../../simplydmx_backend", features = ["stderr-logging"
 tokio = { version = "1.28.1", features = ["full"] }
 nosleep = "0.2.1"
 macos-app-nap = "0.0.1"
+env_logger = "0.11.1"
 
 [target.'cfg(tokio_unstable)'.dependencies]
 console-subscriber = "0.1.9"

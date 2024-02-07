@@ -4,6 +4,7 @@
 )]
 
 pub fn main() {
+  env_logger::init();
   simplydmx::AppBuilder::new().setup(|_app| {
     if let Ok(mut nosleep) = nosleep::NoSleep::new() {
       let _ = nosleep.start(nosleep::NoSleepType::PreventUserIdleDisplaySleep);

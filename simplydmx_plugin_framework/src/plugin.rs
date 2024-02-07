@@ -417,17 +417,17 @@ impl PluginContext {
 			.emit(event_name, filter, message)
 			.await;
 	}
-	pub async fn emit_borrowed<T: BidirectionalPortable + Clone>(
+	pub async fn emit_if_needed<T: BidirectionalPortable + Clone>(
 		&self,
 		event_name: String,
 		filter: FilterCriteria,
-		message: Arc<T>,
+		message: impl FnOnce() -> T,
 	) {
 		self.0
 			.evt_bus
 			.write()
 			.await
-			.emit_borrowed(event_name, filter, message)
+			.emit_if_needed(event_name, filter, message)
 			.await;
 	}
 

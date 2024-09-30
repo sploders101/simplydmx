@@ -1,7 +1,5 @@
 [workspace]
 members = [
 	"simplydmx_backend",
-	"simplydmx_plugin_framework",
-	"simplydmx_plugin_macros",
-	"simplydmx_frontend/src-tauri",
+	# "simplydmx_frontend/src-tauri",
 ]

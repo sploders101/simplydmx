@@ -15,7 +15,6 @@ use tauri::{
 	async_runtime::block_on,
 };
 use simplydmx_lib::{
-	*,
 	api_utilities::*,
 	init::async_main,
 };
@@ -32,8 +31,6 @@ struct ApplicationState {
 }
 impl ApplicationState {
 	async fn start_plugins(app: AppHandle, file: Option<Vec<u8>>) -> Self {
-		let manager = PluginManager::new();
-		let plugin = manager.register_plugin("gui", "Tauri UI").await.unwrap();
 
 		// Boot up SimplyDMX
 		async_main(&manager, file).await;

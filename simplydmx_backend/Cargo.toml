@@ -8,13 +8,10 @@ edition = "2021"
 [dependencies]
 serde = "1.0.136"
 serde_json = "1.0.74"
-simplydmx_plugin_framework = { path = "../simplydmx_plugin_framework" }
 sacn = { path = "../sacn" }
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 async-trait = "0.1.57"
 ciborium = "0.2.0"
-tsify = { version = "0.4.2", default-features = false, optional = true }
-linkme = { version = "0.3.5", optional = true }
 anyhow = "1.0.68"
 thiserror = "1.0.38"
 rustc-hash = "1.1.0"
@@ -22,37 +19,8 @@ tokio = { version = "1.28.1", features = ["full"] }
 enttecopendmx = { path = "../enttecopendmx-rs" }
 thread-priority = "0.13.1"
 rayon = "1.8.0"
-bimap = { version = "0.6.3", features = ["serde"] }
 smartstring = { version = "1.0.1", features = ["serde"] }
 log = "0.4.20"
 
 [lib]
 path = "src/lib.rs"
-
-[[bin]]
-name = "simplydmx_rpcgen"
-path = "src/main.rs"
-required-features = ["export-services"]
-
-[features]
-default = ["default-plugins"]
-
-# This is meant to be run stand-alone, similar to tests. It generates the rpc.ts file that the frontend runs on
-# Plugins should be specified manually. For example, to use the default plugin set, use `-F export-services,default-plugins`.
-export-services = ["linkme", "tsify", "simplydmx_plugin_framework/tsify", "stderr-logging"]
-
-default-plugins = [
-	"output-dmx",
-	"output-dmx-e131",
-	"output-dmx-enttecopendmx",
-]
-
-# Optional plugins
-output-dmx = []
-output-dmx-e131 = ["output-dmx"]
-output-dmx-enttecopendmx = ["output-dmx"]
-
-# Debugging utilities
-stderr-logging = []
-blender-benchmark = []
-startup-benchmark = []

@@ -1,10 +1,13 @@
-pub mod api_utilities;
-pub mod init;
-mod mixer_utils;
-mod output_dmx;
-mod output_dmx_enttecopendmx;
+use patcher::fixture_types::FixtureProfile;
+use rustc_hash::FxHashMap;
+use utils::id_alloc::Id;
+use uuid::Uuid;
+
+mod layering;
 mod patcher;
 mod utils;
 
-pub use init::async_main;
-pub use simplydmx_plugin_framework::*;
+pub struct SimplyDmx {
+	fixture_library: FxHashMap<Uuid, FixtureProfile>,
+	layers: FxHashMap<Id, Layer>,
+}

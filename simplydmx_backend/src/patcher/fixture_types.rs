@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use smartstring::{SmartString, LazyCompact};
+use smartstring::{LazyCompact, SmartString};
 use uuid::Uuid;
 
 /// Data type that contains generic, protocol-erased information about a fixture such as name,
@@ -111,13 +111,107 @@ pub struct Channel {
 	pub ch_type: ChannelType,
 }
 
-/// This should be the largest integer type available from `ChannelSize`, and
-/// is used to store values for each channel.
-pub type ChannelValue = u16;
+/// This represents a vector that can scale automatically to different
+/// integer sizes as necessary for the purpose of representing a channel
+/// value.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub enum ChannelValue {
+	L8(u8),
+	L16(u16),
+}
+impl Default for ChannelValue {
+	fn default() -> Self {
+		Self::L8(0)
+	}
+}
+impl Eq for ChannelValue {}
+impl PartialEq for ChannelValue {
+	fn eq(&self, other: &Self) -> bool {
+		matches!(self.cmp(other), std::cmp::Ordering::Equal)
+	}
+}
+impl PartialOrd for ChannelValue {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		return Some(self.cmp(other));
+	}
+}
+impl Ord for ChannelValue {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		match (self, other) {
+			(Self::L8(left), Self::L8(right)) => left.cmp(right),
+			(Self::L8(left), Self::L16(right)) => Into::<u16>::into(*left).cmp(right),
+			(Self::L16(left), Self::L16(right)) => left.cmp(right),
+			(Self::L16(left), Self::L8(right)) => left.cmp(&Into::<u16>::into(*right)),
+		}
+	}
+}
+impl Into<u8> for ChannelValue {
+	fn into(self) -> u8 {
+		match self {
+			Self::L8(value) => value,
+			Self::L16(value) => (value / 257) as u8,
+		}
+	}
+}
+impl Into<u16> for ChannelValue {
+	fn into(self) -> u16 {
+		match self {
+			Self::L8(value) => (value as u16) * 257,
+			Self::L16(value) => value,
+		}
+	}
+}
 
-/// This should be a signed integer large enough to hold both positive and
-/// negative representations of ChannelValue for offsets.
-pub type ChannelOffsetValue = i32;
+/// This represents a vector that can scale automatically to different
+/// integer sizes as necessary for the purpose of representing an offset
+/// from a base value during blending.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub enum ChannelOffsetValue {
+	L8(i16),
+	L16(i32),
+}
+impl Default for ChannelOffsetValue {
+	fn default() -> Self {
+		Self::L8(0)
+	}
+}
+impl Eq for ChannelOffsetValue {}
+impl PartialEq for ChannelOffsetValue {
+	fn eq(&self, other: &Self) -> bool {
+		matches!(self.cmp(other), std::cmp::Ordering::Equal)
+	}
+}
+impl PartialOrd for ChannelOffsetValue {
+	fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+		return Some(self.cmp(other));
+	}
+}
+impl Ord for ChannelOffsetValue {
+	fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+		match (self, other) {
+			(Self::L8(left), Self::L8(right)) => left.cmp(right),
+			(Self::L8(left), Self::L16(right)) => Into::<i32>::into(*left).cmp(right),
+			(Self::L16(left), Self::L16(right)) => left.cmp(right),
+			(Self::L16(left), Self::L8(right)) => left.cmp(&Into::<i32>::into(*right)),
+		}
+	}
+}
+impl Into<i16> for ChannelOffsetValue {
+	fn into(self) -> i16 {
+		match self {
+			Self::L8(value) => value,
+			Self::L16(value) => (value / 257) as i16,
+		}
+	}
+}
+impl Into<i32> for ChannelOffsetValue {
+	fn into(self) -> i32 {
+		match self {
+			Self::L8(value) => (value as i32) * 257,
+			Self::L16(value) => value,
+		}
+	}
+}
 
 /// Dictates the size of the output. Values will be stored as the largest of these options, but bounds
 /// will be enforced by the UI, mixer, and output will be truncated.

@@ -1,3 +1,21 @@
+## NOTE:
+
+A re-imagining of the backend is underway. I came to the realization that this design I came up with
+for a completely tweakable closed-source codebase is no longer necessary now that the source is open,
+and was holding me back from getting something working, as well as preventing the use of most of what
+makes Rust so great. As a result, I've scrapped it all. I'm starting (mostly) from scratch, and pulling
+in functions as I need them, but the architecture is WAY simpler now, and I expect to have a working
+product much sooner.
+
+This new architecture is going to employ a ticking-style event loop that processes commands with a
+deadline and then pushes a frame. Layers are also getting some new limitations in that their signatures
+follow a similar design to a graphics shader, which will allow them to be heavily parallelized, and
+potentially able to make use of GPU hardware down the line. Layers also already have recursion abilities,
+which can be used to make things like presets, which are smaller subsets of values that you may want to
+combine when building a submaster.
+
+Check it out on branch `redesign-2`!
+
 # SimplyDMX
 
 SimplyDMX aims to be a performant, reliable, and simple program for stage lighting that is highly modular

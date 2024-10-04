@@ -14,7 +14,7 @@ potentially able to make use of GPU hardware down the line. Layers also already 
 which can be used to make things like presets, which are smaller subsets of values that you may want to
 combine when building a submaster.
 
-Check it out on branch `redesign-2`!
+Check it out on branch `rearchitect-2`!
 
 # SimplyDMX
 

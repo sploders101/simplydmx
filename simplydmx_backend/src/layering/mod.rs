@@ -1,10 +1,11 @@
-use std::cmp;
-
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+
+#[cfg(test)]
+mod tests;
 
 use crate::{
 	patcher::fixture_types::{
-		BlendingScheme, Channel, ChannelOffsetValue, ChannelType, ChannelValue,
+		BlendingScheme, Channel, ChannelOffsetValue, ChannelType, ChannelValue, SnapData,
 	},
 	utils::{id_alloc::Id, smallmap::SmallMap},
 };
@@ -30,6 +31,7 @@ fn blend_ints(base: ChannelValue, overlay: ChannelValue, opacity: u16) -> Channe
 	return ChannelValue::L16(((overlay - base) as u32 * opacity as u32 / 65535u32) as u16 + base);
 }
 
+/// Blends a single channel using the default algorithm according to the channel info struct.
 pub fn blend(
 	channel_info: &Channel,
 	base: ChannelValue,
@@ -38,13 +40,54 @@ pub fn blend(
 ) -> ChannelValue {
 	match channel_info.ch_type {
 		ChannelType::Segmented {
-			segments,
-			priority,
-			snapping,
-		} => {}
+			snapping: SnapData::SnapAt(fulcrum),
+			priority: BlendingScheme::LTP,
+			..
+		} => {
+			if opacity > fulcrum.into() {
+				value
+			} else {
+				base
+			}
+		}
+		ChannelType::Segmented {
+			snapping: SnapData::SnapAt(fulcrum),
+			priority: BlendingScheme::HTP,
+			..
+		} => {
+			if opacity > fulcrum.into() {
+				ChannelValue::L16(std::cmp::max(Into::<u16>::into(value), base.into()))
+			} else {
+				base
+			}
+		}
 		ChannelType::Linear {
 			priority: BlendingScheme::HTP,
-		} => {}
+		}
+		| ChannelType::Segmented {
+			priority: BlendingScheme::HTP,
+			snapping: SnapData::NoSnap,
+			..
+		} => {
+			let value = Into::<u16>::into(value) as u32;
+			let opacity = opacity as u32;
+			ChannelValue::L16(std::cmp::max(
+				base.into(),
+				(value * opacity / 65535u32) as u16,
+			))
+		}
+		ChannelType::Linear {
+			priority: BlendingScheme::LTP,
+		}
+		| ChannelType::Segmented {
+			priority: BlendingScheme::LTP,
+			snapping: SnapData::NoSnap,
+			..
+		} => {
+			let value = Into::<u16>::into(value) as i64;
+			let base = Into::<u16>::into(base) as i64;
+			ChannelValue::L16(((value - base) * opacity as i64 / 65535i64 + base) as u16)
+		}
 	}
 }
 

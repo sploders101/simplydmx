@@ -87,7 +87,7 @@ pub enum ControlGroupData {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Channel {
 	/// Name of the channel
-	name: SmartString<LazyCompact>,
+	pub name: SmartString<LazyCompact>,
 
 	/// Designates this channel as a virtual intensity channel.
 	///
@@ -227,7 +227,7 @@ pub enum ChannelType {
 	Segmented {
 		segments: Vec<Segment>,
 		priority: BlendingScheme,
-		snapping: Option<SnapData>,
+		snapping: SnapData,
 	},
 	Linear {
 		priority: BlendingScheme,

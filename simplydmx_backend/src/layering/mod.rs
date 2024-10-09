@@ -23,14 +23,6 @@ pub enum UserDefinedValue {
 	Passthrough(Id),
 }
 
-/// Uses `opacity` as a percentage value (0-65535 is 0%-100%) to go from `base` to `overlay`.
-/// Used for LTP blending on a per-channel basis
-fn blend_ints(base: ChannelValue, overlay: ChannelValue, opacity: u16) -> ChannelValue {
-	let base: u16 = base.into();
-	let overlay: u16 = overlay.into();
-	return ChannelValue::L16(((overlay - base) as u32 * opacity as u32 / 65535u32) as u16 + base);
-}
-
 /// Blends a single channel using the default algorithm according to the channel info struct.
 pub fn blend(
 	channel_info: &Channel,

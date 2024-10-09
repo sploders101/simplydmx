@@ -5,9 +5,11 @@ pub mod fixture_types;
 /// Represents a single instance of a fixture
 pub struct DmxFixtureInstance {
 	/// The ID of the fixture profile from the library
-	fixture_profile: Id,
+	pub fixture_profile: Id,
+	/// The "personality" or "mode" that the fixture is set to
+	pub personality: u32,
 	/// The ID of the logical universe the fixture is in
-	universe: Id,
+	pub universe: Id,
 	/// The offset of the fixture within the universe
-	offset: u16,
+	pub offset: u16,
 }

@@ -6,21 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-serde = "1.0.136"
-serde_json = "1.0.74"
-sacn = { path = "../sacn" }
-uuid = { version = "1.0.0", features = ["v4", "serde"] }
-async-trait = "0.1.57"
-ciborium = "0.2.0"
-anyhow = "1.0.68"
-thiserror = "1.0.38"
-rustc-hash = "1.1.0"
-tokio = { version = "1.28.1", features = ["full"] }
-enttecopendmx = { path = "../enttecopendmx-rs" }
-thread-priority = "0.13.1"
-rayon = "1.8.0"
+rayon = "1.10.0"
+rustc-hash = "2.0.0"
+serde = { version = "1.0.210", features = ["derive"] }
 smartstring = { version = "1.0.1", features = ["serde"] }
-log = "0.4.20"
+thiserror = "1.0.64"
+uuid = { version = "1.10.0", features = ["fast-rng", "serde", "v4"] }
 
 [lib]
 path = "src/lib.rs"

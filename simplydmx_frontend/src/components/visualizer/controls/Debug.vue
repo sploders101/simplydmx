@@ -1,9 +1,9 @@
 <script lang="ts" setup>
-	import { VisibleControlGroup } from "../types";
+import { VisibleControlGroup } from '../types'
 
-	const props = defineProps<{
-		group: VisibleControlGroup,
-	}>();
+const props = defineProps<{
+	group: VisibleControlGroup
+}>()
 </script>
 
 <template>
@@ -13,14 +13,14 @@
 </template>
 
 <style lang="scss">
-	.sdmx-fixture-control {
-		background-color: red;
-		border: 2px solid black;
-		min-width: 5rem;
+.sdmx-fixture-control {
+	background-color: red;
+	border: 2px solid black;
+	min-width: 5rem;
 
-		text-align: center;
-		display: flex;
-		flex-flow: column nowrap;
-		justify-content: center;
-	}
+	text-align: center;
+	display: flex;
+	flex-flow: column nowrap;
+	justify-content: center;
+}
 </style>

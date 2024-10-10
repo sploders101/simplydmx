@@ -1,17 +1,17 @@
-import { FilterCriteria } from "./rpc";
+import { FilterCriteria } from './rpc'
 
-export type Listener<T = unknown> = (msg: Event<T>) => void;
+export type Listener<T = unknown> = (msg: Event<T>) => void
 export interface ListenersWithCriteria {
-	none: Set<Listener<any>>,
-	string: Map<string, Set<Listener<any>>>,
-	uuid: Map<string, Set<Listener<any>>>,
+	none: Set<Listener<any>>
+	string: Map<string, Set<Listener<any>>>
+	uuid: Map<string, Set<Listener<any>>>
 }
 
 export class IPCError extends Error {
-	original_err: any;
+	original_err: any
 	constructor(err_value: any) {
-		super("An error occured: " + JSON.stringify(err_value));
-		this.original_err = err_value;
+		super('An error occured: ' + JSON.stringify(err_value))
+		this.original_err = err_value
 	}
 }
 
@@ -24,8 +24,8 @@ export class IPCError extends Error {
  * so it should be relatively easy to keep track of in the meantime.
  */
 export interface Event<T = unknown> {
-	type: "Event",
-	name: string,
-	criteria: FilterCriteria,
-	data: T, // serde_json::Value,
+	type: 'Event'
+	name: string
+	criteria: FilterCriteria
+	data: T // serde_json::Value,
 }

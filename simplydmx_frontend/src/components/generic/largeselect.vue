@@ -1,51 +1,56 @@
 <script lang="ts">
-	export interface SelectOption {
-		name: string,
-		value: any,
-	}
-	export interface SelectEvent {
-		value: any,
-		event: MouseEvent,
-	}
+export interface SelectOption {
+	name: string
+	value: any
+}
+export interface SelectEvent {
+	value: any
+	event: MouseEvent
+}
 </script>
 
 <script lang="ts" setup>
-	import { ref, computed, type PropType, watch } from "vue";
+import { ref, computed, type PropType, watch } from 'vue'
 
-	const props = defineProps({
-		options: {
-			type: Array as PropType<SelectOption[]>,
-			required: true,
-		},
-		modelValue: {},
-		enableSearch: {
-			type: Boolean,
-			required: false,
-		},
-	});
+const props = defineProps({
+	options: {
+		type: Array as PropType<SelectOption[]>,
+		required: true
+	},
+	modelValue: {},
+	enableSearch: {
+		type: Boolean,
+		required: false
+	}
+})
 
-	const emit = defineEmits<{
-		(e: "update:modelValue", value: any): void,
-		(e: "select", event: SelectEvent): void,
-	}>();
+const emit = defineEmits<{
+	(e: 'update:modelValue', value: any): void
+	(e: 'select', event: SelectEvent): void
+}>()
 
-	watch(() => props.options, () => {
+watch(
+	() => props.options,
+	() => {
 		// If the currently-selected option is not in the new list, deselect.
 		if (!props.options.find((item) => item.value === props.modelValue)) {
-			emit("update:modelValue", null);
+			emit('update:modelValue', null)
 		}
-	})
-
-	const search = ref("");
-	const filteredOptions = computed(() => {
-		if (!props.enableSearch) return props.options;
-		return props.options.filter(({ name: label }) => label.toLowerCase().includes(search.value.toLowerCase()));
-	});
-	
-	function dispatchSelect(value: any, event: MouseEvent) {
-		emit("update:modelValue", value);
-		emit("select", { value, event });
 	}
+)
+
+const search = ref('')
+const filteredOptions = computed(() => {
+	if (!props.enableSearch) return props.options
+	return props.options.filter(({ name: label }) =>
+		label.toLowerCase().includes(search.value.toLowerCase())
+	)
+})
+
+function dispatchSelect(value: any, event: MouseEvent) {
+	emit('update:modelValue', value)
+	emit('select', { value, event })
+}
 </script>
 
 <template>
@@ -56,7 +61,7 @@
 				v-model="search"
 				hint="Search"
 				class="largeselect-search"
-				/>
+			/>
 			<slot name="header-right" />
 		</div>
 		<div class="options-container">
@@ -65,7 +70,7 @@
 				class="largeselect-option"
 				:class="{ active: option.value === props.modelValue }"
 				@click="dispatchSelect(option.value, $event)"
-				>
+			>
 				<slot name="option" :option="option">
 					{{ option.name }}
 				</slot>
@@ -75,54 +80,54 @@
 </template>
 
 <style lang="scss">
-	.sdmx-largeselect {
+.sdmx-largeselect {
+	display: flex;
+	flex-flow: column nowrap;
+	justify-content: flex-start;
+	align-items: stretch;
+	background: var(--largeselect-background);
+	overflow: auto;
+
+	& > .largeselect-header {
 		display: flex;
-		flex-flow: column nowrap;
-		justify-content: flex-start;
-		align-items: stretch;
-		background: var(--largeselect-background);
-		overflow: auto;
-		
-		& > .largeselect-header {
-			display: flex;
-			flex-flow: row nowrap;
-			justify-content: center;
-			align-items: center;
-			gap: 0.75rem;
+		flex-flow: row nowrap;
+		justify-content: center;
+		align-items: center;
+		gap: 0.75rem;
 
-			& > .largeselect-search {
-				flex: 1 1 0;
-				width: 5rem;
-			}
-		}
-
-		& > .options-container {
+		& > .largeselect-search {
 			flex: 1 1 0;
-			display: flex;
-			flex-flow: column nowrap;
-			overflow: auto;
-
-			& > .largeselect-option {
-				height: 3rem;
-				flex: 0 0 auto;
-				cursor: pointer;
-				user-select: none;
-				-webkit-user-select: none;
-
-				&.active {
-					background: var(--largeselect-focused-background);
-				}
-				&:hover:not(.active) {
-					background: var(--largeselect-hover-background);
-				}
-
-				display: flex;
-				flex-flow: row nowrap;
-				align-items: center;
-				padding: 0.5rem;
-
-				font-size: 1.125rem;
-			}
+			width: 5rem;
 		}
 	}
+
+	& > .options-container {
+		flex: 1 1 0;
+		display: flex;
+		flex-flow: column nowrap;
+		overflow: auto;
+
+		& > .largeselect-option {
+			height: 3rem;
+			flex: 0 0 auto;
+			cursor: pointer;
+			user-select: none;
+			-webkit-user-select: none;
+
+			&.active {
+				background: var(--largeselect-focused-background);
+			}
+			&:hover:not(.active) {
+				background: var(--largeselect-hover-background);
+			}
+
+			display: flex;
+			flex-flow: row nowrap;
+			align-items: center;
+			padding: 0.5rem;
+
+			font-size: 1.125rem;
+		}
+	}
+}
 </style>

@@ -4,7 +4,7 @@ $foreground-color: rgb(255, 255, 255, 0.9);
 $accent-color: rgb(0, 154, 3);
 
 .app > .content {
-	background: #101010E0;
+	background: #101010e0;
 }
 
 :root {
@@ -12,11 +12,11 @@ $accent-color: rgb(0, 154, 3);
 	--background-color: #00000050;
 	--sidebar-color: #00000020;
 	--accent-color: rgb(0, 154, 3);
-	--text-color: #FFFFFF;
+	--text-color: #ffffff;
 	--input-background: rgba(30, 30, 30, 0.5);
 	--option-hover: #575757;
-	--label-color: #AAA;
-	--header-color: #FFF;
+	--label-color: #aaa;
+	--header-color: #fff;
 	--additive-surface-shading: #00000033;
 	--error-color: #ed3422;
 	--error-shadow: 0 0 1rem 0 #801c12, inset 0 0 5px 5px rgba(0, 0, 0, 0.25);
@@ -57,7 +57,7 @@ $accent-color: rgb(0, 154, 3);
 	// Dialog
 	--dialog-modal-background: rgba(0, 0, 0, 0.25);
 	--dialog-modal-filter: blur(3px);
-	--dialog-background: #242424EE;
+	--dialog-background: #242424ee;
 	--dialog-border-color: var(--unfocused-border-color);
 	--dialog-box-shadow: 0 0 1rem 0 black;
 
@@ -67,12 +67,12 @@ $accent-color: rgb(0, 154, 3);
 	--tab-bg-hovered: rgba(100, 100, 100, 0.125);
 
 	// LargeSelect
-	--largeselect-background: #212121FF;
+	--largeselect-background: #212121ff;
 	--largeselect-focused-background: rgba(0, 154, 3, 0.25);
-	--largeselect-hover-background: #3E3E3E;
+	--largeselect-hover-background: #3e3e3e;
 
 	// Visualizer
-	--visualizer-control-panel-background: #212121AA;
+	--visualizer-control-panel-background: #212121aa;
 
 	overflow: hidden;
 }
